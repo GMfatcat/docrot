@@ -162,25 +162,13 @@ func (x *extractor) links() {
 			}
 		}
 		if frag != "" && (file == "" || strings.HasSuffix(strings.ToLower(file), ".md")) {
-			if strings.HasPrefix(frag, "L") && isDigits(frag[1:]) {
-				continue // #L12 line anchors
+			if reAnchorLine.MatchString(strings.ToLower(frag)) {
+				continue // #L12 / #L10-L20 line anchors
 			}
 			r := x.anchorRef(file, frag, model.High)
 			x.emit(*r, l.Line, l.Col, l.Section, "")
 		}
 	}
-}
-
-func isDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func (x *extractor) fences() {
@@ -201,7 +189,7 @@ func (x *extractor) fences() {
 				if x.ignored(ln) {
 					continue
 				}
-				for _, r := range x.shellRefs(line) {
+				for _, r := range x.shellRefs(line, plainLangs[lang]) {
 					x.emit(r, ln, 0, section, lang)
 				}
 			}

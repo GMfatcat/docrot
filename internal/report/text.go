@@ -35,9 +35,13 @@ func WriteText(w io.Writer, r *Report, o Options) error {
 	bw := bufio.NewWriter(w)
 	c := palette(o.Color)
 
-	shown := 0
+	shown, hiddenInfo := 0, 0
 	for _, f := range sorted(r) {
 		if f.Baselined && !o.ShowBaselined {
+			continue
+		}
+		if f.Severity == model.SevInfo && !o.ShowInfo {
+			hiddenInfo++
 			continue
 		}
 		fmt.Fprintln(bw, textLine(f, o, c))
@@ -46,7 +50,11 @@ func WriteText(w io.Writer, r *Report, o Options) error {
 	if shown > 0 {
 		fmt.Fprintln(bw)
 	}
-	fmt.Fprintln(bw, SummaryLine(r.Summary))
+	line := SummaryLine(r.Summary)
+	if hiddenInfo > 0 {
+		line += c.dim(fmt.Sprintf(" [%d info hidden; --info to show]", hiddenInfo))
+	}
+	fmt.Fprintln(bw, line)
 	if extra := extraLine(r.Summary.Extra); extra != "" {
 		fmt.Fprintln(bw, extra)
 	}

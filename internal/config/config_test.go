@@ -20,10 +20,10 @@ func TestDefaultIsValid(t *testing.T) {
 		want any
 	}{
 		{"docs", d.Docs, []string{"**/*.md", "llms.txt"}},
-		{"exclude", d.Exclude, []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**"}},
+		{"exclude", d.Exclude, []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"}},
 		{"ignore", d.Ignore, []string{}},
 		{"pairs", d.Pairs, []Pair{}},
-		{"stale", d.Stale, Stale{Enabled: true, MinChurn: 3, MinDays: 90}},
+		{"stale", d.Stale, Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"}}},
 		{"coverage", d.Coverage, Coverage{Report: false, IncludeInternal: false}},
 		{"net", d.Net, false},
 		{"failOn", d.FailOn, "error"},
@@ -115,9 +115,8 @@ func TestParseOverlay(t *testing.T) {
 			name: "nested object merges field by field",
 			json: `{"stale": {"minChurn": 7}}`,
 			check: func(t *testing.T, c Config) {
-				want := Stale{Enabled: true, MinChurn: 7, MinDays: 90}
-				if c.Stale != want {
-					t.Errorf("Stale = %+v, want %+v", c.Stale, want)
+				if !c.Stale.Enabled || c.Stale.MinChurn != 7 || c.Stale.MinDays != 90 || len(c.Stale.Exclude) == 0 {
+					t.Errorf("Stale = %+v, want enabled/7/90 with default exclude", c.Stale)
 				}
 			},
 		},

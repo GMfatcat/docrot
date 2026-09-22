@@ -25,7 +25,12 @@ func (f *fakeIndex) DirExists(rel string) bool  { return f.dirs[rel] }
 func (f *fakeIndex) Glob(p string) []string {
 	var out []string
 	for x := range f.files {
-		if strings.HasPrefix(x, strings.TrimSuffix(p, "*")) {
+		switch {
+		case strings.HasPrefix(p, "**/*"):
+			if strings.HasSuffix(x, strings.TrimPrefix(p, "**/*")) {
+				out = append(out, x)
+			}
+		case strings.HasPrefix(x, strings.TrimSuffix(p, "*")):
 			out = append(out, x)
 		}
 	}
@@ -74,6 +79,14 @@ func (f *fakeIndex) SimilarGoSymbols(q string, n int) []string {
 	return out
 }
 func (f *fakeIndex) IsGoType(n string) bool { return f.types[n] }
+func (f *fakeIndex) HasGoMember(n string) bool {
+	for q := range f.symbols {
+		if i := strings.LastIndex(q, "."); i >= 0 && q[i+1:] == n && strings.Count(q, ".") >= 1 && f.types[q[:i][strings.LastIndex(q[:i], ".")+1:]] {
+			return true
+		}
+	}
+	return false
+}
 func (f *fakeIndex) HasFlag(n string) bool {
 	for _, x := range f.flags {
 		if x == n {
@@ -131,10 +144,10 @@ func (f *fakeIndex) ConfigKeys() []string { return f.cfgKeys }
 
 func newFake() *fakeIndex {
 	return &fakeIndex{
-		files:    map[string]bool{"README.md": true, "docs/guide.md": true, "pkg/httpx/server.go": true, "scripts/verify.ps1": true, "cmd/app/main.go": true},
+		files:    map[string]bool{"README.md": true, "docs/guide.md": true, "pkg/httpx/server.go": true, "scripts/verify.ps1": true, "cmd/app/main.go": true, "pkg/httpx/server_test.go": true},
 		dirs:     map[string]bool{"docs": true, "pkg": true, "pkg/httpx": true, "cmd": true, "cmd/app": true, "scripts": true},
 		module:   "example.com/fixture",
-		pkgs:     map[string]bool{"httpx": true, "main": true},
+		pkgs:     map[string]bool{"httpx": true, "main": true, "cfg": true},
 		types:    map[string]bool{"Server": true},
 		symbols:  map[string]string{"httpx.NewServer": "pkg/httpx/server.go", "httpx.WriteData": "pkg/httpx/server.go", "Server.Addr": "pkg/httpx/server.go", "httpx.Server.Addr": "pkg/httpx/server.go", "NewServer": "pkg/httpx/server.go"},
 		flags:    []string{"addr", "config", "verbose"},
@@ -146,6 +159,12 @@ func newFake() *fakeIndex {
 
 func ref(kind model.Kind, norm string, conf model.Confidence, file string) model.Reference {
 	return model.Reference{Kind: kind, Text: norm, Norm: norm, Confidence: conf, Loc: model.Location{File: file, Line: 1}}
+}
+
+func envRef(name, context string) model.Reference {
+	r := ref(model.KindEnv, name, model.High, "README.md")
+	r.Context = context
+	return r
 }
 
 func TestResolvePolicy(t *testing.T) {
@@ -166,6 +185,13 @@ func TestResolvePolicy(t *testing.T) {
 		{"path missing high", ref(model.KindPath, "pkg/httpx/router.go", model.High, "README.md"), false, false, model.RuleMissingPath, model.SevError, "", ""},
 		{"path missing suggests same basename", ref(model.KindPath, "docs/main.go", model.High, "README.md"), false, false, model.RuleMissingPath, model.SevError, "cmd/app/main.go", ""},
 		{"bare filename nowhere is info", ref(model.KindPath, "nothing.go", model.Medium, "README.md"), false, false, model.RuleMissingPath, model.SevInfo, "", ""},
+		{"bare filename elsewhere is info with suggestion", ref(model.KindPath, "main.go", model.Medium, "README.md"), false, false, model.RuleMissingPath, model.SevInfo, "cmd/app/main.go", ""},
+		{"bare glob matches anywhere", ref(model.KindPath, "*_test.go", model.Medium, "README.md"), true, false, "", "", "", ""},
+		{"gosym receiver collides with package", ref(model.KindGoSymbol, "cfg.Addr", model.High, "README.md"), false, false, model.RuleMissingSymbol, model.SevInfo, "", ""},
+		{"gosym real miss in long package stays error", ref(model.KindGoSymbol, "httpx.Addr", model.High, "README.md"), false, false, model.RuleMissingSymbol, model.SevError, "", ""},
+		{"gosym bare call medium is info", ref(model.KindGoSymbol, "Shutdown", model.Medium, "README.md"), false, false, model.RuleMissingSymbol, model.SevInfo, "", ""},
+		{"gosym snake key falls to config", ref(model.KindGoSymbol, "httpx.max_conns", model.High, "README.md"), false, true, "", "", "", ""},
+		{"import module root", ref(model.KindImport, "example.com/fixture", model.High, "README.md"), true, false, "", "", "", ""},
 		{"renamed", ref(model.KindPath, "old/name.go", model.High, "README.md"), false, false, model.RuleMissingPath, model.SevError, "pkg/httpx/server.go", ""},
 		{"glob ok", ref(model.KindPath, "pkg/httpx/*", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"command missing", ref(model.KindCommand, "scripts/build.ps1", model.High, "README.md"), false, false, model.RuleMissingCommand, model.SevError, "", ""},
@@ -180,10 +206,12 @@ func TestResolvePolicy(t *testing.T) {
 		{"flag medium is info", ref(model.KindFlag, "port", model.Medium, "README.md"), false, false, model.RuleUnknownFlag, model.SevInfo, "", ""},
 		{"flag low skipped", ref(model.KindFlag, "race", model.Low, "README.md"), false, true, "", "", "", ""},
 		{"env ok", ref(model.KindEnv, "FIXTURE_DEBUG", model.High, "README.md"), true, false, "", "", "", ""},
-		{"env unknown warning", ref(model.KindEnv, "FIXTURE_TRACE", model.High, "README.md"), false, false, model.RuleUnknownEnv, model.SevWarning, "", ""},
+		{"env unknown warning", envRef("FIXTURE_TRACE", "set the FIXTURE_TRACE env var"), false, false, model.RuleUnknownEnv, model.SevWarning, "", ""},
+		{"env without env context skipped", envRef("OUT_OF_RANGE", "error code OUT_OF_RANGE is returned"), false, true, "", "", "", ""},
 		{"env external skipped", ref(model.KindEnv, "GIT_AUTHOR_DATE", model.High, "README.md"), false, true, "", "", "", ""},
 		{"configkey ok", ref(model.KindConfigKey, "server.addr", model.Low, "README.md"), true, false, "", "", "", ""},
 		{"configkey missing info", ref(model.KindConfigKey, "server.port", model.Low, "README.md"), false, false, model.RuleUnknownConfigKey, model.SevInfo, "", ""},
+		{"configkey unknown section skipped", ref(model.KindConfigKey, "rec.status", model.Low, "README.md"), false, true, "", "", "", ""},
 		{"configkey domain skipped", ref(model.KindConfigKey, "example.com", model.Low, "README.md"), false, true, "", "", "", ""},
 		{"anchor ok", ref(model.KindAnchor, "docs/guide.md#setup", model.High, "README.md"), true, false, "", "", "", "docs/guide.md"},
 		{"anchor same doc", ref(model.KindAnchor, "#usage", model.High, "README.md"), true, false, "", "", "", "README.md"},

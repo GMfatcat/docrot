@@ -324,7 +324,7 @@ func message(name string, edited time.Time, changed []fileStat) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		fmt.Fprintf(&b, "%s changed %d× (latest %s)", s.file, s.commits, s.latest.UTC().Format(dateLayout))
+		fmt.Fprintf(&b, "%s: %d commits (latest %s)", s.file, s.commits, s.latest.UTC().Format(dateLayout))
 	}
 	return b.String()
 }

@@ -143,6 +143,11 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 			if m := r.ix.Glob(c); len(m) > 0 {
 				return Result{OK: true, File: path.Dir(c)}
 			}
+			if !strings.Contains(c, "/") {
+				if m := r.ix.Glob("**/" + c); len(m) > 0 {
+					return Result{OK: true}
+				}
+			}
 			continue
 		}
 		if r.ix.FileExists(c) || r.ix.DirExists(c) || r.existsOnDisk(c) {
@@ -175,12 +180,22 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		if len(cands) > 3 {
 			cands = cands[:3]
 		}
-		// A bare file name that exists nowhere is more likely prose than a claim.
-		if !strings.Contains(ref.Norm, "/") && len(cands) == 0 && sev.Rank() > model.SevInfo.Rank() {
+		// A bare file name ("main.go", "config.json") is a weak claim: it
+		// usually means "the main.go of whatever we are talking about".
+		if !strings.Contains(ref.Norm, "/") && sev.Rank() > model.SevInfo.Rank() {
 			sev = model.SevInfo
 		}
 	}
 	return Result{Finding: r.finding(rule, sev, ref, msg, cands)}
+}
+
+// maxDist is the edit-distance budget for did-you-mean suggestions: one
+// edit for short names, two for longer ones.
+func maxDist(s string) int {
+	if len(s) < 8 {
+		return 1
+	}
+	return 2
 }
 
 func appendUnique(list []string, s string) []string {
@@ -204,14 +219,29 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 		return Result{OK: true, File: f}
 	}
 	parts := strings.Split(q, ".")
-	first := parts[0]
+	first, last := parts[0], parts[len(parts)-1]
 	sev := model.SeverityFor(ref.Confidence)
 	var msg string
 	switch {
 	case len(parts) == 1:
 		msg = "function or type `" + ref.Text + "` not found in any package"
+		if ref.Confidence < model.High {
+			sev = model.SevInfo // a bare call is usually a method or a local helper
+		}
 	case r.ix.IsGoPackage(first):
+		if strings.ToLower(last) == last && (len(parts) > 1 && (strings.Contains(last, "_") || r.ix.HasJSONKey(q) || r.ix.HasConfigKey(q))) {
+			// kernel.max_concurrent: a config key that happens to start with a package name
+			if r.ix.HasJSONKey(q) || r.ix.HasConfigKey(q) {
+				return Result{OK: true}
+			}
+			return r.resolveConfigKey(model.Reference{Kind: model.KindConfigKey, Text: ref.Text, Norm: q, Confidence: model.Low, Loc: ref.Loc, Section: ref.Section, Context: ref.Context})
+		}
 		msg = "`" + q + "` not found in package " + first
+		if len(parts) == 2 && r.ix.HasGoMember(last) && isReceiverish(first) {
+			// `cfg.Addr` where cfg is both a package and a common variable name
+			msg += " (if `" + first + "` is a variable, its type may have `" + last + "`)"
+			sev = model.SevInfo
+		}
 	case r.ix.IsGoType(first):
 		msg = "`" + q + "` not found on type " + first
 	default:
@@ -224,6 +254,19 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	}
 	cands := r.ix.SimilarGoSymbols(q, 3)
 	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, cands)}
+}
+
+// isReceiverish reports whether name looks like a short variable that
+// commonly collides with a package name (cfg, log, config, app, ...).
+func isReceiverish(name string) bool {
+	if len(name) <= 4 {
+		return true
+	}
+	switch name {
+	case "config", "logger", "client", "server", "store", "router", "handler", "worker", "service", "runner", "engine", "index", "opts", "options", "flags", "state", "cache", "queue", "pool", "conn", "resp", "req":
+		return true
+	}
+	return false
 }
 
 // --- Odin / Python ---------------------------------------------------------
@@ -285,7 +328,7 @@ func (r *Resolver) resolveFlag(ref model.Reference) Result {
 		pool = append(pool, strings.ToLower(strings.ReplaceAll(f, "_", "-")))
 	}
 	var cands []string
-	for _, c := range fuzzy.Rank(ref.Norm, pool, 3, 0) {
+	for _, c := range fuzzy.Rank(ref.Norm, pool, 3, maxDist(ref.Norm)) {
 		cands = append(cands, "--"+c.Text)
 	}
 	msg := "flag `" + ref.Text + "` is not defined by any flag.* call"
@@ -304,6 +347,19 @@ var externalEnvPrefixes = []string{
 	"MINGW", "CI", "BUILD_", "RUNNER_", "JOB_", "ACTIONS_", "ODIN_", "RUST", "CARGO_",
 }
 
+// envContext reports whether the line around a reference talks about
+// environment variables at all; UPPER_SNAKE names are also error codes,
+// constants and date layouts.
+func envContext(line string) bool {
+	l := strings.ToLower(line)
+	for _, kw := range []string{"env", "export ", "environment", "環境", "变量", "變數", "$", "set ", "setx "} {
+		if strings.Contains(l, kw) {
+			return true
+		}
+	}
+	return false
+}
+
 func isExternalEnv(name string) bool {
 	for _, p := range externalEnvPrefixes {
 		if strings.HasPrefix(name, p) {
@@ -320,7 +376,7 @@ func (r *Resolver) resolveEnv(ref model.Reference) Result {
 	if r.ix.HasEnv(ref.Norm) {
 		return Result{OK: true}
 	}
-	if len(r.ix.Envs()) == 0 || isExternalEnv(ref.Norm) {
+	if len(r.ix.Envs()) == 0 || isExternalEnv(ref.Norm) || !envContext(ref.Context) {
 		return Result{Skipped: true}
 	}
 	sev := model.SevWarning
@@ -328,7 +384,7 @@ func (r *Resolver) resolveEnv(ref model.Reference) Result {
 		sev = model.SevInfo
 	}
 	var cands []string
-	for _, c := range fuzzy.Rank(ref.Norm, r.ix.Envs(), 3, 0) {
+	for _, c := range fuzzy.Rank(ref.Norm, r.ix.Envs(), 3, maxDist(ref.Norm)) {
 		cands = append(cands, c.Text)
 	}
 	msg := "environment variable `" + ref.Text + "` is never read by the code"
@@ -372,9 +428,15 @@ func (r *Resolver) resolveConfigKey(ref model.Reference) Result {
 	if r.ix.HasJSONKey(ref.Norm) || r.ix.HasConfigKey(ref.Norm) {
 		return Result{OK: true}
 	}
+	// only report when the top-level segment is a real config section;
+	// otherwise "rec.status" is just a variable in prose
+	top, _, _ := strings.Cut(ref.Norm, ".")
+	if !r.ix.HasJSONKey(top) && !r.ix.HasConfigKey(top) {
+		return Result{Skipped: true}
+	}
 	pool := append(append([]string{}, r.ix.JSONKeys()...), r.ix.ConfigKeys()...)
 	var cands []string
-	for _, c := range fuzzy.Rank(ref.Norm, pool, 3, 0) {
+	for _, c := range fuzzy.Rank(ref.Norm, pool, 3, maxDist(ref.Norm)) {
 		cands = append(cands, c.Text)
 	}
 	msg := "config key `" + ref.Text + "` not found in any config struct tag or sample file"
@@ -398,7 +460,7 @@ func (r *Resolver) resolveAnchor(ref model.Reference) Result {
 		return Result{OK: true, File: target}
 	}
 	var cands []string
-	for _, c := range fuzzy.Rank(slug, r.ix.Anchors(target), 3, 0) {
+	for _, c := range fuzzy.Rank(slug, r.ix.Anchors(target), 3, maxDist(slug)) {
 		cands = append(cands, "#"+c.Text)
 	}
 	msg := "no heading `#" + slug + "` in " + target
@@ -420,10 +482,7 @@ func (r *Resolver) resolveImport(ref model.Reference) Result {
 		return Result{OK: true, File: d}
 	}
 	dir := strings.TrimPrefix(strings.TrimPrefix(ip, mp), "/")
-	if dir == "" {
-		dir = "."
-	}
-	if r.ix.DirExists(dir) {
+	if dir == "" || r.ix.DirExists(dir) {
 		return Result{OK: true, File: dir}
 	}
 	var cands []string

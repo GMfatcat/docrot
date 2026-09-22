@@ -70,6 +70,7 @@ type Index struct {
 	syms     map[string]symbol // every lookup form from non-test files
 	testSyms map[string]symbol // the same forms, from _test.go files
 	types    map[string]bool   // bare names of declared types
+	members  map[string]bool   // names of fields/methods of any type
 
 	entries []entry // counted declarations, in file order (fuzzy candidates)
 
@@ -104,6 +105,7 @@ func Build(root string, opts Options) (*Index, []error) {
 		syms:      map[string]symbol{},
 		testSyms:  map[string]symbol{},
 		types:     map[string]bool{},
+		members:   map[string]bool{},
 		flags:     map[string]bool{},
 		envs:      map[string]bool{},
 		jsonKeys:  map[string]bool{},
@@ -150,6 +152,9 @@ func Build(root string, opts Options) (*Index, []error) {
 		}
 		for _, e := range r.entries {
 			ix.addEntry(target, e)
+			if e.owner != "" {
+				ix.members[e.name] = true
+			}
 			if counted {
 				ix.entries = append(ix.entries, e)
 				quals[e.qual()] = true
@@ -337,6 +342,11 @@ func (ix *Index) SymbolFile(qualified string) (string, int, bool) {
 
 // IsType reports whether name is declared as a type in any package.
 func (ix *Index) IsType(name string) bool { return ix.types[normalizeSymbol(name)] }
+
+// HasMember reports whether any type in the module has a field or method
+// with this name. Used to recognise `cfg.Addr`-style receiver expressions
+// that collide with a package name.
+func (ix *Index) HasMember(name string) bool { return ix.members[normalizeSymbol(name)] }
 
 // HasFlag reports whether a command line flag with this name is defined.
 // Leading dashes are ignored.

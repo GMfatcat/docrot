@@ -83,6 +83,7 @@ type Report struct {
 // Options tune a writer.
 type Options struct {
 	ShowBaselined bool   // text/HTML: also show findings frozen by the baseline
+	ShowInfo      bool   // text: also list info-level findings (always counted)
 	Color         bool   // text: emit ANSI colour
 	Root          string // repository root, used to relativise paths
 }

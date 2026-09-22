@@ -35,8 +35,9 @@ s := httpx.NewServer(":8080")
 
 ## Configuration
 
-Flags: `--addr`, `--config`, `--confg`, `--port`. Environment: `FIXTURE_DEBUG`,
-`FIXTURE_TRACE`. Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
+Flags: `--addr`, `--config`, `--confg`, `--port`.
+Environment variables: `FIXTURE_DEBUG`, `FIXTURE_TRACE`.
+Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
 
 <!-- docrot:ignore -->
 Ignored line mentions `docs/nonexistent.md` and `--nope`.

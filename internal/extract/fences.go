@@ -34,8 +34,13 @@ var outputSinks = map[string]bool{
 	"--config": true, "-config": true, "--baseline": true, "-baseline": true,
 }
 
+// plainLangs are block languages where only prompt-prefixed lines ("$ cmd")
+// are commands; the rest is arbitrary text.
+var plainLangs = map[string]bool{"": true, "text": true, "txt": true, "plaintext": true, "console": true, "terminal": true, "output": true}
+
 // shellRefs extracts command/path references from one line of a shell block.
-func (x *extractor) shellRefs(line string) []model.Reference {
+// When promptOnly is set, lines without a shell prompt are ignored.
+func (x *extractor) shellRefs(line string, promptOnly bool) []model.Reference {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "REM ") {
 		return nil
@@ -43,10 +48,16 @@ func (x *extractor) shellRefs(line string) []model.Reference {
 	if strings.HasPrefix(line, "Write-Host") || strings.HasPrefix(line, "echo ") {
 		return nil
 	}
+	hadPrompt := false
 	if m := rePrompt.FindString(line); m != "" {
 		line = line[len(m):]
+		hadPrompt = true
 	} else if strings.HasPrefix(line, "$ ") || strings.HasPrefix(line, "> ") {
 		line = line[2:]
+		hadPrompt = true
+	}
+	if promptOnly && !hadPrompt {
+		return nil
 	}
 	var out []model.Reference
 	for _, seg := range splitSegments(line) {
@@ -111,7 +122,7 @@ func (x *extractor) shellRefs(line string) []model.Reference {
 		// any other ./x argument, unless it names an output
 		for i := 1; i < len(toks); i++ {
 			t := toks[i]
-			if outputSinks[toks[i-1]] || strings.HasPrefix(t, "-") || !isExplicitPath(t) {
+			if outputSinks[toks[i-1]] || !isDotPath(t) {
 				continue
 			}
 			if i == 1 && (cmd == "cd" || interpreters[cmd] || cmd == "odin") {
@@ -136,6 +147,11 @@ func isIdent(s string) bool {
 		}
 	}
 	return true
+}
+
+// isDotPath reports whether a token starts with ./, ../ or .\ .
+func isDotPath(t string) bool {
+	return strings.HasPrefix(t, "./") || strings.HasPrefix(t, "../") || strings.HasPrefix(t, `.\`)
 }
 
 // isExplicitPath reports whether a shell token is written as a path

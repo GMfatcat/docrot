@@ -198,7 +198,9 @@ func Check(opts Options) (*Run, error) {
 			case res.Finding != nil:
 				r.findings = append(r.findings, *res.Finding)
 			case res.OK:
-				if res.File != "" {
+				// only file-level references feed the staleness analysis; a
+				// directory reference ("servicex/") churns by definition
+				if res.File != "" && ix.FileExists(res.File) {
 					r.resolved = append(r.resolved, stale.ResolvedRef{Ref: ref, File: res.File})
 				}
 				mu.Lock()
@@ -225,7 +227,7 @@ func Check(opts Options) (*Run, error) {
 		staleOut := make([][]model.Finding, len(docs))
 		parallel(len(docs), func(i int) {
 			r := results[i]
-			if len(r.resolved) == 0 || parsed[r.doc] == nil {
+			if len(r.resolved) == 0 || parsed[r.doc] == nil || globx.MatchAny(cfg.Stale.Exclude, r.doc) {
 				return
 			}
 			fs, err := stale.Analyze(run.Git, parsed[r.doc], r.doc, r.resolved, staleOpts)

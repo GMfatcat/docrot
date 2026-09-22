@@ -5,6 +5,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"docrot/internal/model"
 )
@@ -45,7 +46,35 @@ var (
 	reGoImport = regexp.MustCompile(`^\s*(?:import\s+)?(?:[A-Za-z_][A-Za-z0-9_]*\s+)?"([^"]+)"`)
 	reGoSym    = regexp.MustCompile(`(?:^|[^A-Za-z0-9_.])([a-z][A-Za-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)`)
 	reGoTypeM  = regexp.MustCompile(`(?:^|[^A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)`)
+
+	reLineSuffix = regexp.MustCompile(`:\d+(?::\d+)?:?$`)
+	reAnchorLine = regexp.MustCompile(`^l\d+(?:-l\d+)?$`)
+	rePathSym    = regexp.MustCompile(`^((?:[A-Za-z0-9_.-]+/)+)([a-z][A-Za-z0-9_]*)\.([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)$`)
 )
+
+// hasNonASCIIPunct reports whether s contains a non-ASCII rune that is not
+// a letter or digit (full-width brackets, CJK punctuation, dashes…).
+func hasNonASCIIPunct(s string) bool {
+	for _, r := range s {
+		if r > 127 && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// externalCommands are programs whose flags say nothing about this repo.
+var externalCommands = map[string]bool{
+	"go": true, "git": true, "curl": true, "wget": true, "docker": true, "npm": true, "npx": true,
+	"pip": true, "python": true, "python3": true, "make": true, "cargo": true, "odin": true,
+	"gofmt": true, "golangci-lint": true, "gh": true, "kubectl": true, "ssh": true, "tar": true,
+	"zip": true, "pwsh": true, "powershell": true, "node": true, "cmake": true, "gcc": true,
+	"clang": true, "rustc": true, "ls": true, "grep": true, "rg": true, "find": true, "sed": true,
+	"awk": true, "cd": true, "cp": true, "mv": true, "rm": true, "mkdir": true, "cat": true,
+	"sqlite3": true, "psql": true, "openssl": true, "systemctl": true, "journalctl": true,
+	"dotnet": true, "java": true, "mvn": true, "gradle": true, "brew": true, "apt": true,
+	"choco": true, "winget": true, "scoop": true, "ffmpeg": true, "jq": true, "sc": true,
+}
 
 // rejectChars are characters that mark a span as a template, expression or
 // natural language rather than a concrete reference.
@@ -93,6 +122,14 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: strings.TrimSuffix(stripCall(q), ""), Confidence: model.High}
 		}
 		return &model.Reference{Kind: model.KindImport, Text: s, Norm: strings.TrimSuffix(s, "/..."), Confidence: model.High}
+	}
+	// internal/api.Server → symbol Server in package api (dir-qualified)
+	if m := rePathSym.FindStringSubmatch(s); m != nil && !knownExt[strings.ToLower(m[3])] {
+		conf := model.Low
+		if x.hints.IsGoPackage(m[2]) && x.isTopLevelDir(strings.SplitN(m[1], "/", 2)[0]) {
+			conf = model.High
+		}
+		return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: m[2] + "." + m[3], Confidence: conf}
 	}
 	if r := x.pathRef(s, false); r != nil {
 		return r
@@ -161,12 +198,20 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 	if strings.HasPrefix(s, "-") || strings.Contains(s, "://") || strings.ContainsAny(s, "()[]#@") {
 		return nil
 	}
+	if hasNonASCIIPunct(s) {
+		return nil
+	}
 	p := cleanPath(s)
 	if p == "" || p == "." || p == ".." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "~") {
 		return nil
 	}
 	if len(p) > 1 && p[1] == ':' { // Windows drive
 		return nil
+	}
+	// grep-style "file.go:12:" and "file.go:12:3" suffixes
+	p = reLineSuffix.ReplaceAllString(p, "")
+	if strings.Contains(p, ":") {
+		return nil // host:port, URL-ish or PowerShell drive
 	}
 	if strings.HasSuffix(p, "/...") {
 		p = strings.TrimSuffix(p, "/...")
@@ -187,15 +232,16 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 	case hasSlash && (knownExt[ext] || hasGlob || strings.HasSuffix(s, "/")):
 		return x.mkPath(s, p, confCap(model.High, loose))
 	case hasSlash:
-		// a/b with no extension: directory or package path.
+		// a/b with no extension: only a path claim when it is anchored to a
+		// real top-level directory or written explicitly (./a/b). Otherwise
+		// it is prose ("health/ready", "net/http", "feat/x").
 		if isTop {
 			return x.mkPath(s, p, confCap(model.High, loose))
 		}
-		// dotted first segment like largan.local/x is a module path, not ours.
-		if strings.Contains(first, ".") && !knownExt[ext] {
-			return nil
+		if strings.HasPrefix(s, "./") || strings.HasPrefix(s, `.\`) {
+			return x.mkPath(s, p, model.Medium)
 		}
-		return x.mkPath(s, p, model.Medium)
+		return nil
 	case knownExt[ext] && len(segs) == 1 && ext != "":
 		stem := strings.TrimSuffix(p, path.Ext(p))
 		if stem == "" || (ext == "js" && stem[0] >= 'A' && stem[0] <= 'Z') {
@@ -348,7 +394,14 @@ func (x *extractor) classifyTokens(s string) []model.Reference {
 			add(r)
 		}
 	}
+	fields := strings.Fields(s)
+	// flags after an external program describe that program, except for
+	// `go run ./cmd/x --flag`, which runs *our* binary.
+	flagsMeaningful := len(fields) > 0 && (!externalCommands[fields[0]] || (fields[0] == "go" && len(fields) > 1 && fields[1] == "run"))
 	for _, m := range reInFlag.FindAllStringSubmatch(s, -1) {
+		if !flagsMeaningful {
+			break
+		}
 		tok := m[1]
 		if fm := reFlag.FindStringSubmatch(tok); fm != nil {
 			conf := model.Medium

@@ -269,6 +269,13 @@ func (ix *Index) IsGoType(name string) bool {
 	return ix.gos.IsType(name)
 }
 
+func (ix *Index) HasGoMember(name string) bool {
+	if ix.gos == nil {
+		return false
+	}
+	return ix.gos.HasMember(name)
+}
+
 func (ix *Index) HasFlag(name string) bool { return ix.flagSet[normFlag(name)] }
 
 func (ix *Index) Flags() []string {

@@ -284,6 +284,8 @@ type Index interface {
 	// IsGoType reports whether name is a type in any package (used by the
 	// extractor to recognise "Type.Method" forms).
 	IsGoType(name string) bool
+	// HasGoMember reports whether any type has a field or method named name.
+	HasGoMember(name string) bool
 	HasFlag(name string) bool
 	Flags() []string
 	HasEnv(name string) bool

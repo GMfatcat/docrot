@@ -11,7 +11,7 @@ import (
 
 func TestTextLines(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, sampleReport(), Options{}); err != nil {
+	if err := WriteText(&buf, sampleReport(), Options{ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
@@ -42,7 +42,7 @@ func TestTextLines(t *testing.T) {
 
 func TestTextShowBaselined(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, sampleReport(), Options{ShowBaselined: true}); err != nil {
+	if err := WriteText(&buf, sampleReport(), Options{ShowBaselined: true, ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	want := "[baselined] README.md:8:1: warning unknown-flag `--verbose` is not defined"
@@ -53,7 +53,7 @@ func TestTextShowBaselined(t *testing.T) {
 
 func TestTextColor(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, sampleReport(), Options{Color: true}); err != nil {
+	if err := WriteText(&buf, sampleReport(), Options{Color: true, ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	out := buf.String()
@@ -72,7 +72,7 @@ func TestTextColor(t *testing.T) {
 
 func TestTextCoverage(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, sampleReport(), Options{}); err != nil {
+	if err := WriteText(&buf, sampleReport(), Options{ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	for _, want := range []string{
@@ -91,7 +91,7 @@ func TestTextNoCoverageSection(t *testing.T) {
 	r := sampleReport()
 	r.Coverage = nil
 	var buf bytes.Buffer
-	if err := WriteText(&buf, r, Options{}); err != nil {
+	if err := WriteText(&buf, r, Options{ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	if strings.Contains(buf.String(), "Coverage:") {
@@ -151,7 +151,7 @@ func TestSummaryLine(t *testing.T) {
 func TestTextEmptyReport(t *testing.T) {
 	var buf bytes.Buffer
 	r := &Report{Summary: Summary{Git: GitOK}}
-	if err := WriteText(&buf, r, Options{}); err != nil {
+	if err := WriteText(&buf, r, Options{ShowInfo: true}); err != nil {
 		t.Fatalf("WriteText: %v", err)
 	}
 	want := "0 errors, 0 warnings, 0 info — 0 docs, 0 references, 0.00s\n"
@@ -193,5 +193,19 @@ func TestTextLocationFormats(t *testing.T) {
 				t.Errorf("textLine = %q, want prefix %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTextHidesInfoByDefault(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteText(&buf, sampleReport(), Options{}); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if strings.Contains(out, " info pair-lag") {
+		t.Fatal("info finding should be hidden without ShowInfo")
+	}
+	if !strings.Contains(out, "info hidden; --info to show") {
+		t.Fatalf("missing hidden-info note in summary:\n%s", out)
 	}
 }

@@ -83,6 +83,11 @@ func TestClassifyWhole(t *testing.T) {
 		{"internal/store", model.KindPath, "internal/store", model.High},
 		{"main.go", model.KindPath, "main.go", model.Medium},
 		{"a/b", "", "", 0},
+		{"health/ready", "", "", 0},
+		{"net/http", "", "", 0},
+		{"internal/api.Server", model.KindGoSymbol, "api.Server", model.Low},
+		{"httpx/server.go:90:", model.KindPath, "httpx/server.go", model.High},
+		{"localhost:8080/healthz", "", "", 0},
 		{"path/to/file.go", "", "", 0},
 		{"/api/v1/users", "", "", 0},
 		{"C:/Users/x", "", "", 0},
@@ -269,15 +274,15 @@ func TestShellPrompts(t *testing.T) {
 		"user@host:~/repo$ ./scripts/a.ps1 --flag",
 		"./scripts/a.ps1 && go test ./...",
 	} {
-		refs := x.shellRefs(line)
+		refs := x.shellRefs(line, false)
 		if len(refs) == 0 || refs[0].Norm != "scripts/a.ps1" || refs[0].Kind != model.KindCommand {
 			t.Errorf("%q: got %+v", line, refs)
 		}
 	}
-	if refs := x.shellRefs("# ./scripts/comment.ps1"); len(refs) != 0 {
+	if refs := x.shellRefs("# ./scripts/comment.ps1", false); len(refs) != 0 {
 		t.Errorf("comment line: %+v", refs)
 	}
-	if refs := x.shellRefs("go test ./..."); len(refs) != 0 {
+	if refs := x.shellRefs("go test ./...", false); len(refs) != 0 {
 		t.Errorf("./... must not be a reference: %+v", refs)
 	}
 }

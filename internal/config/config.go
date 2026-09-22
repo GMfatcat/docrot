@@ -35,6 +35,9 @@ type Stale struct {
 	Enabled  bool `json:"enabled"`
 	MinChurn int  `json:"minChurn"`
 	MinDays  int  `json:"minDays"`
+	// Exclude are doc globs never analysed for staleness (changelogs,
+	// dated specs and plans are historical records by nature).
+	Exclude []string `json:"exclude"`
 }
 
 // Coverage configures the reverse check: code that no document mentions.
@@ -77,7 +80,7 @@ type Config struct {
 func Default() Config {
 	return Config{
 		Docs:    []string{"**/*.md", "llms.txt"},
-		Exclude: []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**"},
+		Exclude: []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"},
 		Ignore:  []string{},
 		Pairs:   []Pair{},
 		PairPatterns: []string{
@@ -86,7 +89,9 @@ func Default() Config {
 		ConfigSamples: []string{
 			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json",
 		},
-		Stale:    Stale{Enabled: true, MinChurn: 3, MinDays: 90},
+		Stale: Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{
+			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**",
+		}},
 		Coverage: Coverage{Report: false, IncludeInternal: false},
 		Severity: map[string]string{
 			"stale-section": "warning",

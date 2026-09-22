@@ -175,8 +175,9 @@ func (c *common) engineOptions(root string, cfg config.Config, stderr io.Writer)
 func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	c := newCommon("check")
 	var format, output, failOn string
-	var all, quiet, cov bool
+	var all, quiet, cov, info bool
 	c.fs.StringVar(&format, "format", "text", "output format: text|json|sarif|html")
+	c.fs.BoolVar(&info, "info", false, "also list info-level findings in the text report")
 	c.fs.StringVar(&output, "output", "", "write the report to this file instead of stdout")
 	c.fs.StringVar(&failOn, "fail-on", "", "exit 1 when a new finding of this severity or higher exists: error|warning|info|none (default from config, error)")
 	c.fs.BoolVar(&all, "all", false, "also show baselined findings")
@@ -216,7 +217,7 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		defer f.Close()
 		w = f
 	}
-	ropts := report.Options{ShowBaselined: all, Color: output == "" && report.ColorEnabled(stdout), Root: root}
+	ropts := report.Options{ShowBaselined: all, ShowInfo: info || all, Color: output == "" && report.ColorEnabled(stdout), Root: root}
 	if quiet && format == "text" {
 		fmt.Fprintln(w, report.SummaryLine(run.Report.Summary))
 	} else if err := report.Write(format, w, run.Report, ropts); err != nil {
@@ -346,7 +347,7 @@ func cmdPairs(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "no pair findings (%s pairs)\n", orZero(r.Summary.Extra["pairs"]))
 		return exitOK
 	}
-	if err := report.Write(format, stdout, &r, report.Options{Color: report.ColorEnabled(stdout), Root: root}); err != nil {
+	if err := report.Write(format, stdout, &r, report.Options{Color: report.ColorEnabled(stdout), Root: root, ShowInfo: true}); err != nil {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
 		return exitUsage
 	}
