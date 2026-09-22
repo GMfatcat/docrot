@@ -113,6 +113,18 @@ func (x *extractor) shellRefs(line string, promptOnly bool) []model.Reference {
 				}
 				break
 			}
+		case (cmd == "cp" || cmd == "mv" || cmd == "rsync" || cmd == "robocopy" || cmd == "Copy-Item" || cmd == "Move-Item" || cmd == "xcopy") && len(toks) >= 3:
+			// sources must exist; the destination is an output
+			for _, t := range toks[1 : len(toks)-1] {
+				if strings.HasPrefix(t, "-") || !isExplicitPath(t) {
+					continue
+				}
+				if r := x.pathRef(t, false); r != nil {
+					r.Kind, r.Confidence = model.KindCommand, model.Medium
+					out = append(out, *r)
+				}
+			}
+			continue
 		case cmd == "cd" && len(toks) >= 2:
 			if r := x.pathRef(toks[1], false); r != nil {
 				r.Kind, r.Confidence = model.KindCommand, model.Medium

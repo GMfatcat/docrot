@@ -163,6 +163,9 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 	var cands []string
 	if isGlob {
 		msg = "no file matches `" + ref.Text + "`"
+	} else if segs := strings.Split(ref.Norm, "/"); len(segs) >= 2 && r.allTopLevel(segs) {
+		// "errx/logx/timex" is a list of packages, not a path
+		return Result{Skipped: true}
 	} else {
 		msg = "`" + ref.Text + "` not found"
 		if ref.Kind == model.KindCommand {
@@ -180,6 +183,12 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		if len(cands) > 3 {
 			cands = cands[:3]
 		}
+		// The same relative path exists under a sub-tree (a template, an
+		// example): the doc is probably describing that tree.
+		if len(cands) > 0 && strings.HasSuffix(cands[0], "/"+path.Clean(ref.Norm)) && sev == model.SevError {
+			sev = model.SevWarning
+			msg = "`" + ref.Text + "` not found at the repo root (exists under " + strings.TrimSuffix(cands[0], "/"+path.Clean(ref.Norm)) + "/)"
+		}
 		// A bare file name ("main.go", "config.json") is a weak claim: it
 		// usually means "the main.go of whatever we are talking about".
 		if !strings.Contains(ref.Norm, "/") && sev.Rank() > model.SevInfo.Rank() {
@@ -187,6 +196,16 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		}
 	}
 	return Result{Finding: r.finding(rule, sev, ref, msg, cands)}
+}
+
+// allTopLevel reports whether every segment names a top-level directory.
+func (r *Resolver) allTopLevel(segs []string) bool {
+	for _, s := range segs {
+		if !r.ix.DirExists(s) {
+			return false
+		}
+	}
+	return true
 }
 
 // maxDist is the edit-distance budget for did-you-mean suggestions: one
@@ -481,7 +500,7 @@ func (r *Resolver) resolveImport(ref model.Reference) Result {
 	if d, ok := r.ix.GoPackageDir(ip); ok {
 		return Result{OK: true, File: d}
 	}
-	dir := strings.TrimPrefix(strings.TrimPrefix(ip, mp), "/")
+	dir := strings.Trim(strings.TrimPrefix(ip, mp), "/")
 	if dir == "" || r.ix.DirExists(dir) {
 		return Result{OK: true, File: dir}
 	}

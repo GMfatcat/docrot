@@ -31,6 +31,12 @@ var placeholderFirstSegments = map[string]bool{
 	"example": true, "xx": true, "yy": true, "tmp": true, "usr": true, "etc": true,
 	"var": true, "home": true, "mnt": true, "opt": true, "proc": true, "dev": true,
 	"c": true, "d": true, "e": true, "localhost": true, "user": true, "users": true,
+	// runtime and build artifacts
+	"log": true, "logs": true, "out": true, "output": true, "outputs": true, "build": true,
+	"bin": true, "target": true, "obj": true, "dist": true, "cache": true, "data": true,
+	"temp": true, "run": true, "backup": true, "backups": true, "downloads": true,
+	"upload": true, "uploads": true, "coverage": true, "node_modules": true, "vendor": true,
+	"release": true, "releases": true, "artifacts": true, "services": true,
 }
 
 var (
@@ -219,6 +225,9 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 	if strings.Contains(p, "...") || strings.Contains(p, "//") {
 		return nil
 	}
+	if strings.HasSuffix(p, "**") && !strings.HasSuffix(p, "/**") {
+		return nil // "cgo/gcc**" is bold markup gone wrong, not a glob
+	}
 	hasSlash := strings.Contains(p, "/")
 	ext := strings.ToLower(strings.TrimPrefix(path.Ext(p), "."))
 	segs := strings.Split(p, "/")
@@ -229,8 +238,14 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 	}
 	hasGlob := strings.ContainsAny(p, "*?")
 	switch {
-	case hasSlash && (knownExt[ext] || hasGlob || strings.HasSuffix(s, "/")):
+	case hasSlash && (knownExt[ext] || hasGlob):
 		return x.mkPath(s, p, confCap(model.High, loose))
+	case hasSlash && strings.HasSuffix(s, "/"):
+		// "services/aoi-api/" — a directory claim; only high when anchored
+		if isTop {
+			return x.mkPath(s, p, confCap(model.High, loose))
+		}
+		return x.mkPath(s, p, model.Medium)
 	case hasSlash:
 		// a/b with no extension: only a path claim when it is anchored to a
 		// real top-level directory or written explicitly (./a/b). Otherwise

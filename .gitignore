@@ -4,3 +4,4 @@
 /.docrot-report.html
 *.test
 *.out
+reports/

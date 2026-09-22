@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -217,6 +218,9 @@ func Check(opts Options) (*Run, error) {
 		totalRefs += len(r.refs)
 		findings = append(findings, r.findings...)
 	}
+	if run.Git != nil {
+		findings = dropIgnoredPaths(run.Git, findings)
+	}
 
 	// 5. stale sections
 	if run.Git != nil && cfg.Stale.Enabled {
@@ -398,6 +402,51 @@ func Explain(opts Options, doc string) ([]ExplainRow, error) {
 }
 
 // --- helpers ---------------------------------------------------------------
+
+// dropIgnoredPaths removes missing-path/command findings whose path matches
+// a .gitignore rule: "dist/app.exe" not existing is a build artifact, not
+// documentation rot.
+func dropIgnoredPaths(repo *gitx.Repo, findings []model.Finding) []model.Finding {
+	var paths []string
+	cand := func(f model.Finding) []string {
+		if f.Ref == nil || strings.ContainsAny(f.Ref.Norm, "*?") {
+			return nil
+		}
+		norm := path.Clean(f.Ref.Norm)
+		out := []string{norm}
+		if d := path.Dir(f.Loc.File); d != "." {
+			out = append(out, path.Clean(d+"/"+norm))
+		}
+		return out
+	}
+	for _, f := range findings {
+		if f.Rule == model.RuleMissingPath || f.Rule == model.RuleMissingCommand {
+			paths = append(paths, cand(f)...)
+		}
+	}
+	if len(paths) == 0 {
+		return findings
+	}
+	ignored, err := repo.Ignored(paths)
+	if err != nil || len(ignored) == 0 {
+		return findings
+	}
+	kept := findings[:0]
+	for _, f := range findings {
+		drop := false
+		if f.Rule == model.RuleMissingPath || f.Rule == model.RuleMissingCommand {
+			for _, c := range cand(f) {
+				if ignored[c] {
+					drop = true
+				}
+			}
+		}
+		if !drop {
+			kept = append(kept, f)
+		}
+	}
+	return kept
+}
 
 func relDoc(root, doc string) (string, error) {
 	abs := doc
