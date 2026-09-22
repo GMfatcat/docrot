@@ -1,0 +1,6 @@
+/docrot
+/docrot.exe
+/dist/
+/.docrot-report.html
+*.test
+*.out
