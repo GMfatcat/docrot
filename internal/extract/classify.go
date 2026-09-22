@@ -70,6 +70,51 @@ func hasNonASCIIPunct(s string) bool {
 	return false
 }
 
+// placeholderIdents are names documentation uses to mean "any name".
+var placeholderIdents = map[string]bool{
+	"Type": true, "Name": true, "Method": true, "Class": true, "Func": true, "Function": true,
+	"pkg": true, "package": true, "module": true, "method": true, "func": true, "name": true,
+	"field": true, "Field": true, "T": true, "K": true, "V": true, "X": true, "Y": true, "Z": true,
+	"Foo": true, "Bar": true, "Baz": true, "foo": true, "bar": true, "baz": true, "MyType": true,
+	"Example": true, "example": true, "Something": true, "something": true, "Ident": true,
+	"ident": true, "symbol": true, "Symbol": true, "Struct": true, "Iface": true, "Interface": true,
+	"flag": true, "option": true, "x": true, "y": true, "z": true, "xxx": true, "value": true,
+	"UPPER_SNAKE": true, "ENV_VAR": true, "VAR_NAME": true, "FOO_BAR": true, "SOME_VAR": true,
+	"YOUR_VAR": true, "MY_VAR": true, "NAME_HERE": true, "PREFIX_UPPER_SNAKE": true,
+}
+
+// placeholderSegments are path segments that mark an illustrative path.
+var placeholderSegments = map[string]bool{
+	"foo": true, "bar": true, "baz": true, "x": true, "y": true, "z": true, "xx": true, "yy": true,
+	"xxx": true, "yyy": true, "placeholder": true, "your": true, "my": true, "some": true,
+	"path": true, "to": true, "dummy": true, "sample": true, "whatever": true, "example": true,
+}
+
+// IsPlaceholderPath reports whether any segment of p is an illustrative
+// name such as foo, x or path/to; the resolver skips such paths when they
+// do not exist.
+func IsPlaceholderPath(p string) bool {
+	for _, seg := range strings.Split(p, "/") {
+		stem := seg
+		if i := strings.LastIndex(stem, "."); i > 0 {
+			stem = stem[:i]
+		}
+		if placeholderSegments[strings.ToLower(stem)] {
+			return true
+		}
+	}
+	return false
+}
+
+func isPlaceholderSymbol(norm string) bool {
+	for _, part := range strings.Split(norm, ".") {
+		if placeholderIdents[part] {
+			return true
+		}
+	}
+	return false
+}
+
 // tldSegments make "htmx.org" / "example.com" a host name, not a symbol.
 var tldSegments = map[string]bool{"org": true, "com": true, "io": true, "net": true, "dev": true, "app": true, "ai": true, "local": true, "sh": true, "co": true}
 
@@ -123,6 +168,9 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 		return x.anchorRef(s[:i], s[i+1:], model.High)
 	}
 	if m := reFlag.FindStringSubmatch(s); m != nil {
+		if placeholderIdents[m[2]] {
+			return nil
+		}
 		conf := model.High
 		if m[1] == "-" {
 			conf = model.Medium
@@ -130,6 +178,9 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 		return &model.Reference{Kind: model.KindFlag, Text: s, Norm: normFlag(m[2]), Confidence: conf}
 	}
 	if reEnv.MatchString(s) {
+		if placeholderIdents[s] {
+			return nil
+		}
 		return &model.Reference{Kind: model.KindEnv, Text: s, Norm: s, Confidence: model.High}
 	}
 	// module-path qualified symbol or import path: largan.local/mod/httpx.WriteData
@@ -321,6 +372,9 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		if len(parts) > 4 || (len(parts) == 2 && (knownExt[strings.ToLower(parts[1])] || tldSegments[strings.ToLower(parts[1])])) {
 			return nil
 		}
+		if isPlaceholderSymbol(norm) {
+			return nil
+		}
 		if IsStdlibPackage(first) && !x.hints.IsGoPackage(first) {
 			return nil
 		}
@@ -342,8 +396,8 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: norm, Confidence: model.Low}
 		case allLower:
 			return &model.Reference{Kind: model.KindConfigKey, Text: s, Norm: norm, Confidence: model.Low}
-		case x.hints.HasPython() && len(parts) == 2 && isCapitalized(first):
-			// Class.method in a Python repo
+		case x.hints.HasPython() && len(parts) == 2 && isCapitalized(first) && strings.ToLower(parts[1]) == parts[1]:
+			// Class.method in a Python repo (snake_case method; Go methods are Capitalized)
 			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: norm, Confidence: model.Medium}
 		case x.hints.ModulePath() != "":
 			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: norm, Confidence: model.Low}
@@ -352,6 +406,9 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 	}
 	if m := reCall.FindStringSubmatch(s); m != nil {
 		name := m[1]
+		if placeholderIdents[name] {
+			return nil
+		}
 		switch {
 		case x.hints.HasOdin() && isSnake(name):
 			return &model.Reference{Kind: model.KindOdinSym, Text: s, Norm: name, Confidence: model.Medium}
@@ -433,7 +490,7 @@ func (x *extractor) classifyTokens(s string) []model.Reference {
 			break
 		}
 		tok := m[1]
-		if fm := reFlag.FindStringSubmatch(tok); fm != nil {
+		if fm := reFlag.FindStringSubmatch(tok); fm != nil && !placeholderIdents[fm[2]] {
 			conf := model.Medium
 			if fm[1] == "-" {
 				conf = model.Low
@@ -442,6 +499,9 @@ func (x *extractor) classifyTokens(s string) []model.Reference {
 		}
 	}
 	for _, m := range reInEnv.FindAllStringSubmatch(s, -1) {
+		if placeholderIdents[m[1]] {
+			continue
+		}
 		add(&model.Reference{Kind: model.KindEnv, Text: m[1], Norm: m[1], Confidence: model.Medium})
 	}
 	for _, m := range reInPath.FindAllStringSubmatch(s, -1) {

@@ -28,8 +28,11 @@ import (
 	"docrot/internal/report"
 )
 
-// version is set with -ldflags "-X main.version=v1.2.3"; falls back to VCS info.
+// version is set with -ldflags "-X main.version=v1.2.3"; otherwise the
+// release number below is reported together with the VCS revision.
 var version = ""
+
+const release = "0.1.0"
 
 const (
 	exitOK       = 0
@@ -497,13 +500,13 @@ func versionString() string {
 			if len(rev) > 12 {
 				rev = rev[:12]
 			}
-			return "dev+" + rev + dirty
+			return release + "+" + rev + dirty
 		}
 		if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
 			return bi.Main.Version
 		}
 	}
-	return "dev"
+	return release
 }
 
 // findRoot walks up from doc looking for .docrot.json, go.mod or .git.

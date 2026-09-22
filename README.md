@@ -6,8 +6,8 @@
 
 Code moves; docs rarely follow. The README still names a function that was
 renamed two sprints ago, `llms.txt` points an AI agent at a file that no
-longer exists, the `--flag` in the quick-start was deleted, the anchor in
-the guide is dead, and the Chinese README is three commits behind the
+longer exists, the `--config` flag in the quick-start was deleted, the anchor
+in the guide is dead, and the Chinese README is three commits behind the
 English one. Link checkers only look at URLs. Markdown linters only look at
 formatting. Nothing checks the *claims*.
 
@@ -22,12 +22,17 @@ It is a single static binary written in Go with **no dependencies outside
 the standard library**.
 
 ```text
-README.md:42:15: error missing-symbol `httpx.WriteJSON` not found in package httpx (did you mean httpx.WriteData?)
-llms.txt:12:3: warning missing-path `docs/contract.md` not found (did you mean docs/contracts.md?)
-README-zh.md: warning pair-lag 4 commits to README.md since README-zh.md last changed (a1b2c3d "rename WriteJSON", …)
+CHANGELOG.md:91:5: error missing-symbol `httpx.Retry` not found in package httpx (did you mean httpx.ClientConfig.Retry?)
+docs/llms-reference.md:148:3: warning missing-path `internal/api` not found at the repo root (exists under examples/service/)
+README.md:59: warning stale-section section "🚀 快速上手" last edited 2026-08-04; since then servicex/app.go: 4 commits (latest 2026-08-12)
+README-zh.md:1: warning pair-heading translation has 4 headings, source has 5
 
-3 errors, 2 warnings, 5 info (12 baselined) — 14 docs, 1,204 references, 0.83s
+50 errors, 52 warnings, 214 info — 51 docs, 2,306 references, 1.36s [214 info hidden; --info to show]
 ```
+
+Those lines are from a real run on an internal Go repository; see the
+[field report](docs/field-report.md) for what docrot found across eight
+repositories in three languages.
 
 ## Install
 
@@ -54,14 +59,14 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 
 | Rule | The document says… | docrot verifies… |
 |---|---|---|
-| `missing-path` | `` `internal/httpx/server.go` ``, `[guide](docs/guide.md)` | the file or directory exists (relative to the doc or the repo root; globs allowed) |
-| `missing-symbol` | `` `httpx.WriteData` ``, `` `Server.Addr()` ``, `` `render_frame` `` | the Go symbol exists (via `go/parser`), or the Odin / Python declaration exists |
-| `unknown-flag` | `` `--config` `` | some `flag.*` call defines it |
-| `unknown-env` | `` `APP_TOKEN` `` | the code reads it (`os.Getenv`, `os.LookupEnv`, any `*Env*` call) |
-| `unknown-config-key` | `` `server.addr` `` | a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path or a sample config file has it |
-| `broken-anchor` | `[x](docs/guide.md#setup)` | the heading exists (GitHub slug rules, CJK-aware) |
-| `missing-command` | `./scripts/verify.ps1` inside a ```` ```sh ```` block | the script / package path exists |
-| `missing-import` | `import "example.com/mod/pkg"` inside a ```` ```go ```` block | the package directory exists in this module |
+| `missing-path` | `` `internal/gitx/gitx.go` ``, `[rules](docs/rules.md)` | the file or directory exists (relative to the doc or the repo root; globs allowed) |
+| `missing-symbol` | `` `report.WriteSARIF` ``, `` `Resolver.Resolve()` ``, `` `render_frame()` `` | the Go symbol exists (via `go/parser`), or the Odin / Python declaration exists |
+| `unknown-flag` | `` `--format` `` | some `flag.*` call defines it |
+| `unknown-env` | `` `DOCROT_DEBUG` `` | the code reads it (`os.Getenv`, `os.LookupEnv`, any `*Env*` call) |
+| `unknown-config-key` | `` `stale.minChurn` `` | a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path or a sample config file has it |
+| `broken-anchor` | `[x](docs/rules.md#exit-codes)` | the heading exists (GitHub slug rules, CJK-aware) |
+| `missing-command` | `python scripts/verify.py` inside a ```` ```sh ```` block | the script / package path exists |
+| `missing-import` | `import "docrot/internal/model"` inside a ```` ```go ```` block | the package directory exists in this module |
 | `broken-url` | `https://…` (only with `--net`) | the URL answers 2xx/3xx |
 | `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
 | `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
@@ -75,10 +80,10 @@ silence it.
 1. **Tokenize** each Markdown file: headings, fenced blocks, inline code
    spans, links, images, tables, HTML comments. No CommonMark dependency.
 2. **Extract** references from code spans, link targets, shell blocks and
-   Go blocks. Each reference gets a *kind* and a *confidence*:
-   `internal/x/y.go` is a high-confidence path; `main.go` is a medium one;
-   `app.Run(ctx)` is a low-confidence symbol that is never reported as an
-   error.
+   Go blocks. Each reference gets a *kind* and a *confidence*: a path with a
+   directory and an extension is high; a bare file name is medium; a
+   dotted name whose first part is an unknown lower-case word (`app.Run`) is
+   low and never reported.
 3. **Index** the repository once: file tree, Go packages/symbols/flags/env/
    tags (`go/parser`), Odin and Python declarations (regex), Markdown
    anchors, JSON sample keys.
@@ -93,7 +98,15 @@ silence it.
 
 Severity follows confidence: high → error, medium → warning, low → info.
 Flags and environment variables are one step softer because they are so
-often about *other* programs.
+often about *other* programs; glob misses, config keys and bare file names
+are always info. The text report hides info unless you pass `--info`.
+
+docrot was tuned against real repositories, not synthetic examples. Things
+it deliberately ignores: paths matched by `.gitignore` (build artifacts),
+prose like `health/ready` or `net/http`, flags after external programs
+(`go test -race`), `UPPER_SNAKE` words on lines that never mention an
+environment, `cfg.Addr` when `cfg` is both a package and a variable, and
+illustrative names such as `Type.Method`, `--flag` or `path/to/file`.
 
 ## Configuration
 
@@ -102,22 +115,28 @@ often about *other* programs.
 ```json
 {
   "docs": ["**/*.md", "llms.txt"],
-  "exclude": ["vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**"],
+  "exclude": ["vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"],
   "ignore": [],
+  "siblings": [],
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90 },
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
-  "severity": {},
+  "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
   "failOn": "error",
   "minConfidence": "low"
 }
 ```
 
-`ignore` holds regular expressions matched against the reference text.
-`severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
+- `ignore` holds regular expressions matched against the reference text.
+- `siblings` lists other repositories (relative to the root) where a path
+  missing here may legitimately live — useful when a service documents the
+  library it is built on.
+- `stale.exclude` keeps dated documents (changelogs, design specs) out of
+  the staleness analysis; they are historical records by nature.
+- `severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
 
 Inline escape hatches:
 
@@ -133,7 +152,7 @@ inline text <!-- docrot:ignore -->  this line
 ```text
 docrot check [dir] [--format text|json|sarif|html] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
-             [--no-git] [--net] [--all] [--coverage] [--quiet] [--config FILE]
+             [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
@@ -142,6 +161,12 @@ docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python
 docrot init [dir]
 docrot version
 ```
+
+Flags shared by the scanning commands: `--config` picks the config file,
+`--no-git` disables the git rules, `--net` checks URLs, `--verbose` prints
+index and git warnings, `--min-confidence` drops weak references. `check`
+adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`
+and `--quiet`; `explain` adds `--kind` and `--root`; `index` takes `--kind`.
 
 Exit codes: `0` clean, `1` a new finding at or above `--fail-on`, `2` usage
 or internal error. The SARIF output uploads directly to GitHub code
@@ -158,13 +183,18 @@ scanning; baselined findings carry `baselineState: unchanged`.
 ## Development
 
 ```sh
-python scripts/verify.py        # gofmt, vet, test, build, self-check, fixture check
+python scripts/verify.py        # gofmt, vet, test, build, self-check, fixture check, formats
 python scripts/demo.py ../some-repo --out reports
 ```
 
+docrot checks its own documentation as part of `scripts/verify.py`; the
+dated design documents under `docs/superpowers/` are excluded there because
+they are full of illustrative paths by design.
+
 Design: [docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/specs/2026-09-23-docrot-design.md).
 Plan: [docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md).
-Rules: [docs/rules.md](docs/rules.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+Rules: [docs/rules.md](docs/rules.md). Field report: [docs/field-report.md](docs/field-report.md).
+Agent entry point: [llms.txt](llms.txt). Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Non-goals
 

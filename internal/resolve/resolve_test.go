@@ -256,11 +256,11 @@ func TestResolvePolicy(t *testing.T) {
 func TestSeverityOverrideAndMinConfidence(t *testing.T) {
 	ix := newFake()
 	r := New(ix, Options{Severity: map[string]model.Severity{model.RuleMissingPath: model.SevInfo}, MinConfidence: model.Medium})
-	res := r.Resolve(ref(model.KindPath, "nope/x.go", model.High, "README.md"))
+	res := r.Resolve(ref(model.KindPath, "nope/thing.go", model.High, "README.md"))
 	if res.Finding == nil || res.Finding.Severity != model.SevInfo {
 		t.Fatalf("override not applied: %+v", res.Finding)
 	}
-	if res := r.Resolve(ref(model.KindPath, "nope/x.go", model.Low, "README.md")); !res.Skipped {
+	if res := r.Resolve(ref(model.KindPath, "nope/thing.go", model.Low, "README.md")); !res.Skipped {
 		t.Fatal("low confidence should be skipped with MinConfidence=medium")
 	}
 }

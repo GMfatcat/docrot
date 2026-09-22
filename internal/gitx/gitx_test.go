@@ -575,3 +575,41 @@ func TestOptionsNormalized(t *testing.T) {
 		})
 	}
 }
+
+func TestIgnored(t *testing.T) {
+	if !Available() {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	mustGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE=2024-01-01T00:00:00Z", "GIT_COMMITTER_DATE=2024-01-01T00:00:00Z")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	mustGit("init", "-q")
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("dist/\n*.exe\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(dir, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Ignored([]string{"dist/app", "tool.exe", "README.md", "src/main.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got["dist/app"] || !got["tool.exe"] {
+		t.Errorf("expected dist/app and tool.exe to be ignored: %v", got)
+	}
+	if got["README.md"] || got["src/main.go"] {
+		t.Errorf("unexpected ignores: %v", got)
+	}
+	none, err := r.Ignored([]string{"README.md"})
+	if err != nil || len(none) != 0 {
+		t.Errorf("no ignores: %v %v", none, err)
+	}
+}

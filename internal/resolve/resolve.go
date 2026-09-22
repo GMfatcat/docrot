@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"docrot/internal/extract"
 	"docrot/internal/fuzzy"
 	"docrot/internal/model"
 )
@@ -168,6 +169,9 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 			return Result{OK: true, File: c}
 		}
 	}
+	if extract.IsPlaceholderPath(ref.Norm) {
+		return Result{Skipped: true} // docs/foo.md, ./cmd/x: illustrative
+	}
 	rule := model.RuleMissingPath
 	if ref.Kind == model.KindCommand {
 		rule = model.RuleMissingCommand
@@ -177,6 +181,7 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 	var cands []string
 	if isGlob {
 		msg = "no file matches `" + ref.Text + "`"
+		sev = model.SevInfo
 	} else if segs := strings.Split(ref.Norm, "/"); len(segs) >= 2 && r.allTopLevel(segs) {
 		// "errx/logx/timex" is a list of packages, not a path
 		return Result{Skipped: true}
@@ -264,11 +269,10 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 			sev = model.SevInfo // a bare call is usually a method or a local helper
 		}
 	case r.ix.IsGoPackage(first):
-		if strings.ToLower(last) == last && (len(parts) > 1 && (strings.Contains(last, "_") || r.ix.HasJSONKey(q) || r.ix.HasConfigKey(q))) {
-			// kernel.max_concurrent: a config key that happens to start with a package name
-			if r.ix.HasJSONKey(q) || r.ix.HasConfigKey(q) {
-				return Result{OK: true}
-			}
+		if r.ix.HasJSONKey(q) || r.ix.HasConfigKey(q) {
+			return Result{OK: true} // stale.minChurn: a config key that starts with a package name
+		}
+		if strings.ToLower(last) == last && strings.Contains(last, "_") {
 			return r.resolveConfigKey(model.Reference{Kind: model.KindConfigKey, Text: ref.Text, Norm: q, Confidence: model.Low, Loc: ref.Loc, Section: ref.Section, Context: ref.Context})
 		}
 		msg = "`" + q + "` not found in package " + first
