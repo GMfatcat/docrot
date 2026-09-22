@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"docrot/internal/config"
@@ -212,4 +213,29 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// parseDocs (and the staleness stage) call the warn callback from several
+// worker goroutines at once, so Check's warn closure has to serialise the
+// append to Run.Warnings and the write to Stderr. This pins that contract:
+// with an unsynchronised callback the race detector fires here.
+func TestParseDocsWarnsFromWorkers(t *testing.T) {
+	var mu sync.Mutex
+	var warnings []string
+	warn := func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		warnings = append(warnings, fmt.Sprintf(format, args...))
+	}
+	docs := make([]string, 200)
+	for i := range docs {
+		docs[i] = fmt.Sprintf("no-such-dir/missing-%d.md", i)
+	}
+	parsed := parseDocs(t.TempDir(), docs, warn)
+	if len(parsed) != 0 {
+		t.Errorf("parsed %d docs, want 0", len(parsed))
+	}
+	if len(warnings) != len(docs) {
+		t.Errorf("got %d warnings, want %d", len(warnings), len(docs))
+	}
 }

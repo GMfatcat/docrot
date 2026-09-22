@@ -876,6 +876,9 @@ func parseInlineDest(s string, i int) (dest, title string, target rng, end int, 
 			c := s[j]
 			if c == '\\' {
 				j += 2
+				if j > len(s) {
+					j = len(s) // a trailing backslash must not run past the line
+				}
 				continue
 			}
 			if c == ' ' || c == '\t' {

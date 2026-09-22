@@ -36,6 +36,19 @@ First complete release, built in one night against real repositories.
 - `scripts/verify.py` (gofmt, vet, test, build, fixture, self-check,
   formats) and `scripts/demo.py` (batch reports over repositories).
 
+### Fixed after an independent review
+
+- Parser crash on a link destination ending in a backslash.
+- Data race in engine warnings emitted from worker goroutines.
+- Broken anchors in `docs/*.md` pointing at root-level files were silently
+  skipped.
+- Context lines were truncated mid-rune (CJK corruption in JSON/HTML).
+- Baseline fingerprints no longer include the section heading, so renaming
+  a heading keeps the baseline valid.
+- `docrot coverage` no longer counts `NO_COLOR`, `TERM` and other external
+  variables as undocumented API; `-h` exits 0; `--output` fails fast and
+  reports write errors; IPv6 hosts with ports are skipped by `--net`.
+
 ### Heuristics tuned on eight real repositories
 
 - Slash-separated prose (`health/ready`), stdlib import paths, host-like

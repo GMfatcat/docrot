@@ -44,6 +44,7 @@ type Options struct {
 	MinConfidence model.Confidence // 0 → from config
 	Coverage      bool             // compute the coverage section
 	BaselinePath  string           // "" → <root>/.docrot-baseline.json
+	NoBaseline    bool             // ignore any baseline file (used by `docrot baseline`)
 	Verbose       bool
 	Stderr        io.Writer
 	Version       string
@@ -80,8 +81,13 @@ func Check(opts Options) (*Run, error) {
 		return nil, fmt.Errorf("%s is not a directory", opts.Root)
 	}
 	run := &Run{Refs: map[string][]model.Reference{}}
+	// warn is called from the parallel doc-parsing and staleness workers, so
+	// it must serialise both the append and the write to Stderr.
+	var warnMu sync.Mutex
 	warn := func(format string, args ...any) {
 		msg := fmt.Sprintf(format, args...)
+		warnMu.Lock()
+		defer warnMu.Unlock()
 		run.Warnings = append(run.Warnings, msg)
 		fmt.Fprintln(opts.Stderr, "docrot: warning: "+msg)
 	}
@@ -151,6 +157,8 @@ func Check(opts Options) (*Run, error) {
 	if run.Git != nil {
 		if m, err := run.Git.Renames(); err == nil {
 			renames = m
+		} else if opts.Verbose {
+			warn("git renames: %v", err)
 		}
 	}
 
@@ -215,12 +223,15 @@ func Check(opts Options) (*Run, error) {
 	var findings []model.Finding
 	totalRefs := 0
 	for _, r := range results {
+		if r.doc == "" {
+			continue // the document failed to read; nothing was extracted
+		}
 		run.Refs[r.doc] = r.refs
 		totalRefs += len(r.refs)
 		findings = append(findings, r.findings...)
 	}
 	if run.Git != nil {
-		findings = dropIgnoredPaths(run.Git, findings)
+		findings = dropIgnoredPaths(run.Git, findings, warn, opts.Verbose)
 	}
 
 	// 5. stale sections
@@ -264,6 +275,14 @@ func Check(opts Options) (*Run, error) {
 	var cov *report.Coverage
 	if opts.Coverage || cfg.Coverage.Report {
 		exported := ix.GoExported()
+		kept := exported[:0]
+		for _, e := range exported {
+			if e.Kind == model.KindEnv && resolve.IsExternalEnv(e.Qualified) {
+				continue // NO_COLOR, TERM, GOPATH…: not this project's API
+			}
+			kept = append(kept, e)
+		}
+		exported = kept
 		res := coverage.Compute(exported, mentioned)
 		cov = toReportCoverage(res)
 		if cfg.Coverage.Report {
@@ -281,7 +300,9 @@ func Check(opts Options) (*Run, error) {
 		bpath = filepath.Join(root, baseline.DefaultName)
 	}
 	var baselined, fixedN int
-	if b, err := baseline.Load(bpath); err == nil {
+	if opts.NoBaseline {
+		// nothing to apply
+	} else if b, err := baseline.Load(bpath); err == nil {
 		run.Baseline = b
 		var fixed []baseline.Entry
 		baselined, _, fixed = baseline.Apply(b, findings)
@@ -407,7 +428,7 @@ func Explain(opts Options, doc string) ([]ExplainRow, error) {
 // dropIgnoredPaths removes missing-path/command findings whose path matches
 // a .gitignore rule: "dist/app.exe" not existing is a build artifact, not
 // documentation rot.
-func dropIgnoredPaths(repo *gitx.Repo, findings []model.Finding) []model.Finding {
+func dropIgnoredPaths(repo *gitx.Repo, findings []model.Finding, warn func(string, ...any), verbose bool) []model.Finding {
 	var paths []string
 	cand := func(f model.Finding) []string {
 		if f.Ref == nil || strings.ContainsAny(f.Ref.Norm, "*?") {
@@ -429,7 +450,13 @@ func dropIgnoredPaths(repo *gitx.Repo, findings []model.Finding) []model.Finding
 		return findings
 	}
 	ignored, err := repo.Ignored(paths)
-	if err != nil || len(ignored) == 0 {
+	if err != nil {
+		if verbose {
+			warn("git check-ignore: %v (gitignored paths will be reported)", err)
+		}
+		return findings
+	}
+	if len(ignored) == 0 {
 		return findings
 	}
 	kept := findings[:0]
@@ -459,7 +486,7 @@ func relDoc(root, doc string) (string, error) {
 		}
 	}
 	rel, err := filepath.Rel(root, abs)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || strings.HasPrefix(rel, "../") {
 		return "", fmt.Errorf("%s is outside %s", doc, root)
 	}
 	return filepath.ToSlash(rel), nil

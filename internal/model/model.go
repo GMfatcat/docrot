@@ -237,7 +237,10 @@ func Fingerprint(parts ...string) string {
 }
 
 // NewFinding builds a Finding for a reference-based rule and fills the
-// fingerprint from rule|file|kind|norm|section.
+// fingerprint from rule|file|kind|norm. The section heading is deliberately
+// left out so that renaming a heading does not invalidate a baseline; the
+// same reference repeated in several sections of one file shares one
+// fingerprint.
 func NewFinding(rule string, sev Severity, ref Reference, msg string) Finding {
 	r := ref
 	return Finding{
@@ -246,7 +249,7 @@ func NewFinding(rule string, sev Severity, ref Reference, msg string) Finding {
 		Message:     msg,
 		Loc:         ref.Loc,
 		Ref:         &r,
-		Fingerprint: Fingerprint(rule, ref.Loc.File, string(ref.Kind), ref.Norm, ref.Section),
+		Fingerprint: Fingerprint(rule, ref.Loc.File, string(ref.Kind), ref.Norm),
 	}
 }
 

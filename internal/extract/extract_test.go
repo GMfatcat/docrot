@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"docrot/internal/markdown"
 	"docrot/internal/model"
@@ -292,5 +293,24 @@ func TestContextTruncation(t *testing.T) {
 	refs := run(t, goHints(), "`docs/a.md` "+long+"\n")
 	if len(refs) != 1 || len(refs[0].Context) > 160 {
 		t.Fatalf("context not truncated: %d", len(refs[0].Context))
+	}
+}
+
+// A long CJK line must not be cut in the middle of a rune when the context
+// is truncated, or the JSON/SARIF/HTML reports carry U+FFFD.
+func TestContextTruncationKeepsValidUTF8(t *testing.T) {
+	line := strings.Repeat("很長的中文說明文字 ", 20) + "`internal/gone.go`"
+	d := markdown.Parse("README.md", []byte("# 標題\n\n"+line+"\n"))
+	refs := Extract(d, fakeHints{}, Options{})
+	if len(refs) == 0 {
+		t.Fatal("no references extracted")
+	}
+	for _, r := range refs {
+		if !utf8.ValidString(r.Context) {
+			t.Errorf("context is not valid UTF-8: %q", r.Context)
+		}
+		if strings.ContainsRune(r.Context, utf8.RuneError) {
+			t.Errorf("context contains U+FFFD: %q", r.Context)
+		}
 	}
 }

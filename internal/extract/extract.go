@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"docrot/internal/markdown"
 	"docrot/internal/model"
@@ -81,7 +82,11 @@ func (x *extractor) context(line int) string {
 	}
 	s := strings.TrimSpace(x.doc.Lines[line-1])
 	if len(s) > 160 {
-		s = s[:157] + "..."
+		cut := 157
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut-- // never split a multi-byte rune (CJK lines)
+		}
+		s = s[:cut] + "..."
 	}
 	return s
 }

@@ -756,3 +756,20 @@ func TestFingerprintPairsDiffer(t *testing.T) {
 		t.Error("different code should produce different hashes")
 	}
 }
+
+// A link destination ending in a backslash at end of line used to run the
+// destination scanner past the end of the line and panic.
+func TestTrailingBackslashInLinkDestination(t *testing.T) {
+	for _, line := range []string{`see [a](x\`, `![a](docs\`, `[a](a/b\`} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Parse(%q) panicked: %v", line, r)
+				}
+			}()
+			if d := Parse("t.md", []byte(line)); d == nil {
+				t.Errorf("Parse(%q) = nil", line)
+			}
+		}()
+	}
+}

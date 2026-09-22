@@ -11,6 +11,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -105,6 +106,7 @@ Run "docrot <command> -h" for the flags of a command.
 
 // common holds flags shared by the scanning commands.
 type common struct {
+	helpShown  bool // -h/--help was requested: exit 0, not 2
 	fs         *flag.FlagSet
 	configPath string
 	noGit      bool
@@ -128,6 +130,9 @@ func (c *common) parse(args []string, stderr io.Writer) (root string, cfg config
 	c.fs.SetOutput(stderr)
 	pos, err := parseInterspersed(c.fs, args)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			c.helpShown = true
+		}
 		return "", cfg, false
 	}
 	root = "."
@@ -161,6 +166,14 @@ func (c *common) parse(args []string, stderr io.Writer) (root string, cfg config
 	return root, cfg, true
 }
 
+// exitCode after a failed parse: 0 for -h, 2 otherwise.
+func (c *common) exitCode() int {
+	if c.helpShown {
+		return exitOK
+	}
+	return exitUsage
+}
+
 func (c *common) engineOptions(root string, cfg config.Config, stderr io.Writer) engine.Options {
 	mc, _ := model.ParseConfidence(cfg.MinConfidence)
 	return engine.Options{
@@ -183,12 +196,12 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	c.fs.BoolVar(&info, "info", false, "also list info-level findings in the text report")
 	c.fs.StringVar(&output, "output", "", "write the report to this file instead of stdout")
 	c.fs.StringVar(&failOn, "fail-on", "", "exit 1 when a new finding of this severity or higher exists: error|warning|info|none (default from config, error)")
-	c.fs.BoolVar(&all, "all", false, "also show baselined findings")
+	c.fs.BoolVar(&all, "all", false, "also show baselined findings (implies --info)")
 	c.fs.BoolVar(&quiet, "quiet", false, "print only the summary line (text format)")
 	c.fs.BoolVar(&cov, "coverage", false, "append the documentation coverage section")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
-		return exitUsage
+		return c.exitCode()
 	}
 	if !contains(report.Formats, format) {
 		fmt.Fprintf(stderr, "docrot: --format must be one of %s\n", strings.Join(report.Formats, ", "))
@@ -202,6 +215,16 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docrot: --fail-on must be error, warning, info or none\n")
 		return exitUsage
 	}
+	var w io.Writer = stdout
+	var outFile *os.File
+	if output != "" {
+		f, err := os.Create(output) // fail fast, before the scan
+		if err != nil {
+			fmt.Fprintf(stderr, "docrot: %v\n", err)
+			return exitUsage
+		}
+		outFile, w = f, f
+	}
 	opts := c.engineOptions(root, cfg, stderr)
 	opts.ShowAll = all
 	opts.Coverage = cov
@@ -210,16 +233,6 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
 		return exitUsage
 	}
-	w := stdout
-	if output != "" {
-		f, err := os.Create(output)
-		if err != nil {
-			fmt.Fprintf(stderr, "docrot: %v\n", err)
-			return exitUsage
-		}
-		defer f.Close()
-		w = f
-	}
 	ropts := report.Options{ShowBaselined: all, ShowInfo: info || all, Color: output == "" && report.ColorEnabled(stdout), Root: root}
 	if quiet && format == "text" {
 		fmt.Fprintln(w, report.SummaryLine(run.Report.Summary))
@@ -227,7 +240,11 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
 		return exitUsage
 	}
-	if output != "" {
+	if outFile != nil {
+		if err := outFile.Close(); err != nil {
+			fmt.Fprintf(stderr, "docrot: write %s: %v\n", output, err)
+			return exitUsage
+		}
 		fmt.Fprintf(stderr, "%s\nreport written to %s\n", report.SummaryLine(run.Report.Summary), output)
 	}
 	if failSev == "" {
@@ -247,10 +264,10 @@ func cmdBaseline(args []string, stdout, stderr io.Writer) int {
 	c.fs.StringVar(&out, "output", "", "baseline file (default <dir>/"+baseline.DefaultName+")")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
-		return exitUsage
+		return c.exitCode()
 	}
 	opts := c.engineOptions(root, cfg, stderr)
-	opts.BaselinePath = filepath.Join(os.TempDir(), "docrot-none") // ignore existing baseline
+	opts.NoBaseline = true // a baseline is being rebuilt, not applied
 	run, err := engine.Check(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
@@ -273,7 +290,7 @@ func cmdCoverage(args []string, stdout, stderr io.Writer) int {
 	c.fs.StringVar(&format, "format", "text", "output format: text|json")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
-		return exitUsage
+		return c.exitCode()
 	}
 	if format != "text" && format != "json" {
 		fmt.Fprintf(stderr, "docrot: --format must be text or json\n")
@@ -318,7 +335,7 @@ func cmdPairs(args []string, stdout, stderr io.Writer) int {
 	c.fs.StringVar(&format, "format", "text", "output format: text|json")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
-		return exitUsage
+		return c.exitCode()
 	}
 	cfg.Stale.Enabled = false
 	opts := c.engineOptions(root, cfg, stderr)
@@ -365,6 +382,9 @@ func cmdExplain(args []string, stdout, stderr io.Writer) int {
 	c.fs.SetOutput(stderr)
 	pos, err := parseInterspersed(c.fs, args)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return exitOK
+		}
 		return exitUsage
 	}
 	if len(pos) != 1 {
@@ -416,7 +436,7 @@ func cmdIndex(args []string, stdout, stderr io.Writer) int {
 	c.fs.StringVar(&kind, "kind", "symbols", "symbols|flags|env|paths|anchors|config|odin|python")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
-		return exitUsage
+		return c.exitCode()
 	}
 	cfg.Stale.Enabled = false
 	opts := c.engineOptions(root, cfg, stderr)
@@ -443,6 +463,9 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("docrot init", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return exitOK
+		}
 		return exitUsage
 	}
 	dir := "."

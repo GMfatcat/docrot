@@ -417,6 +417,10 @@ func envContext(line string) bool {
 	return false
 }
 
+// IsExternalEnv reports whether name is a well-known environment variable
+// owned by the OS, the toolchain or another program (GOPATH, GIT_*, HOME…).
+func IsExternalEnv(name string) bool { return isExternalEnv(name) }
+
 func isExternalEnv(name string) bool {
 	for _, p := range externalEnvPrefixes {
 		if strings.HasPrefix(name, p) {
@@ -510,8 +514,15 @@ func (r *Resolver) resolveAnchor(ref model.Reference) Result {
 		target = ref.Loc.File
 	}
 	if !r.ix.FileExists(target) {
-		// the path reference already reports the missing file
-		return Result{Skipped: true}
+		// The target is doc-relative; the path resolver also accepts a
+		// root-relative spelling, so try that before giving up. Otherwise
+		// the path reference already reports the missing file.
+		alt, _, _ := strings.Cut(ref.Text, "#")
+		alt = path.Clean(alt)
+		if alt == "" || alt == "." || !r.ix.FileExists(alt) {
+			return Result{Skipped: true}
+		}
+		target = alt
 	}
 	if slug == "" || r.ix.HasAnchor(target, slug) {
 		return Result{OK: true, File: target}
@@ -571,9 +582,10 @@ func (r *Resolver) client() *http.Client {
 
 func skipHost(host string) bool {
 	h := strings.ToLower(host)
-	if i := strings.LastIndex(h, ":"); i >= 0 && !strings.Contains(h, "]") {
-		h = h[:i]
+	if hp, _, err := net.SplitHostPort(h); err == nil {
+		h = hp // strips the port, including for [::1]:8080
 	}
+	h = strings.Trim(h, "[]")
 	if h == "localhost" || strings.HasSuffix(h, ".local") || strings.HasSuffix(h, ".internal") ||
 		strings.HasSuffix(h, ".example") || h == "example.com" || strings.HasSuffix(h, ".example.com") ||
 		h == "example.org" || !strings.Contains(h, ".") {

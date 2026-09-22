@@ -217,6 +217,7 @@ func TestResolvePolicy(t *testing.T) {
 		{"anchor same doc", ref(model.KindAnchor, "#usage", model.High, "README.md"), true, false, "", "", "", "README.md"},
 		{"anchor broken suggests", ref(model.KindAnchor, "docs/guide.md#instal", model.High, "README.md"), false, false, model.RuleBrokenAnchor, model.SevError, "#install", ""},
 		{"anchor missing file skipped", ref(model.KindAnchor, "docs/nope.md#x", model.High, "README.md"), false, true, "", "", "", ""},
+		{"anchor root-relative from a nested doc", rootAnchorRef("docs/README.md#nope", "README.md#nope"), false, false, model.RuleBrokenAnchor, model.SevError, "", ""},
 		{"import ok", ref(model.KindImport, "example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"import missing", ref(model.KindImport, "example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleMissingImport, model.SevError, "", ""},
 		{"import foreign skipped", ref(model.KindImport, "github.com/x/y", model.High, "README.md"), false, true, "", "", "", ""},
@@ -284,4 +285,13 @@ func TestOtherSymbolFallsBackToConfigKey(t *testing.T) {
 	if res := r.Resolve(ref(model.KindOdinSym, "render_frames", model.Medium, "README.md")); res.Finding == nil || res.Finding.Severity != model.SevWarning {
 		t.Fatalf("medium odinsym miss should warn: %+v", res.Finding)
 	}
+}
+
+// rootAnchorRef builds the anchor reference the extractor produces for a
+// nested document linking to a root-level file: Norm is joined with the
+// document's directory, Text keeps the spelling from the document.
+func rootAnchorRef(norm, text string) model.Reference {
+	r := ref(model.KindAnchor, norm, model.High, "docs/guide.md")
+	r.Text = text
+	return r
 }
