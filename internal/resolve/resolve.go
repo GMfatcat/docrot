@@ -254,6 +254,10 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		if looksLikeDomain(ref.Norm) {
 			return Result{Skipped: true}
 		}
+		if len(r.ix.JSONKeys()) > 0 || len(r.ix.ConfigKeys()) > 0 {
+			// ambiguous lower-case dotted name: report it the config-key way
+			return r.resolveConfigKey(ref)
+		}
 	}
 	msg := lang + " symbol `" + ref.Text + "` not found"
 	return Result{Finding: r.finding(model.RuleMissingSymbol, model.SeverityFor(ref.Confidence), ref, msg, sim(ref.Norm, 3))}

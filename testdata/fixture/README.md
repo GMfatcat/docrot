@@ -43,7 +43,7 @@ Ignored line mentions `docs/nonexistent.md` and `--nope`.
 
 ## Other languages
 
-Odin: `fixture_odin.render_frame` and `render_frames`. Python: `helper.summarize`,
+Odin: `fixture_odin.render_frame` and `render_frames()`. Python: `helper.summarize`,
 `Runner.run_async`, `helper.summarise`.
 
 Version 1.2.3 supports 3 retries.

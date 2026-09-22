@@ -55,7 +55,17 @@ const rejectChars = "<>{}$%|\"'"
 // It returns nil when the span is not a single reference.
 func (x *extractor) classifyWhole(s string) *model.Reference {
 	s = strings.TrimSpace(s)
-	if s == "" || len(s) > 120 || strings.ContainsAny(s, rejectChars) || strings.ContainsAny(s, " \t") {
+	if s == "" || len(s) > 120 || strings.ContainsAny(s, rejectChars) {
+		return nil
+	}
+	if strings.ContainsAny(s, " \t") {
+		// `pkg.Func(a, b)` — a call with spaced arguments is still one reference
+		if i := strings.Index(s, "("); i > 0 && strings.HasSuffix(s, ")") && !strings.ContainsAny(s[:i], " \t") {
+			if r := x.symbolRef(s[:i] + "()"); r != nil {
+				r.Text = s
+				return r
+			}
+		}
 		return nil
 	}
 	if reURL.MatchString(s) {
