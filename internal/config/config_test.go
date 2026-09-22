@@ -20,7 +20,7 @@ func TestDefaultIsValid(t *testing.T) {
 		want any
 	}{
 		{"docs", d.Docs, []string{"**/*.md", "llms.txt"}},
-		{"exclude", d.Exclude, []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"}},
+		{"exclude", d.Exclude, []string{"vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"}},
 		{"ignore", d.Ignore, []string{}},
 		{"pairs", d.Pairs, []Pair{}},
 		{"stale", d.Stale, Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"}}},
@@ -70,8 +70,8 @@ func TestDefaultRoundTrip(t *testing.T) {
 			t.Errorf("default JSON is missing key %q", key)
 		}
 	}
-	if len(raw) != 12 {
-		t.Errorf("default JSON has %d keys, want 12: %v", len(raw), raw)
+	if len(raw) != 13 {
+		t.Errorf("default JSON has %d keys, want 13: %v", len(raw), raw)
 	}
 }
 

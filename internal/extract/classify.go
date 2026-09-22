@@ -54,6 +54,7 @@ var (
 	reGoTypeM  = regexp.MustCompile(`(?:^|[^A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)`)
 
 	reLineSuffix = regexp.MustCompile(`:\d+(?::\d+)?:?$`)
+	reDomainSeg  = regexp.MustCompile(`^[a-z0-9-]+(?:\.[a-z0-9-]+)+$`)
 	reAnchorLine = regexp.MustCompile(`^l\d+(?:-l\d+)?$`)
 	rePathSym    = regexp.MustCompile(`^((?:[A-Za-z0-9_.-]+/)+)([a-z][A-Za-z0-9_]*)\.([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)$`)
 )
@@ -68,6 +69,9 @@ func hasNonASCIIPunct(s string) bool {
 	}
 	return false
 }
+
+// tldSegments make "htmx.org" / "example.com" a host name, not a symbol.
+var tldSegments = map[string]bool{"org": true, "com": true, "io": true, "net": true, "dev": true, "app": true, "ai": true, "local": true, "sh": true, "co": true}
 
 // externalCommands are programs whose flags say nothing about this repo.
 var externalCommands = map[string]bool{
@@ -105,6 +109,14 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 	}
 	if reURL.MatchString(s) {
 		return &model.Reference{Kind: model.KindURL, Text: s, Norm: s, Confidence: model.Low}
+	}
+	if strings.HasPrefix(s, "*") || strings.HasPrefix(s, "&") {
+		// *net/http.Server, &Config{}: pointer markers on a symbol
+		if r := x.classifyWhole(strings.TrimLeft(s, "*&")); r != nil && r.Kind != model.KindPath {
+			r.Text = s
+			return r
+		}
+		return nil
 	}
 	// file.md#anchor
 	if i := strings.Index(s, "#"); i > 0 && strings.HasSuffix(strings.ToLower(s[:i]), ".md") {
@@ -233,6 +245,9 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 	segs := strings.Split(p, "/")
 	first := segs[0]
 	isTop := x.isTopLevelDir(first)
+	if hasSlash && !isTop && reDomainSeg.MatchString(first) && !strings.HasPrefix(s, "./") {
+		return nil // ghcr.io/org/image, github.com/x/y, largan.local/mod/pkg
+	}
 	if hasSlash && placeholderFirstSegments[strings.ToLower(first)] && !isTop {
 		return nil
 	}
@@ -303,7 +318,7 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		rest := strings.TrimPrefix(m[2], ".")
 		parts := append([]string{first}, strings.Split(rest, ".")...)
 		norm := strings.Join(parts, ".")
-		if len(parts) > 4 || (len(parts) == 2 && knownExt[strings.ToLower(parts[1])]) {
+		if len(parts) > 4 || (len(parts) == 2 && (knownExt[strings.ToLower(parts[1])] || tldSegments[strings.ToLower(parts[1])])) {
 			return nil
 		}
 		if IsStdlibPackage(first) && !x.hints.IsGoPackage(first) {

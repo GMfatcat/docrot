@@ -174,6 +174,7 @@ func Check(opts Options) (*Run, error) {
 		Net:           opts.Net || cfg.Net,
 		Severity:      sevOverrides,
 		Renames:       renames,
+		Siblings:      absSiblings(root, cfg.Siblings),
 	})
 
 	type docResult struct {
@@ -542,6 +543,22 @@ func parallel(n int, fn func(i int)) {
 	}
 	close(ch)
 	wg.Wait()
+}
+
+// absSiblings resolves sibling repo roots relative to root, keeping only
+// directories that exist.
+func absSiblings(root string, sibs []string) []string {
+	var out []string
+	for _, s := range sibs {
+		p := s
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(root, p)
+		}
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func severityMap(m map[string]string) map[string]model.Severity {

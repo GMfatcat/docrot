@@ -55,6 +55,10 @@ type Config struct {
 	// Ignore are regular expressions applied to Reference.Text; a match
 	// suppresses the reference.
 	Ignore []string `json:"ignore"`
+	// Siblings are other repositories (relative to root or absolute) in
+	// which a path that is missing here may legitimately live, e.g. a
+	// library this repo documents alongside its own code.
+	Siblings []string `json:"siblings"`
 	// Pairs are explicit source/translation document pairs.
 	Pairs []Pair `json:"pairs"`
 	// PairPatterns derive translations from a source name; "{stem}" is
@@ -79,10 +83,11 @@ type Config struct {
 // Default returns the settings docrot uses when there is no config file.
 func Default() Config {
 	return Config{
-		Docs:    []string{"**/*.md", "llms.txt"},
-		Exclude: []string{"vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"},
-		Ignore:  []string{},
-		Pairs:   []Pair{},
+		Docs:     []string{"**/*.md", "llms.txt"},
+		Exclude:  []string{"vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"},
+		Ignore:   []string{},
+		Siblings: []string{},
+		Pairs:    []Pair{},
 		PairPatterns: []string{
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md",
 		},

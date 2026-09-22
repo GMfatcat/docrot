@@ -34,6 +34,7 @@ type Options struct {
 	NetTimeout    time.Duration             // per URL, default 5s
 	Severity      map[string]model.Severity // per-rule override
 	Renames       map[string]string         // old → new from git history
+	Siblings      []string                  // absolute sibling repo roots where missing paths may live
 }
 
 // Result is the outcome of resolving one reference.
@@ -132,8 +133,21 @@ func (r *Resolver) existsOnDisk(rel string) bool {
 	if r.opts.Root == "" || strings.HasPrefix(rel, "..") {
 		return false
 	}
-	_, err := os.Stat(filepath.Join(r.opts.Root, filepath.FromSlash(rel)))
-	return err == nil
+	if _, err := os.Stat(filepath.Join(r.opts.Root, filepath.FromSlash(rel))); err == nil {
+		return true
+	}
+	for _, sib := range r.opts.Siblings {
+		if _, err := os.Stat(filepath.Join(sib, filepath.FromSlash(rel))); err == nil {
+			return true
+		}
+		// "meowbase/httpx/README.md" written from the parent directory's view
+		if first, rest, ok := strings.Cut(rel, "/"); ok && first == filepath.Base(sib) {
+			if _, err := os.Stat(filepath.Join(sib, filepath.FromSlash(rest))); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *Resolver) resolvePath(ref model.Reference) Result {
@@ -198,6 +212,8 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 	return Result{Finding: r.finding(rule, sev, ref, msg, cands)}
 }
 
+func isCapitalized(s string) bool { return s != "" && s[0] >= 'A' && s[0] <= 'Z' }
+
 // allTopLevel reports whether every segment names a top-level directory.
 func (r *Resolver) allTopLevel(segs []string) bool {
 	for _, s := range segs {
@@ -256,12 +272,19 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 			return r.resolveConfigKey(model.Reference{Kind: model.KindConfigKey, Text: ref.Text, Norm: q, Confidence: model.Low, Loc: ref.Loc, Section: ref.Section, Context: ref.Context})
 		}
 		msg = "`" + q + "` not found in package " + first
+		if strings.ToLower(last) == last {
+			// db.synchronous, htmx.trigger: an unexported name or not Go at all
+			sev = model.SevInfo
+		}
 		if len(parts) == 2 && r.ix.HasGoMember(last) && isReceiverish(first) {
 			// `cfg.Addr` where cfg is both a package and a common variable name
 			msg += " (if `" + first + "` is a variable, its type may have `" + last + "`)"
 			sev = model.SevInfo
 		}
 	case r.ix.IsGoType(first):
+		if strings.ToLower(last) == last && r.ix.HasJSONKey(last) {
+			return Result{OK: true} // Envelope.request_id: a wire field, not a Go member
+		}
 		msg = "`" + q + "` not found on type " + first
 	default:
 		if ref.Confidence <= model.Low && (first == "" || first[0] < 'A' || first[0] > 'Z') {
@@ -306,6 +329,17 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		has, sim, lang = r.ix.HasPySymbol, r.ix.SimilarPySymbols, "Python"
 	}
 	if has(ref.Norm) {
+		return Result{OK: true}
+	}
+	// the other language may own it (mixed Odin + Python repos)
+	if ref.Kind == model.KindOdinSym && r.ix.HasPython() && r.ix.HasPySymbol(ref.Norm) {
+		return Result{OK: true}
+	}
+	if ref.Kind == model.KindPySym && r.ix.HasOdin() && r.ix.HasOdinSymbol(ref.Norm) {
+		return Result{OK: true}
+	}
+	// Type.field where Type is a known declaration: members are not indexed
+	if first, _, ok := strings.Cut(ref.Norm, "."); ok && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
 		return Result{OK: true}
 	}
 	if ref.Confidence <= model.Low {
