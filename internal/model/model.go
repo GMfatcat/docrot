@@ -295,9 +295,11 @@ type Index interface {
 
 	// --- Odin / Python ---
 	HasOdin() bool
+	OdinPackages() []string
 	HasOdinSymbol(qualified string) bool
 	SimilarOdinSymbols(qualified string, n int) []string
 	HasPython() bool
+	PyModules() []string
 	HasPySymbol(qualified string) bool
 	SimilarPySymbols(qualified string, n int) []string
 

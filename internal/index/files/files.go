@@ -317,6 +317,9 @@ func (ix *Index) SimilarPaths(rel string, n int) []string {
 		}
 	}
 
+	if len(cands) == 0 {
+		return nil
+	}
 	list := make([]scored, 0, len(cands))
 	for p, r := range cands {
 		list = append(list, scored{path: p, rank: r})

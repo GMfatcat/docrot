@@ -1,0 +1,291 @@
+package extract
+
+import (
+	"regexp"
+	"strings"
+	"testing"
+
+	"docrot/internal/markdown"
+	"docrot/internal/model"
+)
+
+type fakeHints struct {
+	module   string
+	pkgs     map[string]bool
+	types    map[string]bool
+	top      []string
+	odin     []string
+	py       []string
+	hasOdin  bool
+	hasPy    bool
+	noModule bool
+}
+
+func (f fakeHints) ModulePath() string {
+	if f.noModule {
+		return ""
+	}
+	if f.module == "" {
+		return "example.com/fixture"
+	}
+	return f.module
+}
+func (f fakeHints) IsGoPackage(n string) bool { return f.pkgs[n] }
+func (f fakeHints) IsGoType(n string) bool    { return f.types[n] }
+func (f fakeHints) TopLevelDirs() []string    { return f.top }
+func (f fakeHints) HasOdin() bool             { return f.hasOdin }
+func (f fakeHints) OdinPackages() []string    { return f.odin }
+func (f fakeHints) HasPython() bool           { return f.hasPy }
+func (f fakeHints) PyModules() []string       { return f.py }
+
+func goHints() fakeHints {
+	return fakeHints{
+		pkgs:  map[string]bool{"httpx": true, "cfg": true, "store": true, "main": true},
+		types: map[string]bool{"Server": true, "Config": true},
+		top:   []string{"cmd", "docs", "internal", "pkg", "scripts"},
+	}
+}
+
+func run(t *testing.T, h Hints, md string) []model.Reference {
+	t.Helper()
+	doc := markdown.Parse("README.md", []byte(md))
+	return Extract(doc, h, Options{})
+}
+
+func find(refs []model.Reference, kind model.Kind, norm string) *model.Reference {
+	for i := range refs {
+		if refs[i].Kind == kind && refs[i].Norm == norm {
+			return &refs[i]
+		}
+	}
+	return nil
+}
+
+func TestClassifyWhole(t *testing.T) {
+	h := goHints()
+	tests := []struct {
+		in   string
+		kind model.Kind
+		norm string
+		conf model.Confidence
+	}{
+		{"https://example.com/x", model.KindURL, "https://example.com/x", model.Low},
+		{"docs/guide.md#setup", model.KindAnchor, "docs/guide.md#setup", model.High},
+		{"--addr", model.KindFlag, "addr", model.High},
+		{"--timeout_ms=5", model.KindFlag, "timeout-ms", model.High},
+		{"-v", model.KindFlag, "v", model.Medium},
+		{"FIXTURE_DEBUG", model.KindEnv, "FIXTURE_DEBUG", model.High},
+		{"pkg/httpx/server.go", model.KindPath, "pkg/httpx/server.go", model.High},
+		{"./scripts/verify.ps1", model.KindPath, "scripts/verify.ps1", model.High},
+		{`docs\guide.md`, model.KindPath, "docs/guide.md", model.High},
+		{"docs/", model.KindPath, "docs", model.High},
+		{"docs", model.KindPath, "docs", model.High},
+		{"internal/store", model.KindPath, "internal/store", model.High},
+		{"main.go", model.KindPath, "main.go", model.Medium},
+		{"a/b", "", "", 0},
+		{"path/to/file.go", "", "", 0},
+		{"/api/v1/users", "", "", 0},
+		{"C:/Users/x", "", "", 0},
+		{"httpx.NewServer(addr)", model.KindGoSymbol, "httpx.NewServer", model.High},
+		{"httpx.Server.Addr", model.KindGoSymbol, "httpx.Server.Addr", model.High},
+		{"*httpx.Server", model.KindGoSymbol, "httpx.Server", model.High},
+		{"Server.Addr()", model.KindGoSymbol, "Server.Addr", model.High},
+		{"NewServer()", model.KindGoSymbol, "NewServer", model.Medium},
+		{"http.Handler", "", "", 0},
+		{"context.Context", "", "", 0},
+		{"app.Run(ctx)", model.KindGoSymbol, "app.Run", model.Low},
+		{"server.addr", model.KindConfigKey, "server.addr", model.Low},
+		{"jsonx.ReadJSONL[T](path, fn)", "", "", 0}, // jsonx unknown here → Low gosym
+		{"example.com/fixture/pkg/httpx", model.KindImport, "example.com/fixture/pkg/httpx", model.High},
+		{"example.com/fixture/pkg/httpx.WriteData", model.KindGoSymbol, "httpx.WriteData", model.High},
+		{"<path>", "", "", 0},
+		{"Node.js", "", "", 0},
+		{"e.g.", "", "", 0},
+		{"README", "", "", 0},
+		{"go.mod", model.KindPath, "go.mod", model.Medium},
+		{".gitignore", model.KindPath, ".gitignore", model.Medium},
+		{"cmd/app/...", model.KindPath, "cmd/app", model.High},
+	}
+	x := &extractor{doc: markdown.Parse("README.md", nil), hints: h, seen: map[string]bool{}}
+	for _, tc := range tests {
+		r := x.classifyWhole(tc.in)
+		if tc.kind == "" {
+			if r != nil && !(tc.in == "jsonx.ReadJSONL[T](path, fn)" && r.Confidence == model.Low) {
+				t.Errorf("%q: expected no reference, got %+v", tc.in, r)
+			}
+			continue
+		}
+		if r == nil {
+			t.Errorf("%q: expected %s %q, got nil", tc.in, tc.kind, tc.norm)
+			continue
+		}
+		if r.Kind != tc.kind || r.Norm != tc.norm || r.Confidence != tc.conf {
+			t.Errorf("%q: got kind=%s norm=%q conf=%s, want %s %q %s", tc.in, r.Kind, r.Norm, r.Confidence, tc.kind, tc.norm, tc.conf)
+		}
+	}
+}
+
+func TestClassifyTokens(t *testing.T) {
+	h := goHints()
+	x := &extractor{doc: markdown.Parse("README.md", nil), hints: h, seen: map[string]bool{}}
+	refs := x.classifyTokens("cfg.LoadJSON(path, &c); cfg.Validate(&c) --addr :9090 FIXTURE_DEBUG=1 ./scripts/x.ps1 3.14")
+	want := map[string]bool{
+		"gosym|cfg.LoadJSON": true, "gosym|cfg.Validate": true, "flag|addr": true,
+		"env|FIXTURE_DEBUG": true, "path|scripts/x.ps1": true,
+	}
+	got := map[string]bool{}
+	for _, r := range refs {
+		got[string(r.Kind)+"|"+r.Norm] = true
+	}
+	for k := range want {
+		if !got[k] {
+			t.Errorf("missing %s in %v", k, got)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("unexpected extra refs: %v", got)
+	}
+}
+
+func TestDocumentExtraction(t *testing.T) {
+	md := `# Fixture
+
+## Usage
+
+Run ` + "`go run ./cmd/app --addr :9090`" + `. See ` + "`pkg/httpx/router.go`" + ` and [guide](docs/guide.md#setup)
+and [missing](docs/guid.md) and ![logo](assets/logo.png) and [ext](https://example.com).
+
+` + "```sh" + `
+$ ./scripts/verify.ps1
+go run ./cmd/server -v
+python tools/helper.py --fast
+odin build gbench -out:gbench.exe
+go build -o dist/app ./cmd/app
+` + "```" + `
+
+` + "```go" + `
+import (
+	"fmt"
+	"example.com/fixture/pkg/httpx"
+	"example.com/fixture/pkg/router"
+)
+s := httpx.NewServer(":8080") // httpx.Old
+` + "```" + `
+
+<!-- docrot:ignore -->
+Ignored ` + "`docs/nonexistent.md`" + `.
+
+Prose path docs/prose.md here and ` + "`Server.Address()`" + `.
+`
+	refs := run(t, goHints(), md)
+	checks := []struct {
+		kind model.Kind
+		norm string
+		line int
+	}{
+		{model.KindPath, "cmd/app", 5},
+		{model.KindFlag, "addr", 5},
+		{model.KindPath, "pkg/httpx/router.go", 5},
+		{model.KindPath, "docs/guide.md", 5},
+		{model.KindAnchor, "docs/guide.md#setup", 5},
+		{model.KindPath, "docs/guid.md", 6},
+		{model.KindPath, "assets/logo.png", 6},
+		{model.KindURL, "https://example.com", 6},
+		{model.KindCommand, "scripts/verify.ps1", 9},
+		{model.KindCommand, "cmd/server", 10},
+		{model.KindCommand, "tools/helper.py", 11},
+		{model.KindCommand, "gbench", 12},
+		{model.KindCommand, "cmd/app", 13},
+		{model.KindImport, "example.com/fixture/pkg/httpx", 16},
+		{model.KindImport, "example.com/fixture/pkg/router", 16},
+		{model.KindGoSymbol, "httpx.NewServer", 16},
+		{model.KindPath, "docs/prose.md", 28},
+		{model.KindGoSymbol, "Server.Address", 28},
+	}
+	for _, c := range checks {
+		r := find(refs, c.kind, c.norm)
+		if r == nil {
+			t.Errorf("missing %s %q", c.kind, c.norm)
+			continue
+		}
+		if r.Loc.Line != c.line {
+			t.Errorf("%s %q: line %d, want %d", c.kind, c.norm, r.Loc.Line, c.line)
+		}
+		if r.Section != "Usage" {
+			t.Errorf("%s %q: section %q, want Usage", c.kind, c.norm, r.Section)
+		}
+	}
+	if find(refs, model.KindPath, "docs/nonexistent.md") != nil {
+		t.Error("ignored line leaked")
+	}
+	if find(refs, model.KindPath, "dist/app") != nil || find(refs, model.KindCommand, "dist/app") != nil {
+		t.Error("output sink -o dist/app must not be a reference")
+	}
+	if find(refs, model.KindGoSymbol, "httpx.Old") != nil {
+		t.Error("comment in go block leaked")
+	}
+	if find(refs, model.KindPath, "fmt") != nil || find(refs, model.KindImport, "fmt") != nil {
+		t.Error("stdlib import leaked")
+	}
+}
+
+func TestIgnoreFileAndRegex(t *testing.T) {
+	doc := markdown.Parse("x.md", []byte("<!-- docrot:ignore-file -->\n`docs/x.md`\n"))
+	if got := Extract(doc, goHints(), Options{}); len(got) != 0 {
+		t.Fatalf("ignore-file: got %d refs", len(got))
+	}
+	doc = markdown.Parse("x.md", []byte("`docs/x.md` `docs/y.md`\n"))
+	got := Extract(doc, goHints(), Options{Ignore: []*regexp.Regexp{regexp.MustCompile(`x\.md$`)}})
+	if len(got) != 1 || got[0].Norm != "docs/y.md" {
+		t.Fatalf("ignore regex: got %+v", got)
+	}
+}
+
+func TestOdinAndPython(t *testing.T) {
+	h := fakeHints{noModule: true, hasOdin: true, odin: []string{"fixture_odin"}, hasPy: true, py: []string{"tools.helper", "helper"}}
+	refs := run(t, h, "`fixture_odin.render_frame` `render_frames()` `helper.summarize` `Runner.run_async` `server.addr`\n")
+	if r := find(refs, model.KindOdinSym, "fixture_odin.render_frame"); r == nil || r.Confidence != model.High {
+		t.Errorf("odin pkg symbol: %+v", r)
+	}
+	if r := find(refs, model.KindOdinSym, "render_frames"); r == nil || r.Confidence != model.Medium {
+		t.Errorf("odin snake call: %+v", r)
+	}
+	if r := find(refs, model.KindPySym, "helper.summarize"); r == nil || r.Confidence != model.High {
+		t.Errorf("py module symbol: %+v", r)
+	}
+	if r := find(refs, model.KindPySym, "Runner.run_async"); r == nil {
+		t.Errorf("py Class.method: %+v", r)
+	}
+	if r := find(refs, model.KindOdinSym, "server.addr"); r == nil || r.Confidence != model.Low {
+		t.Errorf("lowercase dotted in odin repo should be Low odinsym: %+v", refs)
+	}
+}
+
+func TestShellPrompts(t *testing.T) {
+	x := &extractor{doc: markdown.Parse("README.md", nil), hints: goHints(), seen: map[string]bool{}}
+	for _, line := range []string{
+		"$ ./scripts/a.ps1",
+		"PS C:\\repo> .\\scripts\\a.ps1",
+		"user@host:~/repo$ ./scripts/a.ps1 --flag",
+		"./scripts/a.ps1 && go test ./...",
+	} {
+		refs := x.shellRefs(line)
+		if len(refs) == 0 || refs[0].Norm != "scripts/a.ps1" || refs[0].Kind != model.KindCommand {
+			t.Errorf("%q: got %+v", line, refs)
+		}
+	}
+	if refs := x.shellRefs("# ./scripts/comment.ps1"); len(refs) != 0 {
+		t.Errorf("comment line: %+v", refs)
+	}
+	if refs := x.shellRefs("go test ./..."); len(refs) != 0 {
+		t.Errorf("./... must not be a reference: %+v", refs)
+	}
+}
+
+func TestContextTruncation(t *testing.T) {
+	long := strings.Repeat("x", 300)
+	refs := run(t, goHints(), "`docs/a.md` "+long+"\n")
+	if len(refs) != 1 || len(refs[0].Context) > 160 {
+		t.Fatalf("context not truncated: %d", len(refs[0].Context))
+	}
+}
