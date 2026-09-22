@@ -1,0 +1,5 @@
+{
+  "server": { "addr": ":8080", "timeout_ms": 5000 },
+  "log": { "level": "info", "format": "json" },
+  "retention": { "days": 7 }
+}

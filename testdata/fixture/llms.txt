@@ -1,0 +1,4 @@
+# fixture
+
+- [httpx](pkg/httpx/README.md): `httpx.WriteData`, `httpx.WriteError`
+- [store](internal/store/store.go): `store.Open`

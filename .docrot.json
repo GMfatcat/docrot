@@ -1,0 +1,8 @@
+{
+  "docs": ["**/*.md", "llms.txt"],
+  "exclude": ["vendor/**", "node_modules/**", "**/testdata/**", "dist/**", ".git/**"],
+  "pairs": [{ "source": "README.md", "translation": "README-zh.md" }],
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90 },
+  "coverage": { "report": false, "includeInternal": false },
+  "failOn": "error"
+}

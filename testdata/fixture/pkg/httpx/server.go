@@ -1,0 +1,39 @@
+// Package httpx is a tiny HTTP helper used by the fixture docs.
+package httpx
+
+import "net/http"
+
+// Config is the server configuration.
+type Config struct {
+	Server struct {
+		Addr    string `json:"addr"`
+		Timeout int    `json:"timeout_ms"`
+	} `json:"server"`
+	Log LogConfig `json:"log"`
+}
+
+// LogConfig controls logging.
+type LogConfig struct {
+	Level  string `json:"level"`
+	Format string `json:"format"`
+}
+
+// Server wraps http.Server.
+type Server struct {
+	addr string
+}
+
+// NewServer creates a Server.
+func NewServer(addr string) *Server { return &Server{addr: addr} }
+
+// Addr returns the listen address.
+func (s *Server) Addr() string { return s.addr }
+
+// WriteData writes a JSON envelope.
+func WriteData(w http.ResponseWriter, v any) error { return nil }
+
+// WriteError writes an error envelope.
+func WriteError(w http.ResponseWriter, err error) {}
+
+// Undocumented is never mentioned in any doc.
+func Undocumented() {}
