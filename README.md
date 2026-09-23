@@ -75,6 +75,8 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 | `install-mismatch` | `go get example.com/old/name`, `pip install my-tool`, `npm install @acme/x` | when the name is nearly this project's, it matches `go.mod` / `pyproject.toml` / `package.json` exactly |
 | `toolchain-mismatch` | "requires Go 1.21+", "Python 3.9 or later" | the `go` directive / `requires-python` asks for the same minimum | <!-- docrot:ignore toolchain-mismatch -->
 | `missing-target` | `make lint`, `npm run build`, `just release`, `task deploy` | the Makefile / package.json scripts / justfile / Taskfile define it |
+| `default-mismatch` | `` `--port` `` (default: `` `8080` ``), a table with a Default column | `flag.Int("port", 8080, …)`, a `default:"…"` struct tag, `typer.Option(8080)` or `os.getenv("X", "…")` says the same |
+| `stale-symbol` | a section that names `` `httpx.NewServer` `` | the body of that declaration has not churned in several commits since the section was edited (git) |
 | `broken-url` | `https://…` (only with `--net`) | the URL answers 2xx/3xx |
 | `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
 | `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
@@ -87,8 +89,10 @@ silence it.
 
 ## How it decides
 
-1. **Tokenize** each Markdown file: headings, fenced blocks, inline code
-   spans, links, images, tables, HTML comments. No CommonMark dependency.
+1. **Tokenize** each document: headings, fenced blocks, inline code
+   spans, links, images, tables, comments. Markdown, reStructuredText
+   (Sphinx roles, directives, toctrees, labels; `.txt` sources too) and
+   AsciiDoc are all read into the same shape. No CommonMark dependency.
 2. **Extract** references from code spans, link targets, shell blocks and
    Go blocks. Each reference gets a *kind* and a *confidence*: a path with a
    directory and an extension is high; a bare file name is medium; a
@@ -103,7 +107,9 @@ silence it.
    suggestion (Damerau-Levenshtein over the right candidate set, plus git
    rename history for paths).
 5. **Stale**: `git blame` gives each section an edit time; `git log` counts
-   commits to every referenced file after that time.
+   commits to every referenced file after that time, and the blame of each
+   referenced declaration says whether *its* body moved on. Blame and log
+   answers are cached in the output directory between runs.
 6. **Pairs**: structural fingerprints of both documents are diffed.
 7. **Comments**: for every symbol a document referred to, the attached
    doc comment or docstring is checked the same way — names it cites must
@@ -149,7 +155,7 @@ scanned.
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
   "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
-  "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
+  "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
   "net": false,
   "failOn": "error",
   "minConfidence": "low",
@@ -198,6 +204,7 @@ same place:
 .docrot/.gitignore   a single "*", so the reports never reach a commit
 .docrot/report.md    for agents: findings by file, how to read them, a checklist
 .docrot/report.html  for humans: the filterable single-file page
+.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 .docrot/report.json  the stable JSON schema
 .docrot/report.txt   the terminal report, with info findings
 ```
@@ -207,7 +214,10 @@ interrupted run never leaves half a report where the next reader expects a
 whole one. The directory is excluded from document discovery, so yesterday's
 report is never checked as though it were documentation. Pass `--out-dir` to
 put it somewhere else, `--no-out` to write nothing this run, or set `outDir`
-to the empty string to turn it off for good.
+to the empty string to turn it off for good. The directory also keeps
+`git-cache.json`, the blame and log answers of the last run keyed by blob
+hash and HEAD, which is what makes a second run on a large repository take
+a tenth of the time; deleting it only costs that speed.
 
 ## Commands
 
@@ -222,7 +232,7 @@ docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets
+docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets|defaults
 docrot init [dir]
 docrot version
 ```

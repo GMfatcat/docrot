@@ -66,6 +66,8 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 | `install-mismatch` | `go get example.com/old/name`、`pip install my-tool`、`npm install @acme/x` | 名字接近本專案時，必須與 `go.mod`／`pyproject.toml`／`package.json` 完全一致 |
 | `toolchain-mismatch` | 「requires Go 1.21+」、「Python 3.9 or later」 | `go` 指令／`requires-python` 要求的最低版本相同 | <!-- docrot:ignore toolchain-mismatch -->
 | `missing-target` | `make lint`、`npm run build`、`just release`、`task deploy` | Makefile／package.json scripts／justfile／Taskfile 有定義它 |
+| `default-mismatch` | `` `--port` ``（default: `` `8080` ``）、有 Default 欄的表格 | `flag.Int("port", 8080, …)`、`default:"…"` struct tag、`typer.Option(8080)` 或 `os.getenv("X", "…")` 說的是同一個值 |
+| `stale-symbol` | 某章節提到 `` `httpx.NewServer` `` | 該宣告的本體在章節最後編輯之後沒有連續好幾個 commit 的變動（git） |
 | `broken-url` | `https://…`（僅在 `--net` 時） | URL 回應 2xx/3xx |
 | `stale-section` | 某章節最後編輯於 2026-06-01 | 它引用的程式碼此後沒有大幅變動（git） |
 | `pair-*` | `README.md` ↔ `README-zh.md` | 標題相同、程式碼區塊相同、連結／表格／數字相同、翻譯沒有落後原文（git） |
@@ -77,8 +79,9 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 
 ## 怎麼判斷
 
-1. **Tokenize** 每個 Markdown 檔：標題、fenced 區塊、inline code span、連結、圖片、表格、
-   HTML 註解。不依賴任何 CommonMark 實作。
+1. **Tokenize** 每份文件：標題、fenced 區塊、inline code span、連結、圖片、表格、註解。
+   Markdown、reStructuredText（Sphinx 的 role、directive、toctree、label；`.txt` 來源也行）與
+   AsciiDoc 都讀成同一種結構。不依賴任何 CommonMark 實作。
 2. **抽取** code span、連結目標、shell 區塊與 Go 區塊裡的引用。每個引用都有*種類*與*信心值*：
    有目錄有副檔名的路徑是 high；光一個檔名是 medium；第一段是不認識的小寫字的點號名稱
    （`app.Run`）是 low，永遠不會被報出來。
@@ -87,7 +90,8 @@ docrot check --changed          # only the documents you touched (pre-commit spe
    字串常值，以及各種 manifest（`go.mod`、`pyproject.toml`、`package.json`、Makefile、justfile、Taskfile）。
 4. **解析**每個引用，產生附「你是不是想找」建議的 finding（在正確的候選集合上做
    Damerau-Levenshtein，路徑另外參考 git 改名歷史）。
-5. **過期判定**：`git blame` 給每個章節一個編輯時間；`git log` 數出那之後每個被引用檔案的 commit 數。
+5. **過期判定**：`git blame` 給每個章節一個編輯時間；`git log` 數出那之後每個被引用檔案的 commit 數，
+   被引用的宣告本身也用 blame 看它的本體有沒有繼續變動。blame 與 log 的答案會快取在輸出目錄裡，下次沿用。
 6. **雙語配對**：對兩份文件的結構指紋做 diff。
 7. **註解**：文件指到的每個符號，其 doc comment／docstring 用同一套方法檢查——引用的名字必須存在，
    註解修改之後本體大幅變動也會標出來。
@@ -123,7 +127,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
   "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
-  "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
+  "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
   "net": false,
   "failOn": "error",
   "minConfidence": "low",
@@ -164,6 +168,7 @@ inline text <!-- docrot:ignore -->  this line
 .docrot/.gitignore   a single "*", so the reports never reach a commit
 .docrot/report.md    for agents: findings by file, how to read them, a checklist
 .docrot/report.html  for humans: the filterable single-file page
+.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 .docrot/report.json  the stable JSON schema
 .docrot/report.txt   the terminal report, with info findings
 ```
@@ -186,7 +191,7 @@ docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets
+docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets|defaults
 docrot init [dir]
 docrot version
 ```

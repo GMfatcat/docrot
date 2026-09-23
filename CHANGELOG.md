@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.0 — 2026-09-23
+
+The rest of `docs/roadmap.md`'s tier 2 that was worth doing.
+
+- reStructuredText and AsciiDoc documents are checked like Markdown:
+  `**/*.rst` and `**/*.adoc` are in the default `docs`, and a `.txt` that
+  looks like RST is read as RST (Django). Sphinx roles, directives,
+  toctrees, labels, autosectionlabel refs, literal and doctest blocks,
+  tables and `.. docrot:ignore` are understood; `/rooted` targets climb to
+  the source root; `:ref:` misses are warnings, info when intersphinx is
+  configured. On requests the 21 RST pages produce one error (a removed
+  module named in the changelog); on Django's 686 pages the errors are
+  the deprecation timeline and release notes naming removed APIs, tutorial
+  project files, and Sphinx labels owned by Python's own documentation.
+- Persistent git cache: blame (by blob hash) and log (by HEAD) answers are
+  kept in `<outDir>/git-cache.json`, pruned to what the run used. A second
+  FastAPI run with git drops from 14.8 s to 1.9 s, meowbase from 1.7 s to
+  0.2 s, with identical findings.
+- `stale-symbol`: the body of a declaration a section names changed in
+  several commits after the section was edited; replaces the section-level
+  finding when it fires. Warning by default.
+- `default-mismatch`: documented defaults ("`--port` defaults to `8080`",
+  "(default: `info`)", a Default table column) against `flag.*` literals,
+  `default:"…"` struct tags, typer/click/argparse literals and
+  `os.getenv(NAME, default)`; booleans, numbers and durations compare by
+  value. `docrot index --kind defaults`.
+- Python index: module-level assignments of any case are symbols,
+  attributes of known classes and objects resolve, and a name missing from
+  an existing module is a warning that names where the name lives instead
+  of being rescued by a same-named object elsewhere. Similar-name
+  suggestions only score names of a compatible length: Django's 64,000
+  symbols resolve in 4 s instead of 15 s.
+- Paths that exist under a sub-tree anywhere are warnings naming the tree;
+  `myapp/…` and `mysite/…` are placeholders; keys below a map-typed field
+  are valid; bare manifest names (`package.json`, `Makefile`) are not claims.
+
 ## 0.3.0 — 2026-09-23
 
 Everything in tier 1 of `docs/roadmap.md`, plus a performance fix.

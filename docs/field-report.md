@@ -197,6 +197,20 @@ names). What the new rules found, verified by hand:
 - **Targets and install lines.** No findings: these repositories have no
   Makefiles and install through their own module paths.
 
+## 0.4.0 update
+
+- **git cache.** meowbase with git: 1.7 s cold, 0.2 s warm, identical
+  findings (48 KB cache).
+- **stale-symbol.** At the default thresholds (3 commits, or 90 days) no
+  declaration these repositories document has churned enough since its
+  section was written; with `minChurn: 1` meowbase reports eight, e.g.
+  `api.NewServer` (examples/service/internal/api/server.go:77) changed once
+  after the PRD section naming it was edited. Sections that get a symbol
+  finding lose their file-level one, so the total does not grow.
+- **default-mismatch.** meowbase declares 58 defaults (`default:"…"` struct
+  tags in `cfg`, `openapix`, `servicex`); no document states one that the
+  code contradicts.
+
 ## How to reproduce
 
 ```sh

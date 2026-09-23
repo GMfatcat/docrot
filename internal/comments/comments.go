@@ -79,6 +79,9 @@ var skipTokens = map[string]bool{
 	"snake_case": true, "camelCase": true, "PascalCase": true, "kebab-case": true,
 	"UPPER_SNAKE": true, "UPPER_CASE": true, "lower_case": true, "SCREAMING_SNAKE_CASE": true,
 	"snake_case_name": true, "CamelCase": true,
+	// format and product names spelled like identifiers
+	"reStructuredText": true, "AsciiDoc": true, "CommonMark": true, "JavaScript": true, "TypeScript": true,
+	"PowerShell": true, "GitHub": true, "GitLab": true, "OpenAPI": true, "GraphQL": true, "MkDocs": true,
 	// JSON Schema / OpenAPI vocabulary that reads like camelCase identifiers
 	"anyOf": true, "oneOf": true, "allOf": true, "additionalProperties": true, "readOnly": true,
 	"writeOnly": true, "exclusiveMinimum": true, "exclusiveMaximum": true, "minLength": true,

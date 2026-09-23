@@ -32,16 +32,34 @@ patterns, add regular expressions to `ignore` in `.docrot.json`; they are
 matched against the reference text. To change a rule's level, set
 `severity` in `.docrot.json`, e.g. `{"stale-section": "info"}`.
 
+## Document formats
+
+`docs` selects the files: `**/*.md`, `**/*.rst`, `**/*.adoc` and `llms.txt`
+by default. reStructuredText covers titles (docutils ids), `code-block` /
+`literalinclude` / `include` / `image` / `figure` / `toctree` and the autodoc
+and `py:` declaration directives (their names are claims), `.. _label:`
+targets, `::` literal and `>>>` blocks, grid and simple tables, ``literals``,
+the `:func:` `:class:` `:meth:` `:mod:` `:attr:` `:data:` `:exc:` `:file:`
+`:option:` `:envvar:` `:doc:` `:ref:` `:download:` roles (and
+autosectionlabel `docname:Title` refs), `` `text <target>`_ `` and named
+references, bare URLs, and `.. docrot:ignore` comments in every form the
+Markdown directive has. A `.txt` file that looks like RST (Django's docs) is
+read as RST when included in `docs`. Targets that start with `/` are relative
+to the Sphinx source root, so the resolver climbs the document's ancestors.
+AsciiDoc covers `=` titles, `[[id]]`/`[#id]` anchors, `[source,lang]`
+listings, `link:`/`xref:`/`include::`/`image::` macros, `<<xrefs>>`, bare
+URLs, `//` comments and `////` blocks.
+
 ## Reference rules
 
 | Rule | Kind | Meaning |
 |---|---|---|
 | `missing-path` | path | A file or directory mentioned in the document does not exist. docrot tries the path relative to the document, relative to the repo root, as a glob, and under every configured sibling repo. Suggestions come from same-name files elsewhere, case differences, small typos, and git rename history. A path that exists under a sub-tree (`internal/api` → `examples/service/internal/api`) is reported as a warning that names the sub-tree. | <!-- docrot:ignore -->
-| `missing-symbol` | gosym / odinsym / pysym | A code symbol mentioned in the document does not exist. Go symbols are resolved with `go/parser`: `pkg.Name`, `pkg.Type.Method`, `Type.Method`, `Name()`. Odin and Python symbols are resolved from a lightweight declaration index. |
+| `missing-symbol` | gosym / odinsym / pysym | A code symbol mentioned in the document does not exist. Go symbols are resolved with `go/parser`: `pkg.Name`, `pkg.Type.Method`, `Type.Method`, `Name()`. Odin and Python symbols are resolved from a lightweight declaration index; Python module-level assignments of any case count (`handler500`, `connection`), attributes of a known class or object are accepted, and a name that is missing from a module that exists but is defined elsewhere in the package is a *warning* naming where it lives (a moved name, or one reachable through a compatibility shim) rather than an error. |
 | `unknown-flag` | flag | `--name` / `-name` in the document is not defined by any `flag.*` call. `-` and `_` are treated as equivalent. High confidence is a warning, medium is info; single-dash flags inside a longer command are never reported. Flags after an external program (`go test -race`, `git log --oneline`) are ignored, except after `go run ./cmd/x`. |
 | `unknown-env` | env | An `UPPER_SNAKE` name is never read via `os.Getenv`, `os.LookupEnv`, or any call whose name contains `Env`. Only reported when the line mentions an environment (env, export, `$`, 環境…), when the code reads at least one variable, and when the name is not a well-known external one (`GOPATH`, `GIT_*`, `HOME`…). |
 | `unknown-config-key` | configkey | A dotted key such as `server.addr` appears neither as a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path in any struct nor in any sample config file (`config*.json`, `*.example.json`, …). In prose it is only reported when the top-level segment is a known section, and always as info. A ```` ```json ```` block whose top-level keys include a known config key is a configuration example: every key path in it is checked (comments, trailing commas and `...` placeholders are tolerated; children of an unknown key are not repeated), a missing key is a warning when at least half the top-level keys are known and info otherwise, and suggestions come from the siblings under the same parent (`server.timeout` → `server.timeout_ms`). |
-| `broken-anchor` | anchor | A link such as `[x](docs/rules.md#exit-codes)` or `[x](#exit-codes)` points to a heading that does not exist. Slugs follow GitHub rules (underscores kept), including CJK headings and `-1` suffixes for duplicates. MkDocs custom ids (`## Title { #id }`, `[](){#id}`) count as anchors, and a page containing a mkdocstrings `::: module` directive accepts any anchor. Explicit ids in raw HTML (`<a id="x">`, `<a name="x">`, `<h2 id="x">`) count as anchors. Line anchors (`#L10-L20`) are ignored. |
+| `broken-anchor` | anchor | A link such as `[x](docs/rules.md#exit-codes)` or `[x](#exit-codes)` points to a heading that does not exist. Slugs follow GitHub rules (underscores kept), including CJK headings and `-1` suffixes for duplicates. MkDocs custom ids (`## Title { #id }`, `[](){#id}`) count as anchors, and a page containing a mkdocstrings `::: module` directive accepts any anchor. Explicit ids in raw HTML (`<a id="x">`, `<a name="x">`, `<h2 id="x">`) count as anchors. In reStructuredText the slugs are docutils ids, `.. _label:` targets are global to the documentation set (any page may `:ref:` them), `:ref:` misses are warnings because intersphinx may own the label (info when a `conf.py` maps inventories), and Sphinx's own `genindex`/`modindex`/`search` never count. AsciiDoc ids are `[[id]]`, `[#id]` and the `_section_title` defaults. Line anchors (`#L10-L20`) are ignored. |
 | `broken-url` | url | Only with `--net`: an external URL returned 4xx/5xx or failed to connect. Local, private and `example.*` hosts are skipped. |
 | `missing-command` | command | In a shell code block, the script or path a command refers to (`./scripts/verify.py`, `go run ./cmd/docrot`, `python scripts/demo.py`, `odin build dir`) does not exist. Output arguments (`-o dist/app`, `> out.txt`, `cp`/`mv` destinations) are never checked. In plain ```` ```text ```` blocks only lines with a shell prompt (`$ cmd`) count. |
 | `missing-import` | import | In a Go code block, an import path under this module's path does not correspond to a package directory. Imports outside the module (stdlib, third-party) are ignored. |
@@ -49,6 +67,7 @@ matched against the reference text. To change a rule's level, set
 | `install-mismatch` | install | `go get` / `go install` of a path under this module whose package directory does not exist, or of a path whose last segment is this module's but the rest differs (the README still installs the old path); `pip install` / `uv add` / `poetry add` / `pipx install` of a name within two edits of `pyproject.toml`'s name (PEP 503 normalisation, extras and version specifiers stripped); `npm install` / `yarn add` of a name close to `package.json`'s. Other packages are dependencies and never reported. Shell blocks are errors, inline spans warnings. |
 | `toolchain-mismatch` | toolchain | A sentence with a requirement word (requires, needs, minimum, at least, or later, supports, 需要, 以上…) names `Go 1.21` / `Python 3.9` while `go.mod`'s `go` directive / `requires-python` (or Poetry's `python`) says otherwise. Warning when the document promises less than the manifest requires (users on that version cannot build), info when it asks for more. Negated sentences ("no longer supports Python 3.8") are skipped, and so are the historical documents of `stale.exclude` (changelogs, release notes). | <!-- docrot:ignore toolchain-mismatch -->
 | `missing-target` | target | `make x`, `npm run x`, `just x`, `task x` (shell blocks: error; inline spans: warning) names a target that the root Makefile / package.json `scripts` / justfile / Taskfile does not define. Not checked when the runner file is absent, or when the document sits inside a directory that has its own runner file (a monorepo package). |
+| `default-mismatch` | default | A line that names exactly one flag / config key / environment variable and states a default ("`--port` defaults to `8080`", "(default: `info`)", the Default column of a table) is compared with the code: `flag.*` literal arguments (numbers, strings, booleans, `n*time.Unit` durations), `default:"…"` struct tags under their dotted key, `typer.Option(...)`/`typer.Argument(...)` literals by parameter name, `click.option`/`add_argument` `default=`, `os.getenv(NAME, default)`. Quotes, booleans, numbers and durations are normalised (`30s` equals `30000ms`). Names the code declares no default for are skipped. Warning, with the code's value as the suggestion. |
 
 Letter case is compared exactly on every platform: `docs/foo.md` is not
 `Docs/Foo.md`, even on Windows, and the finding says "differs only by
@@ -80,6 +99,7 @@ registered through constants out of the report.
 | Rule | Meaning |
 |---|---|
 | `stale-section` | Requires git. The section (heading → next heading) was last edited at time *T* (from `git blame`), but a **file** it references has `minChurn` or more commits after *T*, or at least one commit and `minDays` days have passed. Directory references do not count. The message lists the most-changed files. Tune `stale.minChurn` / `stale.minDays`, exclude dated documents with `stale.exclude` (changelogs, release notes, research notes, specs and plans are excluded by default; the same list is skipped by `toolchain-mismatch`), or disable with `stale.enabled: false` or `--no-git`. |
+| `stale-symbol` | Requires git. A section names a Go/Python/Odin declaration whose body lines (from a whitespace-insensitive blame of the source file) were last changed by `stale.minChurn` or more distinct commits after the section's edit time, or by one commit `stale.minDays` later. The finding sits on the reference and names `file:line`; when a section gets one, its coarser `stale-section` finding is dropped. Severity via `stale-symbol` (default warning). |
 
 ## Bilingual pairs
 
@@ -123,6 +143,14 @@ document is still parsed so cross-document anchors resolve, but only the
 changed ones are extracted, resolved and analysed; pair checks run for
 pairs with a changed side; coverage is skipped (it needs every document).
 A clean tree checks nothing and exits 0. Requires git.
+
+## Git cache
+
+Blame and log answers are kept in `<outDir>/git-cache.json` between runs:
+blame by the blob hash of the file at HEAD (never for a file with
+uncommitted changes), log by HEAD, and only the entries a run used are
+written back. Findings are identical with or without it; the difference is
+time. `--no-out` disables the cache along with the reports.
 
 ## Exit codes
 

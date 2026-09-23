@@ -3,10 +3,23 @@
      yet; that is the point of a roadmap, so docrot skips this file. -->
 # Roadmap: what docrot does not check yet
 
-A full review of the pipeline after 0.2.0, updated after 0.3.0 shipped its
-first tier, listing claims documents make that docrot still takes on faith. Ordered by the ratio of "how often this
+A full review of the pipeline after 0.2.0, updated after 0.3.0 and 0.4.0
+shipped the first two tiers, listing claims documents make that docrot still
+takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
 started; each item names the stage it would live in.
+
+## Done in 0.4.0 (from tier 2)
+
+reStructuredText and AsciiDoc input, the persistent git cache,
+`stale-symbol` and `default-mismatch` shipped in 0.4.0; see `CHANGELOG.md`.
+Lessons: Sphinx documentation sets are global (labels resolve across pages,
+`/paths` are relative to a source root that is not the repository root,
+intersphinx owns labels the tree does not define); a name missing from a
+module that exists deserves a warning with its new home, not a rescue by any
+same-named object; documented defaults are rarer in the wild than expected
+(none of the corpus repositories states one that the code contradicts), so
+the rule stays narrow — one subject per line, literal-looking values only.
 
 ## Done in 0.3.0 (was tier 1)
 
@@ -30,15 +43,11 @@ rather than checked.
 
 | Candidate | The lie it catches | Where | Cost |
 |---|---|---|---|
-| **reStructuredText and AsciiDoc input** — at least headings, literals, `:func:`/`:class:` roles, `.. code-block::`, `.. literalinclude::` paths, `:ref:` targets | Half of the Python ecosystem (Django, NumPy, requests, Sphinx sites) documents in RST; docrot currently sees none of it. For credibility outside Markdown-first projects this is the biggest gap. | new `internal/rst` tokenizer producing the same `markdown.Doc` shape, `engine` doc discovery by extension | medium |
-| **`stale-symbol`** — the symbol-level counterpart of `stale-section`: a document paragraph names `httpx.NewServer`; the function body has churned N commits since the paragraph was last edited | `stale-section` works per section and per file. Pointing at the exact symbol makes the finding actionable and lets prose that names five functions be judged five times. Spans already exist for the comment checks. | `stale` (use `SymbolSpan` + blame of the source file) | small–medium |
-| **Flag and config default values** — tables like `| --port | 8080 |` or prose "defaults to 30s" vs the literal in `flag.Int("port", 9090, …)` / struct defaults / `Field(default=…)` | Defaults drift silently; docs are the only place users read them. | `index/gosym` (default literal per flag), `index/py` (typer/click/argparse defaults), `extract` (table cells next to a flag), `resolve` | medium |
 | **Go example blocks must parse** — run `go/parser` on ```` ```go ```` fences (with an implicit `package main` wrapper when needed) and report syntax errors; optionally `gofmt` drift | Copy-paste examples with a missing brace or an old syntax. Stdlib-only and cheap for Go; Python would need a real parser (out of scope). | `extract` or a new `examples` stage | small for Go |
 | **Untranslated pages** (`pair-missing`) — in a `docs/en` ↔ `docs/zh` tree, list source pages with no counterpart, and translations whose source disappeared (`pair-orphan`) | FastAPI has both kinds; translation teams track this by hand. | `pairs` | small |
 | **Coverage for routes and config keys** — once routes and string literals are indexed, "documented / total" for endpoints and for config keys, next to symbols/flags/env | The `llms.txt` audience: an agent needs the endpoint list and the config keys more than the exported Go surface. | `coverage` | small after Tier 1 |
 | **`docrot fix --dry-run`** — apply the high-confidence suggestions: git-recorded renames (`old/path.go → new/path.go`) and case-only mismatches; print a diff, `--apply` to write | The mechanical half of the fixes; the rename map is already computed. Symbol renames stay manual. | new `fix` stage over `Finding.Suggestion` + `Data["candidates"]` | medium |
 | **GitHub/Gitea annotation output** (`--format github`, `::warning file=…,line=…::msg`) and JUnit XML | CI surfaces findings inline on the PR without SARIF upload; Gitea Actions understands the same syntax. | `report` | tiny |
-| **Persistent blame cache** in `outDir` keyed by HEAD and file — FastAPI's 1,692 blames are the whole 16 s | Repeated local runs and CI on the same commit range. | `gitx`, `engine` | small |
 
 ## Tier 3 — possible, not obviously worth it yet
 

@@ -157,6 +157,48 @@ Same clones, `docrot 0.3.0`, git enabled.
   FastAPI from 8.3 s to 2.3 s. With git, FastAPI's 15 s is the 1,692
   `git blame` calls; `docrot check --changed` on a clean tree takes 0.5 s.
 
+## 0.4.0 update: reStructuredText
+
+Two Sphinx projects joined the corpus: requests (21 `.rst` pages) and
+Django (686 `.txt` pages under `docs/`, included with
+`"docs": ["docs/**/*.txt", "**/*.rst", "**/*.md"]`).
+
+| project | pages | references | errors | warnings | info | time (no git) |
+|---|---|---|---|---|---|---|
+| requests | 21 | 423 | 1 | 5 | 11 | 0.06 s |
+| django | 686 | 16,767 | 387 | 221 | 1,112 | 4.5 s |
+
+- **requests.** The one error is `requests.async` in `HISTORY.md`, a module
+  removed years ago (true history). `:attr:` references such as
+  `requests.Response.raw` — instance attributes set in `__init__` — resolve
+  because the owner is a known class. `docs/community/faq.rst` says "Python
+  2.7" in a sentence about SNI; that sentence reads as a requirement and is
+  reported against `requires-python`.
+- **Django.** 294 of the 387 errors are `docs/internals/deprecation.txt`
+  and `docs/releases/*` naming removed APIs (`django.utils.datetime_safe`,
+  `django.utils.encoding.force_text()`) — accurate, and the reason release
+  notes are excluded from the toolchain and staleness checks but not from
+  symbol checks. The rest are the tutorial's `polls/` and `mysite/` project
+  files (the reader's project, not Django's), `django.jQuery` (JavaScript)
+  and `:ref:` labels defined in Python's documentation (`bltin-exceptions`,
+  `logging-config-dictschema`), which intersphinx makes info. The first
+  run reported 1,427 errors: `:doc:` targets got `.rst` instead of the
+  tree's `.txt`, `/topics/x` targets were not climbed to `docs/`, template
+  paths under `django/contrib/admin/templates/` were errors instead of
+  "exists under" warnings, and `django.conf.urls.handler500` (a lowercase
+  module-level assignment) was not indexed. Django's 64,000 symbols also
+  exposed a quadratic corner: every unresolved name was scored against all
+  of them; scoring only names of a compatible length took the run from
+  14.6 s to 4 s.
+- **pydantic** now reports 193 warnings instead of 10 errors for
+  `docs/migration.md`: `pydantic.utils.to_camel` and friends exist in
+  `pydantic.v1.utils`, and `pydantic/utils.py` is a shim that forwards to
+  it, so "not found in module `pydantic.utils` (a `to_camel` exists at
+  pydantic.v1.utils.to_camel)" is the honest verdict.
+- **git cache.** With git, FastAPI's second run takes 1.9 s instead of
+  14.8 s (1,692 blames and 3,000 logs answered from `git-cache.json`,
+  240 KB); findings are identical.
+
 ## How to reproduce
 
 ```sh

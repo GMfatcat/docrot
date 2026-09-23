@@ -50,7 +50,8 @@
 ## 0.2.0 之後
 
 後續候選功能與取捨整理在 `docs/roadmap.md`（路由檢查、字串常值索引、JSON 範例對照、RST 輸入、`--changed`、`fix --dry-run` 等）。
-0.3.0 把該文件的 Tier 1 全部做完（路由、字串常值、JSON 範例、安裝行／工具鏈／make 目標、`--changed`、限定規則的 ignore、HTML 錨點），詳見 `CHANGELOG.md`。
+0.3.0 把該文件的 Tier 1 全部做完（路由、字串常值、JSON 範例、安裝行／工具鏈／make 目標、`--changed`、限定規則的 ignore、HTML 錨點），
+0.4.0 做完 Tier 2 值得做的部分（RST／AsciiDoc 輸入、git 快取、`stale-symbol`、`default-mismatch`），詳見 `CHANGELOG.md`。
 
 ## 事後補充（與原計畫的差異）
 
