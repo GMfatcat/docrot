@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `stale-section` no longer counts a link to the document's own translation
+  (a detected pair): a busy `README-zh.md` used to make the English intro
+  that links to it "stale", while the pair rules already report that drift.
+
 ## 0.8.0 — 2026-09-24
 
 C and C++, the last of the four languages the plugin table was built for.

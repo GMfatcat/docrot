@@ -33,10 +33,10 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 
 ## Contracts
 
-- `internal/model` is the only shared package: `Kind`, `Confidence`, `Severity`, `Reference`, `Finding`, rule ids, `Index` interface.
+- `internal/model` is the only shared package: `Kind`, `Confidence`, `Severity`, `Reference`, `Finding`, rule ids, `Index` interface, the `Langs` table; `internal/index/lang.Index` is the contract every non-Go language implements.
 - Severity policy: paths/anchors/commands/imports/symbols/routes/install/targets follow confidence (high→error, medium→warning, low→info); flags and env are one step softer; config keys in prose and glob misses are info, keys of a JSON config example are warnings; bare file names and bare `/path` spans are info; toolchain-mismatch is a warning when the document promises less than the manifest requires; default-mismatch and stale-symbol are warnings; a Python name missing from an existing module but defined elsewhere in the package is a warning, not an error. Rule-scoped ignores: `<!-- docrot:ignore missing-path -->`.
 - Exit codes: 0 clean, 1 findings at/above `--fail-on`, 2 usage/config/internal error.
-- Config: `.docrot.json` (see docs/configuration.md). Notable keys: `exclude`, `ignore` (regexes on reference text), `siblings` (other repos where paths may live), `stale.exclude`, `severity`, `pairs`, `pairPatterns`.
+- Config: `.docrot.json` (see docs/configuration.md). Notable keys: `exclude`, `ignore` (regexes on reference text), `siblings` (other repos where paths may live), `configSamples` (JSON files mined for config keys), `stale.exclude`, `severity`, `pairs`, `pairPatterns`.
 
 ## Docs
 

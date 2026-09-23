@@ -100,9 +100,10 @@ deliberately ignore is written down in
 `docrot init` writes a `.docrot.json` with the defaults. The keys you will
 actually touch: `docs` and `exclude` (what to scan), `ignore` (regular
 expressions over reference text), `siblings` (other repositories where a
-path may live), `stale.exclude` (changelogs and other historical
-documents), `severity` and `outDir`. To silence one false positive where it
-happens:
+path may live), `configSamples` (the JSON files mined for configuration
+keys; `appsettings*.json` is among the defaults), `stale.exclude`
+(changelogs and other historical documents), `severity` and `outDir`. To
+silence one false positive where it happens:
 
 ```markdown
 <!-- docrot:ignore -->            the next non-blank line
@@ -120,7 +121,8 @@ Every key with its default, the output directory and the git cache:
 ```text
 docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] [--fail-on LEVEL]
 docrot explain <doc>             every extracted reference with its verdict
-docrot baseline | coverage | pairs | comments | index | init | version
+docrot index [dir] --kind K      what was indexed: symbols, flags, env, routes, targets… or one language (rust, js, csharp, c)
+docrot baseline | coverage | pairs | comments | init | version
 ```
 
 Every `check` writes the HTML, Markdown, JSON and text reports into `.docrot/`; the HTML one looks like this:

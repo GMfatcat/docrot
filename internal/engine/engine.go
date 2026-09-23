@@ -326,6 +326,12 @@ func Check(opts Options) (*Run, error) {
 		findings = dropIgnoredPaths(run.Git, findings, warn, opts.Verbose)
 	}
 
+	// bilingual pairs serve two steps: a link to the document's own
+	// translation never makes a section stale (pair drift is the pairs
+	// check's job), and step 6 compares the two sides
+	prs := pairs.Detect(docs, toPairs(cfg.Pairs), cfg.PairPatterns)
+	mates := pairMates(prs)
+
 	// 5. stale sections
 	if run.Git != nil && cfg.Stale.Enabled {
 		staleOpts := stale.Options{MinChurn: cfg.Stale.MinChurn, MinDays: cfg.Stale.MinDays, Now: opts.Now}
@@ -341,7 +347,11 @@ func Check(opts Options) (*Run, error) {
 			if len(r.resolved) == 0 || parsed[r.doc] == nil || globx.MatchAny(cfg.Stale.Exclude, r.doc) {
 				return
 			}
-			fs, err := stale.Analyze(run.Git, parsed[r.doc], r.doc, r.resolved, staleOpts)
+			resolved := dropMateRefs(r.resolved, mates[r.doc])
+			if len(resolved) == 0 {
+				return
+			}
+			fs, err := stale.Analyze(run.Git, parsed[r.doc], r.doc, resolved, staleOpts)
 			if err != nil {
 				if opts.Verbose {
 					warn("stale %s: %v", r.doc, err)
@@ -383,7 +393,6 @@ func Check(opts Options) (*Run, error) {
 	}
 
 	// 6. bilingual pairs (with --changed: only pairs with a changed side)
-	prs := pairs.Detect(docs, toPairs(cfg.Pairs), cfg.PairPatterns)
 	if opts.Changed {
 		set := make(map[string]bool, len(checked))
 		for _, d := range checked {
@@ -933,6 +942,34 @@ func toPairs(ps []config.Pair) []pairs.Pair {
 	out := make([]pairs.Pair, 0, len(ps))
 	for _, p := range ps {
 		out = append(out, pairs.Pair{Source: filepath.ToSlash(p.Source), Translation: filepath.ToSlash(p.Translation)})
+	}
+	return out
+}
+
+// pairMates maps each side of every detected pair to its other side.
+func pairMates(prs []pairs.Pair) map[string]string {
+	m := make(map[string]string, 2*len(prs))
+	for _, p := range prs {
+		m[p.Source] = p.Translation
+		m[p.Translation] = p.Source
+	}
+	return m
+}
+
+// dropMateRefs removes the references that resolved to mate, the document's
+// own translation: its commits say nothing about the accuracy of a section
+// that merely links to it, and the pair rules already compare the two
+// sides. refs is returned unchanged when mate is empty.
+func dropMateRefs(refs []stale.ResolvedRef, mate string) []stale.ResolvedRef {
+	if mate == "" {
+		return refs
+	}
+	var out []stale.ResolvedRef
+	for _, r := range refs {
+		if r.File == mate {
+			continue
+		}
+		out = append(out, r)
 	}
 	return out
 }

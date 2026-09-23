@@ -81,6 +81,7 @@ medium → warning、low → info；文字報告預設隱藏 info，加 `--info`
 
 `docrot init` 會寫出帶預設值的 `.docrot.json`。真正會動到的鍵：`docs` 與 `exclude`（掃什麼）、
 `ignore`（套用在引用文字上的正規表示式）、`siblings`（路徑可能住在哪些其他 repo）、
+`configSamples`（要挖設定鍵的 JSON 檔，預設含 `appsettings*.json`）、
 `stale.exclude`（changelog 之類的歷史文件）、`severity` 與 `outDir`。要在原地壓掉一個誤報：
 
 ```markdown
@@ -98,7 +99,8 @@ inline text <!-- docrot:ignore -->  this line
 ```text
 docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] [--fail-on LEVEL]
 docrot explain <doc>             every extracted reference with its verdict
-docrot baseline | coverage | pairs | comments | index | init | version
+docrot index [dir] --kind K      what was indexed: symbols, flags, env, routes, targets… or one language (rust, js, csharp, c)
+docrot baseline | coverage | pairs | comments | init | version
 ```
 
 每次 `check` 都會把 HTML、Markdown、JSON 與文字報告寫進 `.docrot/`；HTML 版長這樣：
