@@ -54,12 +54,12 @@
 
 ## Wave E — `docrot fix`
 
-- [ ] E1 resolver：改名命中與大小寫命中時填 `Data["fix"]`（依原文框架換算）；測試兩種框架。
-- [ ] E2 `internal/fix`：`Edit{File, Line, Col, Old, New}`、`Plan(findings)`、
+- [x] E1 resolver：改名命中與大小寫命中時填 `Data["fix"]`（依原文框架換算）；測試兩種框架。
+- [x] E2 `internal/fix`：`Edit{File, Line, Col, Old, New}`、`Plan(findings)`、
       `Apply(root, edits, write)`；同行多處由右往左；CRLF／BOM 保留；測試用暫存目錄。
-- [ ] E3 `cmd`：`fix [dir] [--apply] [--format text|json]`；usage；main_test（dry-run 不改檔、
+- [x] E3 `cmd`：`fix [dir] [--apply] [--format text|json]`；usage；main_test（dry-run 不改檔、
       `--apply` 改檔）。
-- [ ] E4 文件：commands 兩語、rules.md 一段「What `docrot fix` applies」、README 兩語 quick
+- [x] E4 文件：commands 兩語、rules.md 一段「What `docrot fix` applies」、README 兩語 quick
       start 多一行、llms.txt。
 
 ## 收尾

@@ -428,6 +428,47 @@ func TestCaseMismatchMessage(t *testing.T) {
 	if !strings.Contains(res.Finding.Message, "letter case") || res.Finding.Suggestion != "README.md" {
 		t.Fatalf("message %q suggestion %q", res.Finding.Message, res.Finding.Suggestion)
 	}
+	if res.Finding.Data["fix"] != "README.md" {
+		t.Errorf("root-frame fix = %v, want README.md", res.Finding.Data["fix"])
+	}
+	// written relative to the document's directory: the fix is too
+	res = r.Resolve(ref(model.KindPath, "../readme.md", model.High, "docs/guide.md"))
+	if res.Finding == nil || res.Finding.Data["fix"] != "../README.md" {
+		t.Errorf("doc-frame fix = %+v", res.Finding)
+	}
+}
+
+func TestRenameFix(t *testing.T) {
+	ix := newFake()
+	r := New(ix, Options{Renames: map[string]string{"old/name.go": "pkg/httpx/server.go", "old/dir": "pkg/httpx"}})
+	cases := map[string]string{"old/name.go": "pkg/httpx/server.go", "./old/name.go": "./pkg/httpx/server.go", "old/dir/": "pkg/httpx/"}
+	for text, want := range cases {
+		res := r.Resolve(ref(model.KindPath, text, model.High, "README.md"))
+		if res.Finding == nil || res.Finding.Data["fix"] != want {
+			t.Errorf("%s: fix = %+v, want %q", text, res.Finding, want)
+		}
+	}
+	// a fuzzy suggestion is never a fix
+	res := r.Resolve(ref(model.KindPath, "docs/main.go", model.High, "README.md"))
+	if res.Finding == nil || res.Finding.Suggestion == "" || res.Finding.Data["fix"] != nil {
+		t.Errorf("fuzzy suggestion marked as a fix: %+v", res.Finding)
+	}
+}
+
+func TestRelSlash(t *testing.T) {
+	cases := []struct{ dir, target, want string }{
+		{".", "README.md", "README.md"},
+		{"docs", "README.md", "../README.md"},
+		{"docs/howto", "README.md", "../../README.md"},
+		{"docs", "docs/guide.md", "guide.md"},
+		{"docs/howto", "docs/guide.md", "../guide.md"},
+		{"docs", "pkg/x.go", "../pkg/x.go"},
+	}
+	for _, c := range cases {
+		if got := relSlash(c.dir, c.target); got != c.want {
+			t.Errorf("relSlash(%q, %q) = %q, want %q", c.dir, c.target, got, c.want)
+		}
+	}
 }
 
 func TestNoFlagsInRepoSkipsFlagRefs(t *testing.T) {

@@ -179,6 +179,14 @@ existing. This is what keeps log fields, header names, metric names, flags
 defined by libraries the index does not parse (pflag, argparse) and routes
 registered through constants out of the report.
 
+### What `docrot fix` applies
+
+Two kinds of `missing-path` / `missing-command` finding carry a mechanical
+correction: a path that git history records as renamed, and a path that
+differs from the real file only by letter case. `docrot fix` rewrites
+exactly those (dry run by default, `--apply` to write) and nothing else;
+the correction is in the finding's `data.fix` field of the JSON report.
+
 ## Staleness
 
 | Rule | Meaning |

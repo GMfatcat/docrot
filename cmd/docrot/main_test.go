@@ -51,6 +51,8 @@ func TestExitCodes(t *testing.T) {
 		{"index unknown kind", []string{"index", fx, "--kind", "planets"}, exitUsage, "unknown index kind"},
 		{"pairs are warnings, below the default fail-on", []string{"pairs", fx, "--no-git"}, exitOK, "pair-heading"},
 		{"comments", []string{"comments", fx, "--no-git"}, exitOK, "comment-mentions-missing"},
+		{"fix without git has nothing mechanical", []string{"fix", fx, "--no-git"}, exitOK, "nothing to fix"},
+		{"fix bad format", []string{"fix", fx, "--no-git", "--format", "xml"}, exitUsage, "--format must be"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -90,6 +92,48 @@ func TestFormatsWriteFiles(t *testing.T) {
 		if !strings.Contains(errs, "report written to") {
 			t.Errorf("%s: stderr lacks the written notice: %s", format, errs)
 		}
+	}
+}
+
+// TestFixDryRunAndApply builds a small repository with a wrongly-cased
+// link, checks that `fix` reports it without touching the file, and that
+// `--apply` rewrites exactly that text.
+func TestFixDryRunAndApply(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, content string) {
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module example.com/x\n\ngo 1.22\n")
+	write("docs/Guide.md", "# Guide\n")
+	write("README.md", "# X\n\nRead the [guide](docs/guide.md) and `docs/GUIDE.md`.\n")
+
+	code, out, errs := call("fix", dir, "--no-git")
+	if code != exitOK || !strings.Contains(out, "docs/guide.md → docs/Guide.md") || !strings.Contains(out, "dry run") {
+		t.Fatalf("dry run: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "README.md"))
+	if !strings.Contains(string(b), "docs/guide.md") {
+		t.Fatal("dry run modified README.md")
+	}
+
+	code, out, errs = call("fix", dir, "--no-git", "--apply")
+	if code != exitOK || !strings.Contains(out, "2 fixes written to 1 file") {
+		t.Fatalf("apply: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	b, _ = os.ReadFile(filepath.Join(dir, "README.md"))
+	if string(b) != "# X\n\nRead the [guide](docs/Guide.md) and `docs/Guide.md`.\n" {
+		t.Errorf("README.md after apply: %q", b)
+	}
+	// a second run has nothing left, and json output is well-formed
+	code, out, _ = call("fix", dir, "--no-git", "--format", "json")
+	if code != exitOK || !strings.Contains(out, `"fixes": 0`) {
+		t.Errorf("json after apply: exit %d %s", code, out)
 	}
 }
 

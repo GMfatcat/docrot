@@ -6,6 +6,7 @@
 //	docrot baseline [dir]          freeze current findings into .docrot-baseline.json
 //	docrot coverage [dir]          which exported symbols/flags/env/routes/config keys are undocumented
 //	docrot pairs [dir]             only the bilingual source/translation checks
+//	docrot fix [dir] [--apply]     rewrite git-renamed and wrongly-cased paths in the documents
 //	docrot explain <doc>           every reference extracted from one document
 //	docrot index [dir] --kind K    dump an index (symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c)
 //	docrot init [dir]              write a default .docrot.json
@@ -13,6 +14,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,6 +30,7 @@ import (
 	"docrot/internal/baseline"
 	"docrot/internal/config"
 	"docrot/internal/engine"
+	"docrot/internal/fix"
 	"docrot/internal/model"
 	"docrot/internal/report"
 )
@@ -72,6 +75,8 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 		return cmdCoverage(rest, stdout, stderr)
 	case "pairs":
 		return cmdPairs(rest, stdout, stderr)
+	case "fix":
+		return cmdFix(rest, stdout, stderr)
 	case "comments":
 		return cmdComments(rest, stdout, stderr)
 	case "explain":
@@ -101,6 +106,7 @@ Usage:
   docrot baseline [dir]           write .docrot-baseline.json with the current findings
   docrot coverage [dir]           list exported symbols / flags / env / routes / config keys no document mentions
   docrot pairs [dir]              only the source/translation pair checks
+  docrot fix [dir] [--apply]      rewrite paths that git renamed or that differ only by letter case (dry run without --apply)
   docrot comments [dir]           comment checks over every exported symbol (not only documented ones)
   docrot explain <doc>            show every reference extracted from one document
   docrot index [dir] --kind K     dump an index: symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c
@@ -468,6 +474,81 @@ func cmdPairs(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	return exitOK
+}
+
+func cmdFix(args []string, stdout, stderr io.Writer) int {
+	c := newCommon("fix")
+	var apply bool
+	var format string
+	c.fs.BoolVar(&apply, "apply", false, "write the fixes into the documents (default: print what would change)")
+	c.fs.StringVar(&format, "format", "text", "output format: text|json")
+	root, cfg, ok := c.parse(args, stderr)
+	if !ok {
+		return c.exitCode()
+	}
+	if format != "text" && format != "json" {
+		fmt.Fprintf(stderr, "docrot: --format must be text or json\n")
+		return exitUsage
+	}
+	cfg.Stale.Enabled = false
+	cfg.Comments.Enabled = false
+	opts := c.engineOptions(root, cfg, stderr)
+	run, err := engine.Check(opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "docrot: %v\n", err)
+		return exitUsage
+	}
+	edits := fix.Plan(run.Report.Findings)
+	results, err := fix.Apply(root, edits, apply)
+	if err != nil {
+		fmt.Fprintf(stderr, "docrot: %v\n", err)
+		return exitUsage
+	}
+	applied, files := 0, 0
+	for _, r := range results {
+		if len(r.Applied) > 0 {
+			applied += len(r.Applied)
+			files++
+		}
+	}
+	if format == "json" {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(map[string]any{"applied": apply, "fixes": applied, "files": results}); err != nil {
+			fmt.Fprintf(stderr, "docrot: %v\n", err)
+			return exitUsage
+		}
+		return exitOK
+	}
+	if applied == 0 {
+		fmt.Fprintln(stdout, "nothing to fix: no finding carries a mechanical correction (git renames, letter case)")
+		return exitOK
+	}
+	for _, r := range results {
+		for _, e := range r.Applied {
+			fmt.Fprintf(stdout, "%s:%d: %s → %s  (%s)\n", r.File, e.Line, e.Old, e.New, e.Rule)
+		}
+		for _, ch := range r.Changes {
+			fmt.Fprintf(stdout, "  - %s\n  + %s\n", strings.TrimSpace(ch.Before), strings.TrimSpace(ch.After))
+		}
+		for _, e := range r.Skipped {
+			fmt.Fprintf(stdout, "%s:%d: skipped, %q is no longer on that line\n", r.File, e.Line, e.Old)
+		}
+	}
+	if apply {
+		fmt.Fprintf(stdout, "\n%s written to %s\n", plural(applied, "fix", "fixes"), plural(files, "file", "files"))
+	} else {
+		fmt.Fprintf(stdout, "\n%s in %s (dry run; pass --apply to write)\n", plural(applied, "fix", "fixes"), plural(files, "file", "files"))
+	}
+	return exitOK
+}
+
+// plural renders "1 fix" / "2 fixes".
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }
 
 func cmdExplain(args []string, stdout, stderr io.Writer) int {

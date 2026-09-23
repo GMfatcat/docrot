@@ -14,6 +14,7 @@ docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table (symbols, flags, env, routes, config keys)
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
+docrot fix [dir] [--apply]       rewrite paths git renamed or that differ only by letter case
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
 docrot index [dir] --kind symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c
 docrot init [dir]
@@ -70,6 +71,20 @@ takes `--kind`.
 later runs only fail on findings that are not in it, and `--all` shows the
 baselined ones again. Fingerprints exclude line numbers and section
 headings, so editing around a finding does not resurrect it.
+
+## Fixing
+
+`docrot fix` applies the mechanical half of the suggestions: a path that
+git history records as renamed (`old/name.go` → `pkg/httpx/server.go`,
+with a `./` prefix or trailing `/` kept as written) and a path that
+differs from the real file only by letter case (`docs/guide.md` for
+`docs/Guide.md`, rewritten in the frame the document used, root or its
+own directory). Without `--apply` it prints each change with the line
+before and after and writes nothing; with `--apply` it rewrites the
+documents, keeping their line endings and byte-order mark. Symbol
+renames, anchors and fuzzy did-you-mean suggestions are never applied.
+Baselined findings are left alone. `--format json` lists the edits.
+The rename map needs git.
 
 ## CI
 

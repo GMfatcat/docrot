@@ -252,6 +252,7 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 	sev := model.SeverityFor(ref.Confidence)
 	var msg string
 	var cands []string
+	fixText := "" // the corrected spelling, when the fix is mechanical
 	if isGlob {
 		msg = "no file matches `" + ref.Text + "`"
 		sev = model.SevInfo
@@ -266,6 +267,7 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		if to, ok := r.opts.Renames[path.Clean(ref.Norm)]; ok {
 			cands = append(cands, to)
 			msg += " (renamed in git history)"
+			fixText = restyle(ref.Text, to)
 		}
 		for _, c := range r.candidates(ref) {
 			for _, s := range r.ix.SimilarPaths(c, 3) {
@@ -279,6 +281,15 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		for _, c := range r.candidates(ref) {
 			if len(cands) > 0 && strings.EqualFold(cands[0], c) && cands[0] != c {
 				msg = "`" + ref.Text + "` differs from `" + cands[0] + "` only by letter case (works on case-insensitive file systems, breaks on Linux)"
+				if !ref.Rooted {
+					// the candidate that matched says which frame the document
+					// wrote in: the repo root, or its own directory
+					if c == path.Clean(ref.Norm) {
+						fixText = restyle(ref.Text, cands[0])
+					} else {
+						fixText = restyle(ref.Text, relSlash(path.Dir(ref.Loc.File), cands[0]))
+					}
+				}
 				break
 			}
 		}
@@ -306,7 +317,45 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 			sev = model.SevInfo
 		}
 	}
-	return Result{Finding: r.finding(rule, sev, ref, msg, cands)}
+	f := r.finding(rule, sev, ref, msg, cands)
+	if fixText != "" && fixText != ref.Text {
+		if f.Data == nil {
+			f.Data = map[string]any{}
+		}
+		f.Data["fix"] = fixText
+	}
+	return Result{Finding: f}
+}
+
+// restyle spells repl the way text was written: a "./" prefix and a
+// trailing "/" are kept, as are backslashes.
+func restyle(text, repl string) string {
+	out := repl
+	if strings.HasPrefix(text, "./") || strings.HasPrefix(text, ".\\") {
+		out = "./" + out
+	}
+	if strings.HasSuffix(text, "/") || strings.HasSuffix(text, "\\") {
+		out += "/"
+	}
+	if strings.Contains(text, "\\") && !strings.Contains(text, "/") {
+		out = strings.ReplaceAll(out, "/", "\\")
+	}
+	return out
+}
+
+// relSlash returns target relative to dir, both slash-separated and
+// repo-relative: relSlash("docs/howto", "README.md") is "../../README.md".
+func relSlash(dir, target string) string {
+	if dir == "." || dir == "" {
+		return target
+	}
+	d := strings.Split(path.Clean(dir), "/")
+	t := strings.Split(path.Clean(target), "/")
+	i := 0
+	for i < len(d) && i < len(t)-1 && d[i] == t[i] {
+		i++
+	}
+	return strings.Repeat("../", len(d)-i) + strings.Join(t[i:], "/")
 }
 
 // genericManifests are bare file names that documents use as common nouns

@@ -43,6 +43,7 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 docrot explain README.md        # what did it extract, and why?
 docrot coverage                 # which exported API is never documented?
 docrot baseline                 # freeze today's findings; fail only on new ones
+docrot fix --apply              # rewrite paths git renamed or that differ only by letter case
 ```
 
 ## 🔍 檢查什麼
