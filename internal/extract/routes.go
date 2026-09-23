@@ -11,16 +11,16 @@ var (
 	// `GET /v1/items`, `POST /items/{id}`: a whole code span
 	reRouteSpan = regexp.MustCompile(`^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(/[^\s]*)$`)
 	// `/healthz`, `/items/{item_id}`: a bare path span
-	rePathSpan = regexp.MustCompile(`^/[A-Za-z0-9_\-.{}:<>*~%+@/]*$`)
+	rePathSpan = regexp.MustCompile(`^/[A-Za-z0-9_\-.{}:<>*~%+@$/]*$`)
 	// "GET /v1/items" in prose or a table row, with or without backticks;
 	// the method must stand alone (not "TARGET /x") and the path ends at
 	// whitespace or punctuation that closes a cell, a span or a sentence.
-	reRouteProse = regexp.MustCompile("(?:^|[\\s|(`\"'])(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)[\\s|]+`?(/[A-Za-z0-9_\\-.{}:<>*~%+@/]*)")
+	reRouteProse = regexp.MustCompile("(?:^|[\\s|(`\"'])(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)[\\s|]+`?(/[A-Za-z0-9_\\-.{}:<>*~%+@$/]*)")
 	// GET /v1/items HTTP/1.1 in an http fence
 	reRouteHTTP = regexp.MustCompile(`^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(/\S*)(?:\s+HTTP/[0-9.]+)?\s*$`)
 	// curl http://localhost:8080/v1/items, curl -X POST 127.0.0.1:3000/x,
 	// $BASE/x and {{host}}/x: a local or placeholder host followed by a path
-	reLocalURL   = regexp.MustCompile(`(?:https?://)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\$\{?[A-Z_]+\}?|\{\{[^}]*\}\}|<[a-z-]+>|host|HOST|example\.com|api\.example\.com|your-host)(?::\d+|:\$?\{?[A-Z_]+\}?)?(/[A-Za-z0-9_\-.{}:<>*~%+@/]*)`)
+	reLocalURL   = regexp.MustCompile(`(?:https?://)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\$\{?[A-Z_]+\}?|\{\{[^}]*\}\}|<[a-z-]+>|host|HOST|example\.com|api\.example\.com|your-host)(?::\d+|:\$?\{?[A-Z_]+\}?)?(/[A-Za-z0-9_\-.{}:<>*~%+@$/]*)`)
 	reCurlMethod = regexp.MustCompile(`(?:-X|--request)\s+([A-Za-z]+)`)
 )
 

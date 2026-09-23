@@ -153,6 +153,50 @@ that were all noise (`errors.Is`, `logger.Info`, `VERIFYING/COMPLETED/FAILED`,
 `env:"NAME"`, `golang.org`, the same grouped `var` comment four times); the
 filters that removed them are described in `docs/rules.md`.
 
+## 0.3.0 update
+
+Same repositories, `docrot 0.3.0`, git enabled. The stale-section set is
+unchanged by design (route, target and toolchain claims do not feed it).
+
+| repo | docs | references | errors | warnings | info | time |
+|---|---|---|---|---|---|---|
+| meowbase | 51 | 2,554 | 50 | 56 | 212 | 1.7 s |
+| meowbase-web | 57 | 7,701 | 193 | 189 | 1,172 | 2.2 s |
+| meowbase-sqlite | 21 | 2,684 | 50 | 31 | 270 | 0.9 s |
+| meowbase-rpc | 27 | 3,476 | 159 | 70 | 413 | 1.2 s |
+| meowshare | 19 | 1,441 | 18 | 49 | 187 | 0.4 s |
+| meowtrace | 86 | 339 | 0 | 8 | 49 | 0.7 s |
+| meowboard | 45 | 4,782 | 42 | 86 | 1,250 | 2.0 s |
+| meowbase-distribute | 3 | 319 | 25 | 10 | 14 | 0.02 s |
+
+References grew by about ten percent (routes, JSON example keys, install
+lines, targets, version sentences); errors fell on meowbase-rpc and
+meowboard because the string-literal index now vouches for names the code
+spells only as strings (`LLM_API_KEY` in a template, wire keys, header
+names). What the new rules found, verified by hand:
+
+- **Routes.** meowbase registers 20 routes (`servicex`, the example
+  service, tests). `docs/contracts.md`'s `/healthz` and `/readyz` resolve;
+  `/openapi.json` and `/docs/` resolve through the string-literal index
+  (they are `openapix` config defaults, not registrations); the one finding
+  is `POST /v1/jobs`, which `CLAUDE.md`, the PRD and the example README
+  all describe and nothing implements — the example README even says it is
+  deferred. meowshare's PRD writes `GET /artifact/{id}/content` for a
+  route the code registers as `/v1/artifacts/{id}/content`; the suggestion
+  names it. meowbase-web's design documents mention Gitea's own OAuth
+  routes, which are warnings docrot cannot tell from local ones.
+- **JSON examples.** `timex/README.md` shows `retry_backoff` and
+  `shutdown_timeout` in a config example whose struct fields are
+  `Backoff` and `ShutdownTimeout` without tags — the example never
+  round-tripped. buildx's `buildx.Info` example matches all ten tags.
+- **Toolchain.** meowshare's `docker/README.md` said Go 1.14 in a sentence
+  about vendoring behaviour; the claim reads as a requirement and is
+  reported against `go 1.26.4`. Research notes under `docs/deep-research/`
+  compare other libraries' Go requirements, so that directory joined the
+  historical defaults.
+- **Targets and install lines.** No findings: these repositories have no
+  Makefiles and install through their own module paths.
+
 ## How to reproduce
 
 ```sh

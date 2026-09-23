@@ -177,6 +177,9 @@ func segsMatch(pat, want []string) bool {
 	if len(pat) > 0 && pat[len(pat)-1] == "{$}" {
 		pat = pat[:len(pat)-1]
 	}
+	if len(want) > 0 && want[len(want)-1] == "{$}" {
+		want = want[:len(want)-1] // the document quotes the Go 1.22 pattern itself
+	}
 	for i, ps := range pat {
 		if ps == "**" {
 			return true

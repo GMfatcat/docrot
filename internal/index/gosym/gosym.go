@@ -213,7 +213,7 @@ func Build(root string, opts Options) (*Index, []error) {
 	ix.stats.Symbols = len(quals)
 	ix.stats.Flags = len(ix.flagList)
 	ix.stats.Envs = len(ix.envList)
-	ix.stats.JSONKeys = len(ix.jsonList)
+	ix.stats.JSONKeys = len(ix.JSONKeys())
 
 	return ix, errs
 }
@@ -387,11 +387,33 @@ func (ix *Index) Literals() *literals.Set { return ix.lits }
 func (ix *Index) Routes() []routes.Route { return append([]routes.Route(nil), ix.routes...) }
 
 // HasJSONKey reports whether a dotted configuration path appears in a struct
-// tag (json, yaml or toml) or as an untagged struct field name.
-func (ix *Index) HasJSONKey(dotted string) bool { return ix.jsonKeys[strings.TrimSpace(dotted)] }
+// tag (json, yaml or toml) or as an untagged struct field name. A path
+// below a map-typed field ("severity.pair-lag" under map[string]string)
+// is accepted whatever its last segment.
+func (ix *Index) HasJSONKey(dotted string) bool {
+	d := strings.TrimSpace(dotted)
+	if ix.jsonKeys[d] {
+		return true
+	}
+	for i := strings.LastIndex(d, "."); i > 0; i = strings.LastIndex(d[:i], ".") {
+		if ix.jsonKeys[d[:i]+".*"] {
+			return true
+		}
+	}
+	return false
+}
 
-// JSONKeys returns every dotted key path found, sorted.
-func (ix *Index) JSONKeys() []string { return append([]string(nil), ix.jsonList...) }
+// JSONKeys returns every dotted key path found, sorted; map wildcards
+// ("labels.*") are left out.
+func (ix *Index) JSONKeys() []string {
+	out := make([]string, 0, len(ix.jsonList))
+	for _, k := range ix.jsonList {
+		if !strings.HasSuffix(k, ".*") {
+			out = append(out, k)
+		}
+	}
+	return out
+}
 
 // Exported lists the exported API surface for coverage: funcs, types, consts,
 // vars and methods of exported types, excluding package main, _test.go files

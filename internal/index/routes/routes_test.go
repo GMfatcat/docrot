@@ -54,7 +54,7 @@ func TestLookup(t *testing.T) {
 		{"GET", "/v1/items"}, {"POST", "/v1/items"}, {"", "/v1/items"},
 		{"GET", "/v1/items/42"}, {"DELETE", "/v1/items/{item_id}"}, {"PUT", "/v1/items/:id"},
 		{"", "/healthz"}, {"GET", "/healthz/"}, {"GET", "/files/a/b/c.txt"},
-		{"GET", "/items"}, {"", "/api"}, {"GET", "/"}, {"GET", "/exact"},
+		{"GET", "/items"}, {"", "/api"}, {"GET", "/"}, {"GET", "/exact"}, {"GET", "/exact/{$}"}, {"GET", "/{$}"},
 		{"GET", "/v1/items?page=2"},
 		// mounted: the trailing segments match a route
 		{"GET", "/api/v1/items"}, {"", "/prefix/healthz"},

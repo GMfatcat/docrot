@@ -13,8 +13,9 @@ formatting. Nothing checks the *claims*.
 
 docrot extracts every claim a document makes about the repository — file
 paths, Go/Odin/Python symbols, CLI flags, environment variables, config
-keys, heading anchors, shell commands, Go import paths — and checks each one
-against the real code. Then it uses git history to spot sections whose
+keys and JSON config examples, heading anchors, shell commands, Go import
+paths, HTTP routes, install lines, `make` targets, toolchain requirements —
+and checks each one against the real code. Then it uses git history to spot sections whose
 referenced code has churned since the prose was last touched, and compares
 bilingual document pairs for structural drift.
 
@@ -55,6 +56,7 @@ docrot check --format html --output docrot.html
 docrot explain README.md        # what did it extract, and why?
 docrot coverage                 # which exported API is never documented?
 docrot baseline                 # freeze today's findings; fail only on new ones
+docrot check --changed          # only the documents you touched (pre-commit speed)
 ```
 
 ## What it checks
@@ -65,10 +67,14 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 | `missing-symbol` | `` `report.WriteSARIF` ``, `` `Resolver.Resolve()` ``, `` `render_frame()` `` | the Go symbol exists (via `go/parser`), or the Odin / Python declaration exists |
 | `unknown-flag` | `` `--format` `` | some `flag.*` call defines it |
 | `unknown-env` | `` `DOCROT_DEBUG` `` | the code reads it (`os.Getenv`, `os.LookupEnv`, any `*Env*` call) |
-| `unknown-config-key` | `` `stale.minChurn` `` | a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path or a sample config file has it |
+| `unknown-config-key` | `` `stale.minChurn` ``, every key of a ```` ```json ```` config example | a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path or a sample config file has it |
 | `broken-anchor` | `[x](docs/rules.md#exit-codes)` | the heading exists (GitHub slug rules, CJK-aware) |
 | `missing-command` | `python scripts/verify.py` inside a ```` ```sh ```` block | the script / package path exists |
 | `missing-import` | `import "docrot/internal/model"` inside a ```` ```go ```` block | the package directory exists in this module |
+| `missing-route` | `` `GET /v1/items` ``, `` `/healthz` ``, `curl localhost:8080/x`, `METHOD \| /path` table rows | a handler registers it: `mux.HandleFunc` (Go 1.22 patterns included), chi/gin/echo method calls, FastAPI/Flask decorators, Starlette `Route`, Django `path()`; parameters and mounted prefixes are matched |
+| `install-mismatch` | `go get example.com/old/name`, `pip install my-tool`, `npm install @acme/x` | when the name is nearly this project's, it matches `go.mod` / `pyproject.toml` / `package.json` exactly |
+| `toolchain-mismatch` | "requires Go 1.21+", "Python 3.9 or later" | the `go` directive / `requires-python` asks for the same minimum | <!-- docrot:ignore toolchain-mismatch -->
+| `missing-target` | `make lint`, `npm run build`, `just release`, `task deploy` | the Makefile / package.json scripts / justfile / Taskfile define it |
 | `broken-url` | `https://…` (only with `--net`) | the URL answers 2xx/3xx |
 | `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
 | `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
@@ -89,8 +95,10 @@ silence it.
    dotted name whose first part is an unknown lower-case word (`app.Run`) is
    low and never reported.
 3. **Index** the repository once: file tree, Go packages/symbols/flags/env/
-   tags (`go/parser`), Odin and Python declarations (regex), Markdown
-   anchors, JSON sample keys.
+   tags (`go/parser`), Odin and Python declarations (regex), HTTP route
+   registrations, Markdown anchors, JSON sample keys, every identifier-like
+   string literal, and the manifests (`go.mod`, `pyproject.toml`,
+   `package.json`, Makefile, justfile, Taskfile).
 4. **Resolve** each reference and produce a finding with a *did-you-mean*
    suggestion (Damerau-Levenshtein over the right candidate set, plus git
    rename history for paths).
@@ -113,7 +121,11 @@ it deliberately ignores: paths matched by `.gitignore` (build artifacts),
 prose like `health/ready` or `net/http`, flags after external programs
 (`go test -race`), `UPPER_SNAKE` words on lines that never mention an
 environment, `cfg.Addr` when `cfg` is both a package and a variable, and
-illustrative names such as `Type.Method`, `--flag` or `path/to/file`.
+illustrative names such as `Type.Method`, `--flag` or `path/to/file`. As a
+last resort, anything the code spells as a string literal — `"request_id"`,
+`"X-Request-ID"`, `"/openapi.json"` — counts as existing, which is what
+keeps log fields, header names and routes registered through constants
+from being reported.
 
 Letter case is checked exactly on every platform. A document that says
 `docs/foo.md` when the file is `Docs/Foo.md` gets a finding on Windows
@@ -135,7 +147,7 @@ scanned.
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
@@ -173,6 +185,7 @@ Inline escape hatches:
 inline text <!-- docrot:ignore -->  this line
 <!-- docrot:ignore-start --> … <!-- docrot:ignore-end -->
 <!-- docrot:ignore-file -->
+<!-- docrot:ignore missing-path unknown-flag -->   only these rules (also with ignore-start)
 ```
 
 ### Output directory
@@ -203,12 +216,13 @@ docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
              [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
+             [--changed] [--since REF]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python
+docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets
 docrot init [dir]
 docrot version
 ```
@@ -217,7 +231,10 @@ Flags shared by the scanning commands: `--config` picks the config file,
 `--no-git` disables the git rules, `--net` checks URLs, `--verbose` prints
 index and git warnings, `--min-confidence` drops weak references. `check`
 adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`,
-`--quiet`, `--out-dir` and `--no-out`; `explain` adds `--kind` and `--root`;
+`--quiet`, `--out-dir`, `--no-out`, `--changed` (only documents modified
+since HEAD, plus untracked ones) and `--since REF` (also documents changed
+on this branch since the merge base with REF — a PR check); `explain` adds
+`--kind` and `--root`;
 `index` takes `--kind`.
 
 Exit codes: `0` clean, `1` a new finding at or above `--fail-on`, `2` usage
@@ -228,6 +245,7 @@ scanning; baselined findings carry `baselineState: unchanged`.
 
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
+- run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```

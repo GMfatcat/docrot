@@ -49,6 +49,9 @@ func walkStructKeys(st *ast.StructType, prefix string, depth int, structs map[st
 				key = prefix + "." + name
 			}
 			out[key] = true
+			if isMapType(fld.Type) {
+				out[key+".*"] = true // a map: any child key is valid
+			}
 			descend(fld.Type, key, depth+1, structs, visiting, out)
 		}
 	}
@@ -72,6 +75,20 @@ func descend(t ast.Expr, prefix string, depth int, structs map[string]*ast.Struc
 		defer delete(visiting, name)
 	}
 	walkStructKeys(st, prefix, depth, structs, visiting, out)
+}
+
+// isMapType reports whether a field type is a map, through pointers and
+// parentheses.
+func isMapType(t ast.Expr) bool {
+	switch e := t.(type) {
+	case *ast.StarExpr:
+		return isMapType(e.X)
+	case *ast.ParenExpr:
+		return isMapType(e.X)
+	case *ast.MapType:
+		return true
+	}
+	return false
 }
 
 // structOf resolves a field type to a struct type declared in the same

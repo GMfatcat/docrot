@@ -26,7 +26,7 @@ func (r *Resolver) resolveTarget(ref model.Reference) Result {
 		return Result{Skipped: true} // no Makefile/justfile/… at the root, or a nested one the doc refers to
 	}
 	if proj.HasTarget(tool, name) {
-		return Result{OK: true, File: proj.TargetFiles[tool]}
+		return Result{OK: true} // Makefile churn does not date a "run make build" sentence
 	}
 	var cands []string
 	for _, c := range fuzzy.Rank(name, targets, 3, maxDist(name)) {
@@ -52,7 +52,7 @@ func (r *Resolver) resolveInstall(ref model.Reference) Result {
 		if name == mod || strings.HasPrefix(name, mod+"/") {
 			sub := strings.TrimPrefix(strings.TrimPrefix(name, mod), "/")
 			if sub == "" || r.ix.DirExists(sub) {
-				return Result{OK: true, File: sub}
+				return Result{OK: true}
 			}
 			if _, ok := r.ix.GoPackageDir(name); ok {
 				return Result{OK: true}
@@ -126,7 +126,7 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 		return Result{Skipped: true}
 	}
 	if dMaj == cMaj && dMin == cMin {
-		return Result{OK: true, File: source}
+		return Result{OK: true} // go.mod churns with every dependency bump; not a staleness signal
 	}
 	label := map[string]string{"go": "Go", "python": "Python"}[tool]
 	need := strconv.Itoa(dMaj) + "." + strconv.Itoa(dMin)

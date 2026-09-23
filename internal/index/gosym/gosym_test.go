@@ -657,6 +657,8 @@ func TestJSONKeys(t *testing.T) {
 		{"peers", true},
 		{"peers.host", true},
 		{"labels", true},
+		{"labels.any-child", true}, // map-typed field: any key below it
+		{"labels.a.b", true},
 		{"version", true},                    // inlined embedded struct
 		{"Debug", true},                      // untagged field keeps its Go name
 		{"addr", true},                       // ServerConfig as its own root

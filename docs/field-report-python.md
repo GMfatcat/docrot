@@ -127,6 +127,36 @@ example blocks (`>>>`, fenced code, `x = …`) inside docstrings are not
 claims and are skipped; JSON-schema vocabulary (`anyOf`, `additionalProperties`)
 and HTTP words (`GET`, `Cookie`) are not identifiers.
 
+## 0.3.0 update
+
+Same clones, `docrot 0.3.0`, git enabled.
+
+| project | docs | references | errors | warnings | info | time |
+|---|---|---|---|---|---|---|
+| httpx | 26 | 691 | 21 | 1 | 94 | 0.3 s |
+| starlette | 30 | 821 | 2 | 1 | 29 | 0.2 s |
+| typer | 80 | 2,569 | 1 | 2 | 101 | 0.9 s |
+| pydantic | 99 | 4,394 | 23 | 6 | 53 | 1.2 s |
+| fastapi | 1,692 | 30,005 | 184 | 150 | 1,902 | 15 s |
+
+- **Routes.** FastAPI's tutorials register 659 routes across `docs_src`
+  (decorators with the path on the next line, `APIRouter(prefix=…)`,
+  `include_router`); every route the English docs and their translations
+  name resolves, including `/users/{user_id}` against `/users/{user_id}`
+  in one module and `/users/me` in another. Starlette registers 106 routes
+  in its tests and docs; no claim is missing.
+- **Toolchain.** Release notes say "drop Python 3.8" a dozen times per
+  project; they are history and are now excluded by default. What remains
+  is info: FastAPI's Pydantic migration guide discusses Python 3.14
+  behaviour, and Pydantic's standard-library page mentions 3.15.
+- **Targets.** pydantic-core's README runs `make build-dev` against its
+  own `pydantic-core/Makefile`; a document inside a directory with its own
+  runner file is left alone rather than checked against the root one.
+- **Speed.** The 0.2.0 numbers hid a quadratic string conversion in the
+  Python signature scanner: pydantic went from 22 s to 0.5 s without git,
+  FastAPI from 8.3 s to 2.3 s. With git, FastAPI's 15 s is the 1,692
+  `git blame` calls; `docrot check --changed` on a clean tree takes 0.5 s.
+
 ## How to reproduce
 
 ```sh

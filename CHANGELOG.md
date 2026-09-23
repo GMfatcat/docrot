@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.3.0 — 2026-09-23
+
+Everything in tier 1 of `docs/roadmap.md`, plus a performance fix.
+
+- `missing-route`: HTTP paths in documents (`` `GET /v1/items` ``, table
+  rows, http fences, curl examples, bare `` `/healthz` `` spans) against the
+  routes the code registers — Go `net/http` patterns (Go 1.22 method
+  prefixes, host-qualified), chi/gin/echo/gorilla method calls and prefixes,
+  FastAPI/Flask decorators, Starlette `Route`/`Mount`, Django `path()`,
+  `APIRouter` prefixes. Parameters normalise across frameworks, a literal
+  segment matches a parameter, mounted routers match by their tail, and a
+  path known only through other methods says so. `docrot index --kind
+  routes` lists them. On FastAPI's 1,692 documents all 659 route claims
+  resolve; on meowbase the one finding is a planned route that was never
+  implemented.
+- String-literal index: every identifier-like string literal and struct-tag
+  value of the Go, Python and Odin sources is the last resort before a
+  route, symbol, flag, environment variable or config key is reported
+  missing, and the comment checks consult it too. Log fields, header names,
+  `pflag`/`argparse` flags and routes registered through constants stop
+  being false positives.
+- ```` ```json ```` configuration examples are checked key by key against
+  the struct tags and sample files (comments, trailing commas and `...`
+  tolerated; a fragment `"key": value,` is wrapped): a dropped or misspelled
+  key is a warning with a sibling suggestion (`timeout` → `timeout_ms`).
+- `install-mismatch`, `toolchain-mismatch`, `missing-target`: `go get` /
+  `pip install` / `npm install` of this project by the wrong path or name,
+  "requires Go 1.21" against `go.mod`'s `go` directive and "Python 3.9+"
+  against `requires-python`, and `make` / `npm run` / `just` / `task`
+  targets against the runner files. Release notes and research notes join
+  the historical defaults of `stale.exclude`, which the toolchain check
+  also skips.
+- `docrot check --changed [--since REF]`: only documents modified since
+  HEAD (plus untracked ones), or since the merge base with REF; anchors of
+  every document still resolve. A clean FastAPI tree checks in 0.5 s.
+- Rule-scoped ignores (`<!-- docrot:ignore missing-path -->`,
+  `docrot:ignore-start unknown-flag,unknown-env`) and explicit HTML ids
+  (`<a id>`, `<a name>`, `<h2 id>`) as anchors.
+- The Python span scanner converted the remaining byte slice to a string
+  on every byte; fixing that takes a full FastAPI check from 8.3 s to
+  2.3 s without git and pydantic from 22 s to 0.5 s.
+  `DOCROT_CPUPROFILE=file` writes a CPU profile of `check`.
+
 ## 0.2.0 — 2026-09-23
 
 - Output directory: every `docrot check` run now rewrites one directory —

@@ -227,6 +227,9 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 	if extract.IsPlaceholderPath(ref.Norm) {
 		return Result{Skipped: true} // docs/foo.md, ./cmd/x: illustrative
 	}
+	if genericManifests[ref.Norm] {
+		return Result{Skipped: true} // "package.json", "Makefile": names of things, not claims about this repo
+	}
 	rule := model.RuleMissingPath
 	if ref.Kind == model.KindCommand {
 		rule = model.RuleMissingCommand
@@ -277,6 +280,17 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		}
 	}
 	return Result{Finding: r.finding(rule, sev, ref, msg, cands)}
+}
+
+// genericManifests are bare file names that documents use as common nouns
+// ("keep it next to package.json"); their absence is not documentation rot.
+var genericManifests = map[string]bool{
+	"package.json": true, "package-lock.json": true, "pyproject.toml": true, "setup.py": true,
+	"setup.cfg": true, "requirements.txt": true, "go.mod": true, "go.sum": true, "go.work": true,
+	"Makefile": true, "GNUmakefile": true, "justfile": true, "Taskfile.yml": true, "Cargo.toml": true,
+	"Dockerfile": true, "docker-compose.yml": true, "compose.yml": true, ".gitignore": true,
+	".dockerignore": true, ".editorconfig": true, "tsconfig.json": true, "Gemfile": true,
+	"pom.xml": true, "build.gradle": true, "CMakeLists.txt": true, "poetry.lock": true, "uv.lock": true,
 }
 
 func isCapitalized(s string) bool { return s != "" && s[0] >= 'A' && s[0] <= 'Z' }
@@ -730,7 +744,9 @@ func (r *Resolver) resolveRoute(ref model.Reference) Result {
 	method, p := SplitRoute(ref.Norm)
 	m := r.ix.MatchRoute(method, p)
 	if m.OK {
-		return Result{OK: true, File: m.File}
+		// no File: /healthz is registered in several places (tests, examples,
+		// the service) and a churning handler says nothing about the claim
+		return Result{OK: true}
 	}
 	if len(m.Methods) == 0 && (r.ix.HasLiteral(p) || r.ix.HasLiteral(p+"/") || r.ix.HasLiteral(strings.TrimPrefix(p, "/"))) {
 		return Result{OK: true} // registered through a constant or a config default

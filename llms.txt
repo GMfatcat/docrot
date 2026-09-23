@@ -1,26 +1,26 @@
 # docrot
 
-> docrot finds where documentation lies about the code. It extracts every claim a Markdown document makes about a repository (file paths, Go/Odin/Python symbols, CLI flags, environment variables, config keys, heading anchors, shell commands, Go import paths), checks each against the real code, uses git history to flag sections whose referenced code churned after the prose was last edited, and compares bilingual document pairs for structural drift. Single static Go binary, standard library only.
+> docrot finds where documentation lies about the code. It extracts every claim a Markdown document makes about a repository (file paths, Go/Odin/Python symbols, CLI flags, environment variables, config keys and JSON config examples, heading anchors, shell commands, Go import paths, HTTP routes, install lines, make/npm/just/task targets, Go/Python version requirements), checks each against the real code, uses git history to flag sections whose referenced code churned after the prose was last edited, and compares bilingual document pairs for structural drift. Single static Go binary, standard library only.
 
 Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `internal/`.
 
 ## Commands
 
-- `docrot check [dir]` — scan, report, exit 1 when a new finding reaches `--fail-on` (default error). Formats: text (default; info hidden unless `--info`), md, json, sarif, html.
+- `docrot check [dir]` — scan, report, exit 1 when a new finding reaches `--fail-on` (default error). Formats: text (default; info hidden unless `--info`), md, json, sarif, html. `--changed` checks only documents modified since HEAD plus untracked ones; `--since REF` adds the branch's documents since the merge base (PR check). Both need git; coverage is skipped in that mode.
 - Every `docrot check` also rewrites the `outDir` directory (a dot-directory at the repo root by default, excluded from discovery, self-ignoring via its own `.gitignore`) with the same report in all four formats; the Markdown one is written for agents — findings grouped by file, what the severities mean, and a fix checklist. `--out-dir` moves it, `--no-out` skips it.
 - `docrot explain <doc>` — every reference extracted from one document with kind, confidence and verdict. Use it before writing ignore rules.
 - `docrot baseline [dir]` — freeze current findings into `.docrot-baseline.json`; later runs only fail on new ones.
 - `docrot coverage [dir]` — exported symbols / flags / env vars never mentioned by any document.
 - `docrot pairs [dir]` — only the source/translation checks.
 - `docrot comments [dir]` — comment checks over every exported declaration, not only documented ones.
-- `docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python` — dump an index.
+- `docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets` — dump an index.
 - `docrot init [dir]` — write a default `.docrot.json`.
 
 ## Pipeline (one package per stage)
 
 - `internal/markdown` — line-oriented tokenizer: headings (GitHub slugs, CJK-safe), fences, code spans, links, images, tables, HTML comments, `docrot:ignore` directives, structural fingerprint for pairs.
 - `internal/extract` — tokens → `model.Reference` with a kind and a confidence (high/medium/low). Heuristics are in `classify.go` (spans, links, prose) and `fences.go` (shell and Go blocks).
-- `internal/index` — composite `model.Index` over `index/files`, `index/gosym` (go/parser: packages, symbols, methods, fields, flags, env reads, json/yaml/toml tag paths, exported surface), `index/odin`, `index/py`, `index/anchors`, `index/config` (JSON sample keys).
+- `internal/index` — composite `model.Index` over `index/files`, `index/gosym` (go/parser: packages, symbols, methods, fields, flags, env reads, json/yaml/toml tag paths, route registrations, string literals, exported surface), `index/odin`, `index/py` (declarations, routes, literals), `index/routes` (normalised HTTP routes: parameters, prefixes, method sets), `index/literals` (identifier-like string literals, the last resort before a name is reported missing), `index/project` (go.mod, pyproject.toml, package.json, Makefile/justfile/Taskfile targets), `index/anchors` (heading slugs, custom ids, HTML ids), `index/config` (JSON sample keys).
 - `internal/resolve` — per-kind resolvers producing `model.Finding` with did-you-mean suggestions (`internal/fuzzy`, git rename history, sibling repos).
 - `internal/gitx` — git CLI wrapper: blame line times, commits since, renames, check-ignore; cached, bounded concurrency, graceful when git is absent.
 - `internal/stale` — section edit time (blame) vs churn of referenced files (log).
@@ -34,7 +34,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 ## Contracts
 
 - `internal/model` is the only shared package: `Kind`, `Confidence`, `Severity`, `Reference`, `Finding`, rule ids, `Index` interface.
-- Severity policy: paths/anchors/commands/imports/symbols follow confidence (high→error, medium→warning, low→info); flags and env are one step softer; config keys and glob misses are info; bare file names are info.
+- Severity policy: paths/anchors/commands/imports/symbols/routes/install/targets follow confidence (high→error, medium→warning, low→info); flags and env are one step softer; config keys in prose and glob misses are info, keys of a JSON config example are warnings; bare file names and bare `/path` spans are info; toolchain-mismatch is a warning when the document promises less than the manifest requires. Rule-scoped ignores: `<!-- docrot:ignore missing-path -->`.
 - Exit codes: 0 clean, 1 findings at/above `--fail-on`, 2 usage/config/internal error.
 - Config: `.docrot.json` (see README). Notable keys: `exclude`, `ignore` (regexes on reference text), `siblings` (other repos where paths may live), `stale.exclude`, `severity`, `pairs`, `pairPatterns`.
 

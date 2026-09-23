@@ -10,7 +10,8 @@
 linter 只看排版，沒有任何工具檢查文件裡的「主張」。
 
 docrot 把文件對 repo 的每一個主張——檔案路徑、Go/Odin/Python 符號、CLI flag、環境變數、
-設定鍵、標題錨點、shell 指令、Go import 路徑——逐一抽出來，對照真正的程式碼。接著用 git
+設定鍵與 JSON 設定範例、標題錨點、shell 指令、Go import 路徑、HTTP 路由、安裝指令、`make` 目標、
+工具鏈版本需求——逐一抽出來，對照真正的程式碼。接著用 git
 歷史找出「散文最後一次修改之後，引用的程式碼已經大幅變動」的章節，並比對雙語文件的結構是否漂移。
 
 它是單一靜態執行檔，以 Go 撰寫，**除了標準庫沒有任何依賴**。
@@ -46,6 +47,7 @@ docrot check --format html --output docrot.html
 docrot explain README.md        # what did it extract, and why?
 docrot coverage                 # which exported API is never documented?
 docrot baseline                 # freeze today's findings; fail only on new ones
+docrot check --changed          # only the documents you touched (pre-commit speed)
 ```
 
 ## 檢查什麼
@@ -56,10 +58,14 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 | `missing-symbol` | `` `report.WriteSARIF` ``、`` `Resolver.Resolve()` ``、`` `render_frame()` `` | Go 符號存在（透過 `go/parser`），或 Odin／Python 宣告存在 |
 | `unknown-flag` | `` `--format` `` | 有某個 `flag.*` 呼叫定義了它 |
 | `unknown-env` | `` `DOCROT_DEBUG` `` | 程式碼有讀它（`os.Getenv`、`os.LookupEnv`、任何名字含 `Env` 的呼叫） |
-| `unknown-config-key` | `` `stale.minChurn` `` | 某個 `json:"…"`／`yaml:"…"`／`toml:"…"` tag 路徑或設定樣本檔有這個鍵 |
+| `unknown-config-key` | `` `stale.minChurn` ``、```` ```json ```` 設定範例裡的每一個鍵 | 某個 `json:"…"`／`yaml:"…"`／`toml:"…"` tag 路徑或設定樣本檔有這個鍵 |
 | `broken-anchor` | `[x](docs/rules.md#exit-codes)` | 標題存在（GitHub slug 規則，支援 CJK） |
 | `missing-command` | ```` ```sh ```` 區塊裡的 `python scripts/verify.py` | 腳本／套件路徑存在 |
 | `missing-import` | ```` ```go ```` 區塊裡的 `import "docrot/internal/model"` | 套件目錄存在於本模組 |
+| `missing-route` | `` `GET /v1/items` ``、`` `/healthz` ``、`curl localhost:8080/x`、`METHOD \| /path` 表格列 | 有 handler 註冊了它：`mux.HandleFunc`（含 Go 1.22 pattern）、chi/gin/echo 的 method 呼叫、FastAPI/Flask 裝飾器、Starlette `Route`、Django `path()`；參數與掛載前綴都會比對 |
+| `install-mismatch` | `go get example.com/old/name`、`pip install my-tool`、`npm install @acme/x` | 名字接近本專案時，必須與 `go.mod`／`pyproject.toml`／`package.json` 完全一致 |
+| `toolchain-mismatch` | 「requires Go 1.21+」、「Python 3.9 or later」 | `go` 指令／`requires-python` 要求的最低版本相同 | <!-- docrot:ignore toolchain-mismatch -->
+| `missing-target` | `make lint`、`npm run build`、`just release`、`task deploy` | Makefile／package.json scripts／justfile／Taskfile 有定義它 |
 | `broken-url` | `https://…`（僅在 `--net` 時） | URL 回應 2xx/3xx |
 | `stale-section` | 某章節最後編輯於 2026-06-01 | 它引用的程式碼此後沒有大幅變動（git） |
 | `pair-*` | `README.md` ↔ `README-zh.md` | 標題相同、程式碼區塊相同、連結／表格／數字相同、翻譯沒有落後原文（git） |
@@ -77,7 +83,8 @@ docrot baseline                 # freeze today's findings; fail only on new ones
    有目錄有副檔名的路徑是 high；光一個檔名是 medium；第一段是不認識的小寫字的點號名稱
    （`app.Run`）是 low，永遠不會被報出來。
 3. **建索引**，整個 repo 只做一次：檔案樹、Go 套件／符號／flag／環境變數／tag（`go/parser`）、
-   Odin 與 Python 宣告（regex）、Markdown 錨點、JSON 樣本鍵。
+   Odin 與 Python 宣告（regex）、HTTP 路由註冊、Markdown 錨點、JSON 樣本鍵、每一個像識別字的
+   字串常值，以及各種 manifest（`go.mod`、`pyproject.toml`、`package.json`、Makefile、justfile、Taskfile）。
 4. **解析**每個引用，產生附「你是不是想找」建議的 finding（在正確的候選集合上做
    Damerau-Levenshtein，路徑另外參考 git 改名歷史）。
 5. **過期判定**：`git blame` 給每個章節一個編輯時間；`git log` 數出那之後每個被引用檔案的 commit 數。
@@ -93,7 +100,9 @@ info，加 `--info` 才列出。
 docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的東西：被 `.gitignore` 排除的路徑
 （建置產物）、`health/ready` 或 `net/http` 這類散文、外部程式後面的 flag（`go test -race`）、
 所在行完全沒提到環境的 `UPPER_SNAKE` 字、`cfg` 同時是套件又是變數時的 `cfg.Addr`，以及
-`Type.Method`、`--flag`、`path/to/file` 這類示意用名稱。
+`Type.Method`、`--flag`、`path/to/file` 這類示意用名稱。最後一道防線：程式碼裡以字串常值拼出來的
+東西——`"request_id"`、`"X-Request-ID"`、`"/openapi.json"`——一律視為存在，log 欄位、header 名稱、
+用常數註冊的路由因此不會被誤報。
 
 大小寫在每個平台上都嚴格比對。檔案叫 `Docs/Foo.md` 而文件寫 `docs/foo.md`，在 Windows
 與 macOS 上一樣會得到 finding，訊息寫明「只差大小寫」——因為這種連結在作者的筆電上能開，
@@ -112,7 +121,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
@@ -143,6 +152,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 inline text <!-- docrot:ignore -->  this line
 <!-- docrot:ignore-start --> … <!-- docrot:ignore-end -->
 <!-- docrot:ignore-file -->
+<!-- docrot:ignore missing-path unknown-flag -->   only these rules (also with ignore-start)
 ```
 
 ### 輸出目錄
@@ -170,12 +180,13 @@ docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
              [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
+             [--changed] [--since REF]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python
+docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets
 docrot init [dir]
 docrot version
 ```
@@ -183,7 +194,8 @@ docrot version
 掃描類指令共用的 flag：`--config` 指定設定檔、`--no-git` 停用 git 規則、`--net` 檢查 URL、
 `--verbose` 印出索引與 git 警告、`--min-confidence` 丟掉弱引用。`check` 另有 `--format`、
 `--output`、`--fail-on`、`--info`、`--all`、`--coverage`、`--quiet`、`--out-dir` 與
-`--no-out`；`explain` 另有 `--kind` 與 `--root`；`index` 接受 `--kind`。
+`--no-out`、`--changed`（只檢查 HEAD 之後修改過的文件，加上未追蹤的）與 `--since REF`（再加上
+這條分支自 merge base 以來改過的文件——PR 檢查用）；`explain` 另有 `--kind` 與 `--root`；`index` 接受 `--kind`。
 
 Exit code：`0` 乾淨、`1` 有達到 `--fail-on` 的新 finding、`2` 用法或內部錯誤。SARIF 輸出可直接上傳
 GitHub code scanning；已 baseline 的 finding 會帶 `baselineState: unchanged`。
@@ -192,6 +204,7 @@ GitHub code scanning；已 baseline 的 finding 會帶 `baselineState: unchanged
 
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
+- run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```
