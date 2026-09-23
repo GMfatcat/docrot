@@ -7,17 +7,28 @@ import (
 )
 
 var (
-	customIDRe   = regexp.MustCompile(`\s*\{#[^}]*\}\s*$`)
+	customIDRe   = regexp.MustCompile(`\s*\{\s*#[^}]*\}\s*$`)
 	inlineLinkRe = regexp.MustCompile(`!?\[([^\]]*)\]\([^)]*\)`)
 	refLinkRe    = regexp.MustCompile(`!?\[([^\]]*)\]\[[^\]]*\]`)
 	htmlTagRe    = regexp.MustCompile(`</?[A-Za-z][^>]*>`)
+	customIDCap  = regexp.MustCompile(`\{\s*#([^}\s]+)\s*\}`)
 )
+
+// CustomID returns the explicit anchor id of a heading written in the
+// Markdown-extensions style "## Title { #my-id }" (MkDocs, Python-Markdown),
+// or "" when there is none.
+func CustomID(heading string) string {
+	if m := customIDCap.FindStringSubmatch(heading); m != nil {
+		return strings.ToLower(m[1])
+	}
+	return ""
+}
 
 // Slug converts heading text into a GitHub anchor slug.
 //
 // The rules are GitHub's: lower-case everything, drop every character that
-// is not a Unicode letter, digit, space or hyphen (so CJK survives and
-// emoji do not), and turn spaces into hyphens. Runs of hyphens are *not*
+// is not a Unicode letter, digit, underscore, space or hyphen (so CJK
+// survives and emoji do not), and turn spaces into hyphens. Runs of hyphens are *not*
 // collapsed and leading/trailing hyphens are *not* trimmed, which is why
 // "🐱 meowbase" becomes "-meowbase".
 //
@@ -41,8 +52,8 @@ func Slug(heading string) string {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			b.WriteRune(unicode.ToLower(r))
-		case r == '-':
-			b.WriteByte('-')
+		case r == '-' || r == '_':
+			b.WriteRune(r)
 		case unicode.IsSpace(r):
 			b.WriteByte('-')
 		}

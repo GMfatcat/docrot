@@ -8,7 +8,7 @@ Steps:
   4. go build            → dist/docrot(.exe)
   5. docrot check on the fixture repo (must exit 1: it contains known lies)
   6. docrot check on docrot's own repo (must exit 0 with --fail-on error)
-  7. docrot check --format json/sarif/html on the fixture (must produce valid output)
+  7. docrot check --format md/json/sarif/html on the fixture (must produce valid output)
 
 Exit code 0 when everything passes; 1 otherwise. Run from anywhere:
     python scripts/verify.py [--no-race] [--keep]
@@ -84,7 +84,9 @@ def main(argv: list[str]) -> int:
     print(run([str(EXE), "version"]).stdout.strip())
 
     step("docrot check on fixture (expects exit 1 with known findings)")
-    p = run([str(EXE), "check", str(FIXTURE), "--no-git"], check=False)
+    # --no-out everywhere the fixture is scanned: testdata is checked in, and
+    # a report directory has no business appearing inside it.
+    p = run([str(EXE), "check", str(FIXTURE), "--no-git", "--no-out"], check=False)
     print(p.stdout)
     if p.returncode != 1:
         failures.append(f"fixture check: expected exit 1, got {p.returncode}\n{p.stderr}")
@@ -103,9 +105,9 @@ def main(argv: list[str]) -> int:
     step("output formats")
     tmp = Path(tempfile.mkdtemp(prefix="docrot-verify-"))
     try:
-        for fmt in ("json", "sarif", "html"):
+        for fmt in ("md", "json", "sarif", "html"):
             out = tmp / f"report.{fmt}"
-            p = run([str(EXE), "check", str(FIXTURE), "--no-git", "--format", fmt, "--output", str(out)], check=False)
+            p = run([str(EXE), "check", str(FIXTURE), "--no-git", "--no-out", "--format", fmt, "--output", str(out)], check=False)
             if p.returncode not in (0, 1):
                 failures.append(f"format {fmt}: exit {p.returncode}\n{p.stderr}")
                 continue
@@ -120,6 +122,10 @@ def main(argv: list[str]) -> int:
                     failures.append("sarif: version is not 2.1.0")
                 if fmt == "json" and "findings" not in doc:
                     failures.append("json: no findings key")
+            elif fmt == "md":
+                for want in ("# docrot report", "## How to read this", "## Findings", "## Fix checklist", "missing-path"):
+                    if want not in data:
+                        failures.append(f"md: report is missing {want!r}")
             else:
                 if "<html" not in data.lower() or "missing-path" not in data:
                     failures.append("html: report looks empty")

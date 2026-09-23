@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -40,6 +42,10 @@ func (f *fakeIndex) SimilarPaths(rel string, n int) []string {
 	base := rel[strings.LastIndex(rel, "/")+1:]
 	var out []string
 	for x := range f.files {
+		if strings.EqualFold(x, rel) {
+			out = append([]string{x}, out...)
+			continue
+		}
 		if strings.HasSuffix(x, "/"+base) || x == base {
 			out = append(out, x)
 		}
@@ -122,6 +128,7 @@ func (f *fakeIndex) SimilarOdinSymbols(string, int) []string { return nil }
 func (f *fakeIndex) HasPython() bool                         { return len(f.py) > 0 }
 func (f *fakeIndex) PyModules() []string                     { return nil }
 func (f *fakeIndex) HasPySymbol(q string) bool               { return f.py[q] }
+func (f *fakeIndex) PyModuleIsExample(string) bool           { return false }
 func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
 func (f *fakeIndex) HasAnchor(doc, slug string) bool {
 	for _, a := range f.anchors[doc] {
@@ -263,6 +270,36 @@ func TestSeverityOverrideAndMinConfidence(t *testing.T) {
 	}
 	if res := r.Resolve(ref(model.KindPath, "nope/thing.go", model.Low, "README.md")); !res.Skipped {
 		t.Fatal("low confidence should be skipped with MinConfidence=medium")
+	}
+}
+
+func TestExistsExactIsCaseSensitive(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "Docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Docs", "README.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for rel, want := range map[string]bool{
+		"Docs/README.md": true, "docs/README.md": false, "Docs/readme.md": false, "Docs/Readme.md": false,
+		"Docs": true, "docs": false, "Docs/": true, "nope/README.md": false, ".": true,
+	} {
+		if got := ExistsExact(root, rel); got != want {
+			t.Errorf("ExistsExact(%q) = %v, want %v", rel, got, want)
+		}
+	}
+}
+
+func TestCaseMismatchMessage(t *testing.T) {
+	ix := newFake()
+	r := New(ix, Options{})
+	res := r.Resolve(ref(model.KindPath, "readme.md", model.High, "docs/guide.md"))
+	if res.Finding == nil {
+		t.Fatal("expected a finding for readme.md")
+	}
+	if !strings.Contains(res.Finding.Message, "letter case") || res.Finding.Suggestion != "README.md" {
+		t.Fatalf("message %q suggestion %q", res.Finding.Message, res.Finding.Suggestion)
 	}
 }
 

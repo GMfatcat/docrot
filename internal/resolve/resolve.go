@@ -124,6 +124,19 @@ func (r *Resolver) candidates(ref model.Reference) []string {
 	}
 	if !strings.HasPrefix(norm, "../") {
 		cands = append(cands, path.Clean(norm))
+	} else if docDir != "." && docDir != "" {
+		// "../../docs_src/x.py" written from a docs tree whose base is not
+		// the document's own directory (MkDocs docs_dir, Sphinx source):
+		// climb the ancestors and accept the first that resolves.
+		for d := path.Dir(docDir); ; d = path.Dir(d) {
+			c := path.Clean(d + "/" + norm)
+			if !strings.HasPrefix(c, "../") {
+				cands = append(cands, c)
+			}
+			if d == "." || d == "/" {
+				break
+			}
+		}
 	}
 	return cands
 }
@@ -134,21 +147,55 @@ func (r *Resolver) existsOnDisk(rel string) bool {
 	if r.opts.Root == "" || strings.HasPrefix(rel, "..") {
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(r.opts.Root, filepath.FromSlash(rel))); err == nil {
+	if ExistsExact(r.opts.Root, rel) {
 		return true
 	}
 	for _, sib := range r.opts.Siblings {
-		if _, err := os.Stat(filepath.Join(sib, filepath.FromSlash(rel))); err == nil {
+		if ExistsExact(sib, rel) {
 			return true
 		}
 		// "meowbase/httpx/README.md" written from the parent directory's view
 		if first, rest, ok := strings.Cut(rel, "/"); ok && first == filepath.Base(sib) {
-			if _, err := os.Stat(filepath.Join(sib, filepath.FromSlash(rest))); err == nil {
+			if ExistsExact(sib, rest) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// ExistsExact reports whether rel exists under root with exactly this
+// spelling. os.Stat is case-insensitive on Windows and macOS, so a document
+// saying "Readme.md" would pass there and fail on Linux; docrot compares
+// every path component against the directory listing instead, so the
+// verdict is the same on every platform.
+func ExistsExact(root, rel string) bool {
+	rel = strings.Trim(rel, "/")
+	if rel == "" || rel == "." {
+		return true
+	}
+	dir := root
+	for _, comp := range strings.Split(rel, "/") {
+		if comp == "" || comp == "." {
+			continue
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return false
+		}
+		found := false
+		for _, e := range entries {
+			if e.Name() == comp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+		dir = filepath.Join(dir, comp)
+	}
+	return true
 }
 
 func (r *Resolver) resolvePath(ref model.Reference) Result {
@@ -201,6 +248,13 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 		}
 		if len(cands) > 3 {
 			cands = cands[:3]
+		}
+		// Only the letter case differs: exists on Windows/macOS, breaks on Linux.
+		for _, c := range r.candidates(ref) {
+			if len(cands) > 0 && strings.EqualFold(cands[0], c) && cands[0] != c {
+				msg = "`" + ref.Text + "` differs from `" + cands[0] + "` only by letter case (works on case-insensitive file systems, breaks on Linux)"
+				break
+			}
 		}
 		// The same relative path exists under a sub-tree (a template, an
 		// example): the doc is probably describing that tree.
@@ -302,6 +356,23 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, cands)}
 }
 
+// pyStdlibModules are the Python standard library modules documentation
+// mentions most; a dotted name starting with one is not a claim about this
+// repository unless the repository defines it itself.
+var pyStdlibModules = map[string]bool{}
+
+func init() {
+	for _, m := range strings.Fields(`typing typing_extensions datetime enum dataclasses collections functools itertools
+		os sys re json pathlib asyncio logging math random time uuid decimal fractions io shutil subprocess
+		threading multiprocessing socket ssl http urllib email csv sqlite3 unittest pytest contextlib abc
+		inspect types copy pickle struct hashlib hmac secrets base64 string textwrap operator warnings
+		argparse configparser tempfile glob fnmatch zipfile tarfile gzip heapq bisect array queue weakref
+		numbers statistics ipaddress mimetypes platform signal select selectors traceback importlib pkgutil
+		builtins __future__ concurrent contextvars dis gc html xml zoneinfo tomllib venv pprint reprlib`) {
+		pyStdlibModules[m] = true
+	}
+}
+
 // isReceiverish reports whether name looks like a short variable that
 // commonly collides with a package name (cfg, log, config, app, ...).
 func isReceiverish(name string) bool {
@@ -309,7 +380,8 @@ func isReceiverish(name string) bool {
 		return true
 	}
 	switch name {
-	case "config", "logger", "client", "server", "store", "router", "handler", "worker", "service", "runner", "engine", "index", "opts", "options", "flags", "state", "cache", "queue", "pool", "conn", "resp", "req":
+	case "config", "logger", "client", "server", "store", "router", "handler", "worker", "service", "runner", "engine", "index", "opts", "options", "flags", "state", "cache", "queue", "pool", "conn", "resp", "req",
+		"request", "response", "session", "model", "instance", "self", "cls", "user", "item", "items", "result", "results", "data", "settings", "context", "message", "event", "task", "job", "record", "row", "field", "value", "values", "params", "args", "kwargs", "template", "templates", "schema", "form", "file", "files":
 		return true
 	}
 	return false
@@ -343,8 +415,22 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		return Result{OK: true}
 	}
 	// Type.field where Type is a known declaration: members are not indexed
-	if first, _, ok := strings.Cut(ref.Norm, "."); ok && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
+	first, _, dotted := strings.Cut(ref.Norm, ".")
+	if dotted && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
 		return Result{OK: true}
+	}
+	sev := model.SeverityFor(ref.Confidence)
+	if ref.Kind == model.KindPySym {
+		switch {
+		case !dotted:
+			sev = model.SevInfo // a bare call is usually a method or a local helper
+		case pyStdlibModules[first]:
+			return Result{Skipped: true} // typing.Annotated, datetime.strptime
+		case isReceiverish(first):
+			return Result{Skipped: true} // app.routes, client.get: an instance
+		case r.ix.PyModuleIsExample(first):
+			sev = model.SevInfo // app.main from docs_src: a tutorial layout
+		}
 	}
 	if ref.Confidence <= model.Low {
 		// a lower-case dotted name may be a config key instead
@@ -360,7 +446,7 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		}
 	}
 	msg := lang + " symbol `" + ref.Text + "` not found"
-	return Result{Finding: r.finding(model.RuleMissingSymbol, model.SeverityFor(ref.Confidence), ref, msg, sim(ref.Norm, 3))}
+	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, sim(ref.Norm, 3))}
 }
 
 // --- flags -----------------------------------------------------------------

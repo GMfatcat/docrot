@@ -364,6 +364,8 @@ func (ix *Index) PyModules() []string {
 
 func (ix *Index) HasPySymbol(q string) bool { return ix.pys != nil && ix.pys.Has(q) }
 
+func (ix *Index) PyModuleIsExample(m string) bool { return ix.pys != nil && ix.pys.IsExampleModule(m) }
+
 func (ix *Index) SimilarPySymbols(q string, n int) []string {
 	if ix.pys == nil {
 		return nil

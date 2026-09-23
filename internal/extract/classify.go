@@ -18,7 +18,8 @@ func init() {
 	for _, e := range strings.Fields(`go md json txt ps1 py odin yaml yml toml sh exe dll zip pdb ini cfg
 		html css js ts sql csv jsonl log mod sum proto env gif png jpg jpeg svg pdf lock bat cmd
 		rs c h cpp hpp cc mtrace gguf safetensors wasm tmpl tpl gotmpl xml ico webp mp4 gz tar bz2 xz
-		7z conf service plist rst adoc ipynb pyi mjs cjs tsx jsx vue scss less map`) {
+		7z conf service plist rst adoc ipynb pyi mjs cjs tsx jsx vue scss less map
+		pem crt key cff whl egg pyc pth cfg jsonc toml ini`) {
 		knownExt[e] = true
 	}
 }
@@ -36,7 +37,7 @@ var placeholderFirstSegments = map[string]bool{
 	"bin": true, "target": true, "obj": true, "dist": true, "cache": true, "data": true,
 	"temp": true, "run": true, "backup": true, "backups": true, "downloads": true,
 	"upload": true, "uploads": true, "coverage": true, "node_modules": true, "vendor": true,
-	"release": true, "releases": true, "artifacts": true, "services": true,
+	"release": true, "releases": true, "artifacts": true, "services": true, "app": true,
 }
 
 var (
@@ -442,8 +443,8 @@ func (x *extractor) isPyModule(name string) bool {
 		x.pyMods = map[string]bool{}
 		for _, p := range x.hints.PyModules() {
 			x.pyMods[p] = true
-			if i := strings.LastIndex(p, "."); i >= 0 {
-				x.pyMods[p[i+1:]] = true
+			if i := strings.Index(p, "."); i >= 0 {
+				x.pyMods[p[:i]] = true // the top-level package
 			}
 		}
 	}

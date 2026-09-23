@@ -13,6 +13,7 @@
 package anchors
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,10 +25,13 @@ type Index struct {
 	docs map[string]*docAnchors
 }
 
+var customIDAll = regexp.MustCompile(`\{\s*#([\w-]+)\s*\}`)
+
 type docAnchors struct {
-	slugs []string        // sorted, unique
-	set   map[string]bool // exact slugs
-	alt   map[string]bool // lower-cased heading text and normalised slugs
+	generated bool            // document contains mkdocstrings "::: " directives
+	slugs     []string        // sorted, unique
+	set       map[string]bool // exact slugs
+	alt       map[string]bool // lower-cased heading text and normalised slugs
 }
 
 // New returns an empty Index.
@@ -50,7 +54,31 @@ func (ix *Index) Add(docRel string, d *markdown.Doc) {
 		da = &docAnchors{set: map[string]bool{}, alt: map[string]bool{}}
 		ix.docs[key] = da
 	}
+	addSlug := func(slug string) {
+		if slug != "" && !da.set[slug] {
+			da.set[slug] = true
+			da.slugs = append(da.slugs, slug)
+		}
+		if slug != "" {
+			da.alt[normSlug(slug)] = true
+		}
+	}
+	// explicit ids anywhere: "## Title { #id }", "[](){#id}", standalone
+	// "{#id}" lines (MkDocs / Python-Markdown attr_list conventions); and
+	// mkdocstrings directives ("::: pkg.module") generate anchors we cannot
+	// enumerate, so such documents accept any anchor.
+	for _, line := range d.Lines {
+		for _, m := range customIDAll.FindAllStringSubmatch(line, -1) {
+			addSlug(strings.ToLower(m[1]))
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "::: ") {
+			da.generated = true
+		}
+	}
 	for _, h := range d.Headings {
+		if id := markdown.CustomID(h.Text); id != "" {
+			addSlug(id)
+		}
 		if h.Slug != "" && !da.set[h.Slug] {
 			da.set[h.Slug] = true
 			da.slugs = append(da.slugs, h.Slug)
@@ -71,6 +99,9 @@ func (ix *Index) Has(docRel, slug string) bool {
 	da := ix.docs[normPath(docRel)]
 	if da == nil || slug == "" {
 		return false
+	}
+	if da.generated {
+		return true // API docs rendered by mkdocstrings: anchors are not in the source
 	}
 	if da.set[slug] {
 		return true

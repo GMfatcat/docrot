@@ -37,10 +37,19 @@ matched against the reference text. To change a rule's level, set
 | `unknown-flag` | flag | `--name` / `-name` in the document is not defined by any `flag.*` call. `-` and `_` are treated as equivalent. High confidence is a warning, medium is info; single-dash flags inside a longer command are never reported. Flags after an external program (`go test -race`, `git log --oneline`) are ignored, except after `go run ./cmd/x`. |
 | `unknown-env` | env | An `UPPER_SNAKE` name is never read via `os.Getenv`, `os.LookupEnv`, or any call whose name contains `Env`. Only reported when the line mentions an environment (env, export, `$`, 環境…), when the code reads at least one variable, and when the name is not a well-known external one (`GOPATH`, `GIT_*`, `HOME`…). |
 | `unknown-config-key` | configkey | A dotted key such as `server.addr` appears neither as a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path in any struct nor in any sample config file (`config*.json`, `*.example.json`, …). Only reported when the top-level segment is a known section. Always info. |
-| `broken-anchor` | anchor | A link such as `[x](docs/rules.md#exit-codes)` or `[x](#exit-codes)` points to a heading that does not exist. Slugs follow GitHub rules, including CJK headings and `-1` suffixes for duplicates. Line anchors (`#L10-L20`) are ignored. |
+| `broken-anchor` | anchor | A link such as `[x](docs/rules.md#exit-codes)` or `[x](#exit-codes)` points to a heading that does not exist. Slugs follow GitHub rules (underscores kept), including CJK headings and `-1` suffixes for duplicates. MkDocs custom ids (`## Title { #id }`, `[](){#id}`) count as anchors, and a page containing a mkdocstrings `::: module` directive accepts any anchor. Line anchors (`#L10-L20`) are ignored. |
 | `broken-url` | url | Only with `--net`: an external URL returned 4xx/5xx or failed to connect. Local, private and `example.*` hosts are skipped. |
 | `missing-command` | command | In a shell code block, the script or path a command refers to (`./scripts/verify.py`, `go run ./cmd/docrot`, `python scripts/demo.py`, `odin build dir`) does not exist. Output arguments (`-o dist/app`, `> out.txt`, `cp`/`mv` destinations) are never checked. In plain ```` ```text ```` blocks only lines with a shell prompt (`$ cmd`) count. |
 | `missing-import` | import | In a Go code block, an import path under this module's path does not correspond to a package directory. Imports outside the module (stdlib, third-party) are ignored. |
+
+Letter case is compared exactly on every platform: `docs/foo.md` is not
+`Docs/Foo.md`, even on Windows, and the finding says "differs only by
+letter case". For Python, module and package names are valid symbols,
+names imported at the top of a module count as that module's names (so
+`fastapi.status` resolves), dotted names starting with a standard-library
+module (`typing.Annotated`) or an example object (`app.routes`, `client.get`)
+are skipped, and symbols defined under `tests/`, `docs/`, `docs_src/`,
+`examples/` or `scripts/` are info rather than errors.
 
 Things the extractor does not treat as references at all: slash-separated
 prose (`health/ready`, `net/http`), lists of top-level directories

@@ -25,7 +25,8 @@ README-zh.md:1: warning pair-heading translation has 4 headings, source has 5
 ```
 
 這幾行來自對一個內部 Go repo 的真實執行；docrot 在八個 repo、三種語言上找到了什麼，
-見[實地報告](docs/field-report.md)。
+見[實地報告](docs/field-report.md)；對 httpx、Starlette、Typer、Pydantic 與 FastAPI
+（1,692 份文件、372 組翻譯配對）的結果見 [Python 實地報告](docs/field-report-python.md)。
 
 ## 安裝
 
@@ -90,6 +91,10 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 所在行完全沒提到環境的 `UPPER_SNAKE` 字、`cfg` 同時是套件又是變數時的 `cfg.Addr`，以及
 `Type.Method`、`--flag`、`path/to/file` 這類示意用名稱。
 
+大小寫在每個平台上都嚴格比對。檔案叫 `Docs/Foo.md` 而文件寫 `docs/foo.md`，在 Windows
+與 macOS 上一樣會得到 finding，訊息寫明「只差大小寫」——因為這種連結在作者的筆電上能開，
+到 Linux CI 就壞。文件探索本身則不分大小寫，所以 `README.MD` 與 `readme.md` 都會被掃描。
+
 ## 設定
 
 `docrot init` 會寫出帶預設值的 `.docrot.json`：
@@ -108,7 +113,8 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
   "failOn": "error",
-  "minConfidence": "low"
+  "minConfidence": "low",
+  "outDir": ".docrot"
 }
 ```
 
@@ -117,6 +123,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   服務文件裡引用它所依賴的函式庫時很有用。
 - `stale.exclude` 把有日期的文件（changelog、設計規格）排除在過期分析之外；它們本質上是歷史紀錄。
 - `severity` 覆蓋某條規則的等級，例如 `{"stale-section": "info"}`。
+- `outDir` 是每次執行都會重寫的輸出目錄；見下。
 
 行內逃生口：
 
@@ -127,11 +134,30 @@ inline text <!-- docrot:ignore -->  this line
 <!-- docrot:ignore-file -->
 ```
 
+### 輸出目錄
+
+每次 `docrot check` 都會重寫一個目錄——由 `outDir` 設定指定——讓人與 agent
+永遠在同一個地方找到最新的報告：
+
+```text
+.docrot/.gitignore   a single "*", so the reports never reach a commit
+.docrot/report.md    for agents: findings by file, how to read them, a checklist
+.docrot/report.html  for humans: the filterable single-file page
+.docrot/report.json  the stable JSON schema
+.docrot/report.txt   the terminal report, with info findings
+```
+
+每個檔案都先寫到暫存檔再改名就位，所以中途被打斷的執行，不會在下一個讀者期待
+完整報告的地方留下半份。這個目錄會被排除在文件探索之外，所以昨天的報告永遠不會
+被當成文件來檢查。用 `--out-dir` 換個地方寫，用 `--no-out` 讓這次不寫，或把
+`outDir` 設成空字串永久關掉。
+
 ## 指令
 
 ```text
-docrot check [dir] [--format text|json|sarif|html] [--output FILE]
+docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
+             [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
@@ -144,8 +170,8 @@ docrot version
 
 掃描類指令共用的 flag：`--config` 指定設定檔、`--no-git` 停用 git 規則、`--net` 檢查 URL、
 `--verbose` 印出索引與 git 警告、`--min-confidence` 丟掉弱引用。`check` 另有 `--format`、
-`--output`、`--fail-on`、`--info`、`--all`、`--coverage` 與 `--quiet`；`explain` 另有
-`--kind` 與 `--root`；`index` 接受 `--kind`。
+`--output`、`--fail-on`、`--info`、`--all`、`--coverage`、`--quiet`、`--out-dir` 與
+`--no-out`；`explain` 另有 `--kind` 與 `--root`；`index` 接受 `--kind`。
 
 Exit code：`0` 乾淨、`1` 有達到 `--fail-on` 的新 finding、`2` 用法或內部錯誤。SARIF 輸出可直接上傳
 GitHub code scanning；已 baseline 的 finding 會帶 `baselineState: unchanged`。
@@ -170,7 +196,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 
 設計：[docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/specs/2026-09-23-docrot-design.md)。
 計畫：[docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md)。
-規則：[docs/rules.md](docs/rules.md)。實地報告：[docs/field-report.md](docs/field-report.md)。
+規則：[docs/rules.md](docs/rules.md)。實地報告：[docs/field-report.md](docs/field-report.md)、[docs/field-report-python.md](docs/field-report-python.md)。
 給 agent 的入口：[llms.txt](llms.txt)。變更：[CHANGELOG.md](CHANGELOG.md)。
 
 ## 非目標

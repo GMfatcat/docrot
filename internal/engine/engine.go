@@ -5,6 +5,7 @@
 package engine
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +51,14 @@ type Options struct {
 	Stderr        io.Writer
 	Version       string
 	Now           time.Time
+	// OutDir is a directory, relative to Root, rewritten with the report in
+	// every format at the end of a run. Empty means "write nothing". It is
+	// always excluded from document discovery and indexing, even when
+	// NoOut is set, so a report left by an earlier run is never read back
+	// as a document.
+	OutDir string
+	// NoOut suppresses writing OutDir without forgetting about it.
+	NoOut bool
 }
 
 // Run is the outcome of Check.
@@ -61,6 +71,11 @@ type Run struct {
 	Git      *gitx.Repo // nil when unavailable/disabled
 	Baseline *baseline.File
 	Fixed    []baseline.Entry
+	// Written lists the report files written into OutDir, named the way
+	// OutDir was (so relative to Root unless the caller gave an absolute
+	// directory) and always with forward slashes. Empty when nothing was
+	// written, because OutDir was off or every write failed.
+	Written []string
 }
 
 // Check runs the full pipeline.
@@ -73,6 +88,7 @@ func Check(opts Options) (*Run, error) {
 		opts.Now = time.Now()
 	}
 	cfg := opts.Config
+	cfg.Exclude = excludeOutDir(cfg.Exclude, opts.OutDir)
 	root, err := filepath.Abs(opts.Root)
 	if err != nil {
 		return nil, err
@@ -352,7 +368,119 @@ func Check(opts Options) (*Run, error) {
 		sum.Extra["pairs"] = strconv.Itoa(len(prs))
 	}
 	run.Report = &report.Report{Summary: sum, Findings: findings, Coverage: cov, Version: opts.Version}
+
+	// 10. output directory
+	if opts.OutDir != "" && !opts.NoOut {
+		run.Written = writeOutDir(root, opts.OutDir, run.Report, opts.ShowAll, warn)
+	}
 	return run, nil
+}
+
+// OutFiles are the files every `docrot check` run rewrites inside the
+// output directory, in the order they are written.
+var OutFiles = []string{"report.html", "report.md", "report.json", "report.txt"}
+
+// outGitignore is what the output directory's .gitignore says: ignore
+// everything in here, including itself. It is written once and never
+// overwritten, so a project that wants to commit its reports only has to
+// empty the file.
+const outGitignore = "*\n"
+
+// writeOutDir rewrites <root>/<outDir> with the report in every format and
+// returns the files it wrote, relative to root. Nothing here is fatal: a
+// read-only checkout should still get its findings on stdout, so every
+// failure becomes a warning and the run continues.
+func writeOutDir(root, outDir string, r *report.Report, showBaselined bool, warn func(string, ...any)) []string {
+	dir := outDir
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(root, filepath.FromSlash(outDir))
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		warn("out dir: %v", err)
+		return nil
+	}
+	gitignore := filepath.Join(dir, ".gitignore")
+	if _, err := os.Stat(gitignore); errors.Is(err, fs.ErrNotExist) {
+		if err := writeFileAtomic(gitignore, func(w io.Writer) error {
+			_, err := io.WriteString(w, outGitignore)
+			return err
+		}); err != nil {
+			warn("out dir: %v", err)
+		}
+	}
+	// The text and Markdown reports are the ones an agent reads end to end,
+	// so they carry the info findings the terminal hides by default.
+	base := report.Options{Root: root, ShowBaselined: showBaselined}
+	full := base
+	full.ShowInfo = true
+	formats := map[string]report.Options{
+		"report.html": base,
+		"report.md":   full,
+		"report.json": base,
+		"report.txt":  full,
+	}
+	names := map[string]string{"report.html": "html", "report.md": "md", "report.json": "json", "report.txt": "text"}
+	var written []string
+	for _, name := range OutFiles {
+		o := formats[name]
+		err := writeFileAtomic(filepath.Join(dir, name), func(w io.Writer) error {
+			return report.Write(names[name], w, r, o)
+		})
+		if err != nil {
+			warn("out dir: %s: %v", name, err)
+			continue
+		}
+		written = append(written, path.Join(filepath.ToSlash(outDir), name))
+	}
+	return written
+}
+
+// writeFileAtomic renders into a temporary file beside path and renames it
+// over path, so an interrupted or failing run never leaves a half-written
+// report where the next reader expects a whole one.
+func writeFileAtomic(dest string, render func(io.Writer) error) (err error) {
+	f, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer func() {
+		if err != nil {
+			f.Close()
+			os.Remove(tmp)
+		}
+	}()
+	bw := bufio.NewWriter(f)
+	if err = render(bw); err != nil {
+		return err
+	}
+	if err = bw.Flush(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	if err = os.Rename(tmp, dest); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// excludeOutDir appends "<outDir>/**" to the exclude globs unless it is
+// already there. Without it the reports of the previous run would be
+// discovered as documents and indexed as files.
+func excludeOutDir(exclude []string, outDir string) []string {
+	if outDir == "" {
+		return exclude
+	}
+	pat := path.Clean(filepath.ToSlash(outDir)) + "/**"
+	for _, e := range exclude {
+		if e == pat {
+			return exclude
+		}
+	}
+	return append(slices.Clone(exclude), pat)
 }
 
 // ExplainRow is one extracted reference with its resolution, for `docrot explain`.
@@ -514,7 +642,9 @@ func discoverDocs(root string, include, exclude []string) ([]string, error) {
 		if globx.MatchAny(exclude, rel) {
 			return nil
 		}
-		if globx.MatchAny(include, rel) {
+		// Include globs match case-insensitively: "**/*.md" must find
+		// README.MD and Readme.markdown-style variants on every platform.
+		if globx.MatchAny(include, rel) || globx.MatchAny(include, strings.ToLower(rel)) {
 			out = append(out, rel)
 		}
 		return nil

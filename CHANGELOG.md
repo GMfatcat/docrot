@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.2.0 — 2026-09-23
+
+- Output directory: every `docrot check` run now rewrites one directory —
+  `outDir`, a dot-directory at the repo root by default — with the same
+  report in every format, so a human and an agent always find the current
+  findings in the same place. It holds a `.gitignore` of its own (written
+  once, containing `*`) so the reports never reach a commit, each file is
+  renamed into place from a temporary file so an interrupted run leaves no
+  half-written report, and the directory is excluded from document
+  discovery so yesterday's report is never checked as documentation.
+  `--out-dir` moves it, `--no-out` skips it, an empty `outDir` disables it.
+- New `md` report format, also available as `--format md`: Markdown written
+  for an agent rather than a terminal. It explains what a finding is, what
+  the severities mean and how to silence a false positive; groups findings
+  by document; always includes info-level findings; lists the rules it used
+  with their descriptions; and ends with a fix checklist of the distinct
+  document/rule pairs, most severe first.
+- Python support tuned on five real projects (httpx, Starlette, Typer,
+  Pydantic, FastAPI): modules and packages count as references, top-level
+  imports re-export names (`fastapi.status`), standard-library modules and
+  example objects (`app.routes`) are skipped, tutorial modules under
+  `docs_src/` or `tests/` are info, MkDocs-style `../../docs_src/x.py`
+  includes resolve from ancestor directories, `{ #custom-id }` anchors and
+  mkdocstrings pages are understood, slugs keep underscores. See
+  `docs/field-report-python.md`.
+- Letter case is checked the same way on every platform: `docs/foo.md`
+  for a file called `Docs/Foo.md` is a finding on Windows and macOS too,
+  with a message that says so; `README.MD` and `readme.md` are discovered
+  by `**/*.md`.
+- HTML/JSON reports no longer contain U+FFFD from mid-rune truncation.
+
 ## 0.1.0 — 2026-09-23
 
 First complete release, built in one night against real repositories.

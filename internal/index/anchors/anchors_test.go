@@ -41,7 +41,7 @@ func TestHasAndAnchors(t *testing.T) {
 		{"duplicate suffix", "README.md", "usage-1", true},
 		{"raw heading text fallback", "README.md", "getting started", true},
 		{"underscore normalised", "README.md", "foo_bar", true},
-		{"slug of underscore heading", "README.md", "foobar", true},
+		{"slug of underscore heading", "README.md", "foo-bar", true},
 		{"mixed case input", "README.md", "Getting-Started", true},
 		{"windows separator in path", "README.md", "docrot", true},
 		{"dot slash prefix", "./README.md", "docrot", true},
@@ -57,7 +57,7 @@ func TestHasAndAnchors(t *testing.T) {
 		})
 	}
 
-	want := []string{"-核心目標", "docrot", "foobar", "getting-started", "usage", "usage-1"}
+	want := []string{"-核心目標", "docrot", "foo_bar", "getting-started", "usage", "usage-1"}
 	if got := ix.Anchors("README.md"); !reflect.DeepEqual(got, want) {
 		t.Errorf("Anchors = %v, want %v", got, want)
 	}

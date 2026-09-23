@@ -1,6 +1,7 @@
 // Command docrot finds where documentation lies about the code.
 //
-//	docrot check [dir] [flags]     scan docs, report findings, exit 1 on failures
+//	docrot check [dir] [flags]     scan docs, report findings, exit 1 on failures,
+//	                               and rewrite the output directory (.docrot by default)
 //	docrot baseline [dir]          freeze current findings into .docrot-baseline.json
 //	docrot coverage [dir]          which exported symbols/flags/env are undocumented
 //	docrot pairs [dir]             only the bilingual source/translation checks
@@ -33,7 +34,7 @@ import (
 // release number below is reported together with the VCS revision.
 var version = ""
 
-const release = "0.1.0"
+const release = "0.2.0"
 
 const (
 	exitOK       = 0
@@ -185,15 +186,21 @@ func (c *common) engineOptions(root string, cfg config.Config, stderr io.Writer)
 		Verbose:       c.verbose,
 		Stderr:        stderr,
 		Version:       versionString(),
+		// Every command keeps the output directory out of discovery and
+		// indexing, but only `check` rewrites it.
+		OutDir: cfg.OutDir,
+		NoOut:  true,
 	}
 }
 
 func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	c := newCommon("check")
-	var format, output, failOn string
-	var all, quiet, cov, info bool
-	c.fs.StringVar(&format, "format", "text", "output format: text|json|sarif|html")
+	var format, output, failOn, outDir string
+	var all, quiet, cov, info, noOut bool
+	c.fs.StringVar(&format, "format", "text", "output format: "+strings.Join(report.Formats, "|"))
 	c.fs.BoolVar(&info, "info", false, "also list info-level findings in the text report")
+	c.fs.StringVar(&outDir, "out-dir", "", "directory rewritten with the report in every format (default from config, "+config.DefaultOutDir+")")
+	c.fs.BoolVar(&noOut, "no-out", false, "do not write the output directory")
 	c.fs.StringVar(&output, "output", "", "write the report to this file instead of stdout")
 	c.fs.StringVar(&failOn, "fail-on", "", "exit 1 when a new finding of this severity or higher exists: error|warning|info|none (default from config, error)")
 	c.fs.BoolVar(&all, "all", false, "also show baselined findings (implies --info)")
@@ -228,6 +235,10 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	opts := c.engineOptions(root, cfg, stderr)
 	opts.ShowAll = all
 	opts.Coverage = cov
+	if outDir != "" {
+		opts.OutDir = outDir
+	}
+	opts.NoOut = noOut
 	run, err := engine.Check(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
@@ -246,6 +257,10 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 			return exitUsage
 		}
 		fmt.Fprintf(stderr, "%s\nreport written to %s\n", report.SummaryLine(run.Report.Summary), output)
+	}
+	if len(run.Written) > 0 {
+		fmt.Fprintf(stderr, "reports written to %s/ (report.md for agents, report.html for humans)\n",
+			strings.TrimSuffix(filepath.ToSlash(opts.OutDir), "/"))
 	}
 	if failSev == "" {
 		return exitOK
@@ -477,7 +492,8 @@ func cmdInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
 		return exitUsage
 	}
-	fmt.Fprintf(stdout, "wrote %s\n", p)
+	fmt.Fprintf(stdout, "wrote %s (docrot check rewrites %s/ with the report in every format)\n",
+		p, config.DefaultOutDir)
 	return exitOK
 }
 

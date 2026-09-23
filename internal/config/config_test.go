@@ -65,13 +65,14 @@ func TestDefaultRoundTrip(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	for _, key := range []string{"docs", "exclude", "ignore", "pairs", "pairPatterns",
-		"configSamples", "stale", "coverage", "severity", "net", "failOn", "minConfidence"} {
+		"configSamples", "stale", "coverage", "severity", "net", "failOn", "minConfidence",
+		"outDir"} {
 		if _, ok := raw[key]; !ok {
 			t.Errorf("default JSON is missing key %q", key)
 		}
 	}
-	if len(raw) != 13 {
-		t.Errorf("default JSON has %d keys, want 13: %v", len(raw), raw)
+	if len(raw) != 14 {
+		t.Errorf("default JSON has %d keys, want 14: %v", len(raw), raw)
 	}
 }
 

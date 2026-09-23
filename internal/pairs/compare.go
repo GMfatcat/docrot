@@ -3,6 +3,7 @@ package pairs
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -137,8 +138,8 @@ func linkFindings(p Pair, sf, tf markdown.Fingerprint, opts Options) []model.Fin
 		path.Base(p.Source):      true,
 		path.Base(p.Translation): true,
 	}
-	srcLinks := dropMates(sf.Links, mates)
-	trLinks := dropMates(tf.Links, mates)
+	srcLinks := stripLangSegments(dropMates(sf.Links, mates))
+	trLinks := stripLangSegments(dropMates(tf.Links, mates))
 
 	var out []model.Finding
 	for _, t := range missing(srcLinks, trLinks) {
@@ -248,6 +249,25 @@ func newFinding(rule, translation, detail string, sev model.Severity, line int, 
 		Loc:         model.Location{File: translation, Line: line},
 		Fingerprint: model.Fingerprint(rule, translation, detail),
 	}
+}
+
+var reLangSeg = regexp.MustCompile(`^(https?://[^/]+)/[a-z]{2}(?:-(?:[a-zA-Z]{2}|Hans|Hant))?(/|$)`)
+
+// stripLangSegments removes a leading language path segment from absolute
+// URLs ("https://site/ja/tutorial/" → "https://site/tutorial/") so that a
+// translation linking to its own language variant is not reported as drift.
+func stripLangSegments(targets []string) []string {
+	out := make([]string, 0, len(targets))
+	seen := map[string]bool{}
+	for _, t := range targets {
+		n := reLangSeg.ReplaceAllString(t, "$1$2")
+		n = strings.TrimSuffix(n, "/")
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // dropMates removes the links that point at the other file of the pair,

@@ -32,7 +32,9 @@ README-zh.md:1: warning pair-heading translation has 4 headings, source has 5
 
 Those lines are from a real run on an internal Go repository; see the
 [field report](docs/field-report.md) for what docrot found across eight
-repositories in three languages.
+repositories in three languages, and the
+[Python field report](docs/field-report-python.md) for httpx, Starlette,
+Typer, Pydantic and FastAPI (1,692 documents, 372 translation pairs).
 
 ## Install
 
@@ -108,6 +110,13 @@ prose like `health/ready` or `net/http`, flags after external programs
 environment, `cfg.Addr` when `cfg` is both a package and a variable, and
 illustrative names such as `Type.Method`, `--flag` or `path/to/file`.
 
+Letter case is checked exactly on every platform. A document that says
+`docs/foo.md` when the file is `Docs/Foo.md` gets a finding on Windows
+and macOS as well, worded "differs only by letter case", because that link
+works on the author's laptop and breaks on the Linux CI runner. Document
+discovery itself is case-insensitive, so `README.MD` and `readme.md` are
+scanned.
+
 ## Configuration
 
 `docrot init` writes a `.docrot.json` with the defaults:
@@ -126,7 +135,8 @@ illustrative names such as `Type.Method`, `--flag` or `path/to/file`.
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
   "failOn": "error",
-  "minConfidence": "low"
+  "minConfidence": "low",
+  "outDir": ".docrot"
 }
 ```
 
@@ -137,6 +147,7 @@ illustrative names such as `Type.Method`, `--flag` or `path/to/file`.
 - `stale.exclude` keeps dated documents (changelogs, design specs) out of
   the staleness analysis; they are historical records by nature.
 - `severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
+- `outDir` is the directory every run rewrites; see below.
 
 Inline escape hatches:
 
@@ -147,11 +158,33 @@ inline text <!-- docrot:ignore -->  this line
 <!-- docrot:ignore-file -->
 ```
 
+### Output directory
+
+Every `docrot check` run rewrites one directory, named by the `outDir`
+setting, so that a human and an agent always find the current report in the
+same place:
+
+```text
+.docrot/.gitignore   a single "*", so the reports never reach a commit
+.docrot/report.md    for agents: findings by file, how to read them, a checklist
+.docrot/report.html  for humans: the filterable single-file page
+.docrot/report.json  the stable JSON schema
+.docrot/report.txt   the terminal report, with info findings
+```
+
+Each file is rendered into a temporary file and renamed into place, so an
+interrupted run never leaves half a report where the next reader expects a
+whole one. The directory is excluded from document discovery, so yesterday's
+report is never checked as though it were documentation. Pass `--out-dir` to
+put it somewhere else, `--no-out` to write nothing this run, or set `outDir`
+to the empty string to turn it off for good.
+
 ## Commands
 
 ```text
-docrot check [dir] [--format text|json|sarif|html] [--output FILE]
+docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
+             [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
@@ -165,8 +198,9 @@ docrot version
 Flags shared by the scanning commands: `--config` picks the config file,
 `--no-git` disables the git rules, `--net` checks URLs, `--verbose` prints
 index and git warnings, `--min-confidence` drops weak references. `check`
-adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`
-and `--quiet`; `explain` adds `--kind` and `--root`; `index` takes `--kind`.
+adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`,
+`--quiet`, `--out-dir` and `--no-out`; `explain` adds `--kind` and `--root`;
+`index` takes `--kind`.
 
 Exit codes: `0` clean, `1` a new finding at or above `--fail-on`, `2` usage
 or internal error. The SARIF output uploads directly to GitHub code
@@ -193,7 +227,7 @@ they are full of illustrative paths by design.
 
 Design: [docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/specs/2026-09-23-docrot-design.md).
 Plan: [docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md).
-Rules: [docs/rules.md](docs/rules.md). Field report: [docs/field-report.md](docs/field-report.md).
+Rules: [docs/rules.md](docs/rules.md). Field reports: [docs/field-report.md](docs/field-report.md), [docs/field-report-python.md](docs/field-report-python.md).
 Agent entry point: [llms.txt](llms.txt). Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## Non-goals

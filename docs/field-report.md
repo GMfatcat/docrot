@@ -3,6 +3,9 @@
      not claims about docrot itself, so docrot skips the whole file. -->
 # Field report: docrot on eight real repositories
 
+A companion report covers five open-source Python projects of different
+sizes: `docs/field-report-python.md`.
+
 Date: 2026-09-23. Binary: `docrot 0.1.0`, default `.docrot.json` unless
 noted, git enabled. All eight repositories live side by side under one
 `project/` directory; they share a library (`meowbase`) and two of them are

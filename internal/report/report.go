@@ -1,9 +1,10 @@
-// Package report turns a finished docrot run into something a human or a
-// machine can read: compiler-style text for a terminal, a stable JSON schema
-// for scripts, SARIF 2.1.0 for GitHub code scanning, and a single-file HTML
-// page with filtering.
+// Package report turns a finished docrot run into something a human, an
+// agent or a machine can read: compiler-style text for a terminal, Markdown
+// written for a language model, a stable JSON schema for scripts, SARIF
+// 2.1.0 for GitHub code scanning, and a single-file HTML page with
+// filtering.
 //
-// All four writers share the Report value built by the engine. Each writer
+// All five writers share the Report value built by the engine. Each writer
 // sorts a copy of the findings with Sort, so output is deterministic no
 // matter what order the resolvers produced them in.
 package report
@@ -82,20 +83,22 @@ type Report struct {
 
 // Options tune a writer.
 type Options struct {
-	ShowBaselined bool   // text/HTML: also show findings frozen by the baseline
+	ShowBaselined bool   // text/markdown/HTML: also show findings frozen by the baseline
 	ShowInfo      bool   // text: also list info-level findings (always counted)
 	Color         bool   // text: emit ANSI colour
 	Root          string // repository root, used to relativise paths
 }
 
 // Formats lists the accepted format names for Write, in help order.
-var Formats = []string{"text", "json", "sarif", "html"}
+var Formats = []string{"text", "md", "json", "sarif", "html"}
 
 // Write dispatches on format, which must be one of Formats.
 func Write(format string, w io.Writer, r *Report, o Options) error {
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case "text", "":
 		return WriteText(w, r, o)
+	case "md", "markdown":
+		return WriteMarkdown(w, r, o)
 	case "json":
 		return WriteJSON(w, r, o)
 	case "sarif":

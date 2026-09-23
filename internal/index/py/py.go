@@ -48,6 +48,8 @@ type symbol struct {
 type Index struct {
 	stats   Stats
 	modules []string // sorted, unique
+	modSet  map[string]bool
+	example map[string]bool // modules whose files live under tests/, docs/, examples/…
 
 	byFull        map[string]symbol   // "module.qualified" -> first declaration
 	byClassMethod map[string][]symbol // "Class.method" -> declarations across modules
@@ -60,6 +62,8 @@ var (
 	reClass = regexp.MustCompile(`^class\s+(\w+)\s*[:(]`)
 	reDef   = regexp.MustCompile(`^(?:async\s+)?def\s+(\w+)\s*\(`)
 	reConst = regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)\s*=[^=]`)
+	reFrom  = regexp.MustCompile(`^from\s+[\w.]+\s+import\s+(.+)$`)
+	reImp   = regexp.MustCompile(`^import\s+(.+)$`)
 )
 
 // Build walks root, reads every *.py file (skipping .git, vendor,
@@ -182,6 +186,13 @@ func Build(root string, exclude []string) (*Index, error) {
 		}
 	}
 
+	ix.modSet = modSet
+	ix.example = map[string]bool{}
+	for _, sym := range ix.all {
+		if isExamplePath(sym.file) {
+			ix.example[sym.module] = true
+		}
+	}
 	for m := range modSet {
 		ix.modules = append(ix.modules, m)
 	}
@@ -269,10 +280,64 @@ func parseFile(content, rel string) []symbol {
 			if m := reConst.FindStringSubmatch(trimmed); m != nil {
 				name := m[1]
 				syms = append(syms, symbol{qualified: name, name: name, file: rel, line: i + 1})
+				continue
+			}
+			// top-level imports become names of this module ("from starlette
+			// import status" in fastapi/__init__.py makes fastapi.status real)
+			if m := reFrom.FindStringSubmatch(trimmed); m != nil {
+				list := m[1]
+				for j := i + 1; strings.Contains(list, "(") && !strings.Contains(list, ")") && j < len(lines); j++ {
+					list += " " + strings.TrimSpace(strings.TrimRight(lines[j], "\r"))
+				}
+				for _, name := range importedNames(list) {
+					syms = append(syms, symbol{qualified: name, name: name, file: rel, line: i + 1})
+				}
+				continue
+			}
+			if m := reImp.FindStringSubmatch(trimmed); m != nil {
+				for _, name := range importedNames(m[1]) {
+					syms = append(syms, symbol{qualified: name, name: name, file: rel, line: i + 1})
+				}
 			}
 		}
 	}
 	return syms
+}
+
+// importedNames returns the local names bound by an import list such as
+// "a, b as c, (d,\n e)" or "os.path as p": the alias when present,
+// otherwise the last dotted component. "*" is ignored.
+func importedNames(list string) []string {
+	list = strings.NewReplacer("(", " ", ")", " ", "\\", " ").Replace(list)
+	if i := strings.Index(list, "#"); i >= 0 {
+		list = list[:i]
+	}
+	var out []string
+	for _, part := range strings.Split(list, ",") {
+		f := strings.Fields(part)
+		if len(f) == 0 || f[0] == "*" {
+			continue
+		}
+		name := f[0]
+		if len(f) == 3 && f[1] == "as" {
+			name = f[2]
+		} else if i := strings.LastIndex(name, "."); i >= 0 {
+			name = name[i+1:]
+		}
+		if name != "" && isIdent(name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func isIdent(s string) bool {
+	for i, r := range s {
+		if !(r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (i > 0 && r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	return s != ""
 }
 
 func isExcludedDir(rel string, exclude []string) bool {
@@ -354,16 +419,46 @@ func (ix *Index) resolve(qualified string) []symbol {
 	if s, ok := ix.byFull[q]; ok {
 		return []symbol{s}
 	}
+	if ix.modSet[q] {
+		// "fastapi.responses": a module or package is a valid reference
+		return []symbol{{module: q, name: q}}
+	}
 	parts := strings.Split(q, ".")
 	if len(parts) >= 2 {
 		cmKey := parts[len(parts)-2] + "." + parts[len(parts)-1]
 		if m := ix.byClassMethod[cmKey]; len(m) > 0 {
 			return m
 		}
+		// package re-export: "fastapi.FastAPI" when FastAPI is declared in
+		// fastapi/applications.py (the package's __init__ re-exports it)
+		pkg := strings.Join(parts[:len(parts)-1], ".")
+		if ix.modSet[pkg] {
+			for _, sym := range ix.byName[parts[len(parts)-1]] {
+				if sym.module == pkg || strings.HasPrefix(sym.module, pkg+".") {
+					return []symbol{sym}
+				}
+			}
+		}
 	}
 	last := parts[len(parts)-1]
 	return ix.byName[last]
 }
+
+// IsExampleModule reports whether module is defined under a tests, docs,
+// examples, scripts or benchmarks tree rather than in the library itself.
+func (ix *Index) IsExampleModule(module string) bool { return ix.example[module] }
+
+func isExamplePath(rel string) bool {
+	first, _, _ := strings.Cut(rel, "/")
+	switch strings.ToLower(first) {
+	case "tests", "test", "testing", "docs", "doc", "docs_src", "examples", "example", "samples", "scripts", "benchmarks", "bench", "demo", "demos":
+		return true
+	}
+	return false
+}
+
+// IsModule reports whether qualified names a module or package of the tree.
+func (ix *Index) IsModule(qualified string) bool { return ix.modSet[qualified] }
 
 // Similar returns up to n existing candidates (formatted "module.qualified")
 // whose bare name is close (Damerau-Levenshtein distance <= max(2, len/4),

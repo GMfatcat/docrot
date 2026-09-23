@@ -22,7 +22,7 @@ func TestSlug(t *testing.T) {
 		{"plain", "Hello World", "hello-world"},
 		{"case", "Getting STARTED", "getting-started"},
 		{"punctuation dropped", "What's new?", "whats-new"},
-		{"underscore dropped", "foo_bar", "foobar"},
+		{"underscore kept (GitHub)", "foo_bar", "foo_bar"},
 		{"hyphens not collapsed", "A -- B", "a----b"},
 		{"emoji removed keeps hyphen", "\U0001F431 meowbase", "-meowbase"},
 		{"cjk kept", "\U0001F3AF 核心目標", "-核心目標"},

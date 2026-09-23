@@ -306,6 +306,9 @@ type Index interface {
 	HasPython() bool
 	PyModules() []string
 	HasPySymbol(qualified string) bool
+	// PyModuleIsExample reports whether a Python module lives under a tests,
+	// docs or examples tree (so claims about it are weaker).
+	PyModuleIsExample(module string) bool
 	SimilarPySymbols(qualified string, n int) []string
 
 	// --- Markdown anchors ---

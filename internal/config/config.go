@@ -78,7 +78,15 @@ type Config struct {
 	// MinConfidence drops references below this confidence:
 	// "low", "medium" or "high".
 	MinConfidence string `json:"minConfidence"`
+	// OutDir is the directory, relative to the repo root, that every
+	// `docrot check` run rewrites with the report in every format.
+	// Empty means "write nothing".
+	OutDir string `json:"outDir"`
 }
+
+// DefaultOutDir is the directory `docrot check` rewrites unless the config
+// or --out-dir says otherwise.
+const DefaultOutDir = ".docrot"
 
 // Default returns the settings docrot uses when there is no config file.
 func Default() Config {
@@ -106,6 +114,7 @@ func Default() Config {
 		Net:           false,
 		FailOn:        "error",
 		MinConfidence: "low",
+		OutDir:        DefaultOutDir,
 	}
 }
 
