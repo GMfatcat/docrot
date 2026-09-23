@@ -231,7 +231,7 @@ func TestParseDocsWarnsFromWorkers(t *testing.T) {
 	for i := range docs {
 		docs[i] = fmt.Sprintf("no-such-dir/missing-%d.md", i)
 	}
-	parsed := parseDocs(t.TempDir(), docs, warn)
+	parsed := parseDocs(t.TempDir(), docs, 0, warn)
 	if len(parsed) != 0 {
 		t.Errorf("parsed %d docs, want 0", len(parsed))
 	}

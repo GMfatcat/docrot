@@ -114,7 +114,8 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "net": false,
   "failOn": "error",
   "minConfidence": "low",
-  "outDir": ".docrot"
+  "outDir": ".docrot",
+  "maxFileMB": 8
 }
 ```
 
@@ -124,6 +125,9 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 - `stale.exclude` 把有日期的文件（changelog、設計規格）排除在過期分析之外；它們本質上是歷史紀錄。
 - `severity` 覆蓋某條規則的等級，例如 `{"stale-section": "info"}`。
 - `outDir` 是每次執行都會重寫的輸出目錄；見下。
+- `maxFileMB` 限制 docrot 會「讀內容」的檔案大小（文件、Go／Odin／Python 原始碼、JSON 樣本）。
+  二進位檔完全不會被打開——只有檔名進入路徑索引，所以一個 4 GB 的模型檔不論有沒有被
+  gitignore 都只花一筆目錄項目。超過上限的文字檔會跳過並警告；指向它的路徑仍然能解析。
 
 行內逃生口：
 

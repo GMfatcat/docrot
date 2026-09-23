@@ -125,7 +125,7 @@ func Check(opts Options) (*Run, error) {
 		if docErr != nil {
 			return
 		}
-		parsed = parseDocs(root, docs, warn)
+		parsed = parseDocs(root, docs, cfg.MaxFileBytes(), warn)
 	}()
 	go func() {
 		defer wg.Done()
@@ -133,6 +133,7 @@ func Check(opts Options) (*Run, error) {
 			Exclude:         cfg.Exclude,
 			ConfigSamples:   cfg.ConfigSamples,
 			IncludeInternal: cfg.Coverage.IncludeInternal,
+			MaxFileSize:     cfg.MaxFileBytes(),
 		})
 	}()
 	wg.Wait()
@@ -146,6 +147,9 @@ func Check(opts Options) (*Run, error) {
 		if opts.Verbose {
 			warn("index: %v", e)
 		}
+	}
+	for _, rel := range ix.Stats().SkippedLarge {
+		warn("skipping %s: larger than maxFileMB, not parsed (its path still resolves)", rel)
 	}
 	run.Index = ix
 	run.Docs = docs
@@ -510,7 +514,7 @@ func Explain(opts Options, doc string) ([]ExplainRow, error) {
 		return nil, err
 	}
 	cfg := opts.Config
-	ix, _, err := index.Build(root, index.Options{Exclude: cfg.Exclude, ConfigSamples: cfg.ConfigSamples})
+	ix, _, err := index.Build(root, index.Options{Exclude: cfg.Exclude, ConfigSamples: cfg.ConfigSamples, MaxFileSize: cfg.MaxFileBytes()})
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +523,7 @@ func Explain(opts Options, doc string) ([]ExplainRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	for d, p := range parseDocs(root, docs, func(string, ...any) {}) {
+	for d, p := range parseDocs(root, docs, cfg.MaxFileBytes(), func(string, ...any) {}) {
 		ix.AddDoc(d, p)
 	}
 	p := markdown.Parse(rel, data)
@@ -653,10 +657,20 @@ func discoverDocs(root string, include, exclude []string) ([]string, error) {
 	return out, err
 }
 
-func parseDocs(root string, docs []string, warn func(string, ...any)) map[string]*markdown.Doc {
+// parseDocs reads and tokenizes the documents. A document larger than
+// maxSize bytes (0 = unlimited) is skipped with a warning: a multi-megabyte
+// "Markdown" file is a data dump, not prose, and would only cost time.
+func parseDocs(root string, docs []string, maxSize int64, warn func(string, ...any)) map[string]*markdown.Doc {
 	out := make([]*markdown.Doc, len(docs))
 	parallel(len(docs), func(i int) {
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(docs[i])))
+		p := filepath.Join(root, filepath.FromSlash(docs[i]))
+		if maxSize > 0 {
+			if st, err := os.Stat(p); err == nil && st.Size() > maxSize {
+				warn("skipping %s: %d MiB exceeds maxFileMB", docs[i], st.Size()>>20)
+				return
+			}
+		}
+		data, err := os.ReadFile(p)
 		if err != nil {
 			warn("read %s: %v", docs[i], err)
 			return

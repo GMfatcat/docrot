@@ -27,6 +27,10 @@ type Options struct {
 	ConfigSamples   []string // glob patterns for JSON sample files
 	IncludeInternal bool     // include internal/ packages in GoExported
 	IncludeTests    bool     // index symbols from _test.go files as first-class
+	// MaxFileSize caps the size of any file whose contents are read (Go,
+	// Odin, Python, JSON samples). Larger files stay in the path index but
+	// are not parsed. 0 means no cap.
+	MaxFileSize int64
 }
 
 // Stats summarises the built index for the report.
@@ -45,7 +49,10 @@ type Stats struct {
 	ConfigFiles int
 	ConfigKeys  int
 	ParseErrors int
-	Duration    time.Duration
+	// SkippedLarge lists files (relative) not parsed because they exceed
+	// Options.MaxFileSize.
+	SkippedLarge []string
+	Duration     time.Duration
 }
 
 // Index implements model.Index.
@@ -70,7 +77,10 @@ var _ model.Index = (*Index)(nil)
 func Build(root string, opts Options) (*Index, []error, error) {
 	start := time.Now()
 	ix := &Index{root: root, opts: opts, anch: anchors.New()}
-	excl := expandExcludes(root, opts.Exclude)
+	excl, large := expandExcludes(root, opts.Exclude, opts.MaxFileSize)
+	ix.stats.SkippedLarge = large
+	// content indexers never open oversized files; the path index still lists them
+	excl = append(excl, large...)
 
 	var (
 		wg    sync.WaitGroup
@@ -162,14 +172,15 @@ func Build(root string, opts Options) (*Index, []error, error) {
 	return ix, warns, nil
 }
 
+// parsedExt are the extensions whose contents an indexer would read; only
+// these are subject to the size cap (a 4 GB model file is never opened).
+var parsedExt = map[string]bool{".go": true, ".odin": true, ".py": true, ".json": true, ".jsonc": true}
+
 // expandExcludes walks root and returns the relative paths (files and
 // directories) matched by the glob patterns, so leaf indexes that only
-// understand concrete paths can prune them.
-func expandExcludes(root string, patterns []string) []string {
-	if len(patterns) == 0 {
-		return nil
-	}
-	var out []string
+// understand concrete paths can prune them, plus the parsed-type files that
+// exceed maxSize (0 = unlimited).
+func expandExcludes(root string, patterns []string, maxSize int64) (excluded, large []string) {
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -182,15 +193,21 @@ func expandExcludes(root string, patterns []string) []string {
 		if d.IsDir() && (d.Name() == ".git" || d.Name() == "node_modules") {
 			return filepath.SkipDir
 		}
-		if globx.MatchAny(patterns, rel) {
-			out = append(out, rel)
+		if len(patterns) > 0 && globx.MatchAny(patterns, rel) {
+			excluded = append(excluded, rel)
 			if d.IsDir() {
 				return filepath.SkipDir
+			}
+			return nil
+		}
+		if maxSize > 0 && !d.IsDir() && parsedExt[strings.ToLower(filepath.Ext(rel))] {
+			if info, ierr := d.Info(); ierr == nil && info.Size() > maxSize {
+				large = append(large, rel)
 			}
 		}
 		return nil
 	})
-	return out
+	return excluded, large
 }
 
 func normFlag(name string) string {

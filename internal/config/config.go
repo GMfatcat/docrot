@@ -82,6 +82,23 @@ type Config struct {
 	// `docrot check` run rewrites with the report in every format.
 	// Empty means "write nothing".
 	OutDir string `json:"outDir"`
+	// MaxFileMB is the largest file (in MiB) whose *contents* docrot will
+	// read: documents, Go/Odin/Python sources and JSON samples above it are
+	// skipped with a warning. Binaries are never read regardless — only
+	// their names go into the path index. 0 means the default (8).
+	MaxFileMB int `json:"maxFileMB"`
+}
+
+// DefaultMaxFileMB is the content-read cap when MaxFileMB is 0.
+const DefaultMaxFileMB = 8
+
+// MaxFileBytes returns the content-read cap in bytes.
+func (c Config) MaxFileBytes() int64 {
+	mb := c.MaxFileMB
+	if mb <= 0 {
+		mb = DefaultMaxFileMB
+	}
+	return int64(mb) << 20
 }
 
 // DefaultOutDir is the directory `docrot check` rewrites unless the config
@@ -115,6 +132,7 @@ func Default() Config {
 		FailOn:        "error",
 		MinConfidence: "low",
 		OutDir:        DefaultOutDir,
+		MaxFileMB:     DefaultMaxFileMB,
 	}
 }
 
