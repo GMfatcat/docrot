@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 
+	"docrot/internal/index/defaults"
 	"docrot/internal/index/literals"
 	"docrot/internal/index/routes"
 	"docrot/internal/model"
@@ -84,6 +85,7 @@ type Index struct {
 	jsonKeys map[string]bool
 	routes   []routes.Route // registrations, test files included, in file order
 	lits     *literals.Set  // identifier-like string literals, test files included
+	defs     *defaults.Set  // flag and struct-tag defaults
 
 	flagList []string
 	envList  []string
@@ -119,6 +121,7 @@ func Build(root string, opts Options) (*Index, []error) {
 		envs:      map[string]bool{},
 		jsonKeys:  map[string]bool{},
 		lits:      literals.New(),
+		defs:      defaults.New(),
 	}
 	ix.modulePath = readModulePath(root)
 
@@ -181,6 +184,9 @@ func Build(root string, opts Options) (*Index, []error) {
 		for _, f := range r.flags {
 			ix.flags[f] = true
 		}
+		for _, d := range r.defs {
+			ix.defs.Add(d[0], d[1], d[2])
+		}
 		for _, e := range r.envs {
 			ix.envs[e] = true
 		}
@@ -199,7 +205,7 @@ func Build(root string, opts Options) (*Index, []error) {
 	}
 
 	for _, structs := range structsByDir {
-		collectJSONKeys(structs, ix.jsonKeys)
+		collectJSONKeys(structs, ix.jsonKeys, ix.defs)
 	}
 
 	ix.buildPackages(dirPkg)
@@ -381,6 +387,10 @@ func (ix *Index) Envs() []string { return append([]string(nil), ix.envList...) }
 
 // Literals returns the identifier-like string literals of the code base.
 func (ix *Index) Literals() *literals.Set { return ix.lits }
+
+// Defaults returns the defaults of flags (flag.* literal arguments) and
+// config keys (`default:"…"` struct tags).
+func (ix *Index) Defaults() *defaults.Set { return ix.defs }
 
 // Routes returns every HTTP route registration found (mux.HandleFunc,
 // r.Get, r.Mount…), test files included, in file order.

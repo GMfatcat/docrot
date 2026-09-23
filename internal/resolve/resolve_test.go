@@ -21,7 +21,8 @@ type fakeIndex struct {
 	anchors     map[string][]string
 	odin, py    map[string]bool
 	pyMods      map[string]bool
-	routes      []string // "GET /x" or "/x"
+	defaults    map[string]string // "flag:addr" → ":8080"
+	routes      []string          // "GET /x" or "/x"
 	literals    map[string]bool
 	project     model.Project
 }
@@ -137,7 +138,11 @@ func (f *fakeIndex) PyIsModule(q string) bool                { return f.pyMods[q
 func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
 func (f *fakeIndex) HasLiteral(s string) bool                { return f.literals[s] }
 func (f *fakeIndex) Project() model.Project                  { return f.project }
-func (f *fakeIndex) HasRoutes() bool                         { return len(f.routes) > 0 }
+func (f *fakeIndex) Default(kind, name string) (string, bool) {
+	v, ok := f.defaults[kind+":"+name]
+	return v, ok
+}
+func (f *fakeIndex) HasRoutes() bool { return len(f.routes) > 0 }
 func (f *fakeIndex) MatchRoute(method, p string) model.RouteMatch {
 	var methods []string
 	for _, r := range f.routes { // "GET /x" or "/x"
@@ -202,6 +207,7 @@ func newFake() *fakeIndex {
 		anchors:  map[string][]string{"docs/guide.md": {"setup", "install"}, "README.md": {"usage"}},
 		routes:   []string{"GET /v1/items", "POST /v1/items", "/healthz"},
 		literals: map[string]bool{"/openapi.json": true, "http.requests": true, "emit_event": true, "dry-run": true, "FIXTURE_HOME": true, "server.tls": true},
+		defaults: map[string]string{"flag:addr": ":8080", "key:log.level": "info", "flag:timeout": "30s"},
 		project: model.Project{
 			GoModule: "example.com/fixture", GoVersion: "1.22",
 			PyName: "my-tool", PyRequires: ">=3.10",
@@ -312,6 +318,11 @@ func TestResolvePolicy(t *testing.T) {
 		{"toolchain go higher is info", ref(model.KindToolchain, "go:1.23", model.Medium, "README.md"), false, false, model.RuleToolchain, model.SevInfo, "1.22", ""},
 		{"toolchain python too low", ref(model.KindToolchain, "python:3.9", model.Medium, "README.md"), false, false, model.RuleToolchain, model.SevWarning, "3.10", ""},
 		{"toolchain unknown skipped", ref(model.KindToolchain, "rust:1.0", model.Medium, "README.md"), false, true, "", "", "", ""},
+		{"default same", ref(model.KindDefault, "flag:addr|:8080", model.Medium, "README.md"), true, false, "", "", "", ""},
+		{"default same quoted", ref(model.KindDefault, "key:log.level|\"info\"", model.High, "README.md"), true, false, "", "", "", ""},
+		{"default duration same", ref(model.KindDefault, "flag:timeout|30000ms", model.Medium, "README.md"), true, false, "", "", "", ""},
+		{"default differs", ref(model.KindDefault, "flag:addr|:9090", model.Medium, "README.md"), false, false, model.RuleDefaultMismatch, model.SevWarning, ":8080", ""},
+		{"default unknown skipped", ref(model.KindDefault, "flag:nope|1", model.Medium, "README.md"), false, true, "", "", "", ""},
 		{"import ok", ref(model.KindImport, "example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"import missing", ref(model.KindImport, "example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleMissingImport, model.SevError, "", ""},
 		{"import foreign skipped", ref(model.KindImport, "github.com/x/y", model.High, "README.md"), false, true, "", "", "", ""},

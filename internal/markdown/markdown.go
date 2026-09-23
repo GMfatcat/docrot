@@ -522,6 +522,10 @@ func delimiterCells(line string) ([]string, bool) {
 
 // splitRow splits a table row on unescaped '|', dropping the optional
 // leading and trailing pipe.
+// SplitRow splits a GFM table row into trimmed cells ("\|" escapes kept
+// as "|"); nil for a row with no content.
+func SplitRow(line string) []string { return splitRow(line) }
+
 func splitRow(line string) []string {
 	s := strings.TrimSpace(line)
 	s = strings.ReplaceAll(s, `\|`, "\x00")

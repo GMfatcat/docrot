@@ -99,6 +99,8 @@ func (r *Resolver) Resolve(ref model.Reference) Result {
 		return r.resolveInstall(ref)
 	case model.KindToolchain:
 		return r.resolveToolchain(ref)
+	case model.KindDefault:
+		return r.resolveDefault(ref)
 	}
 	return Result{Skipped: true}
 }

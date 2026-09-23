@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"docrot/internal/fuzzy"
+	"docrot/internal/index/defaults"
 	"docrot/internal/model"
 )
 
@@ -100,6 +101,34 @@ func (r *Resolver) resolveInstall(ref model.Reference) Result {
 		return Result{Finding: r.finding(model.RuleInstallMismatch, sev, ref, msg, []string{want})}
 	}
 	return Result{Skipped: true}
+}
+
+// resolveDefault compares a documented default ("flag:port|8080") with
+// the one the code declares. Names the code declares no default for are
+// skipped.
+func (r *Resolver) resolveDefault(ref model.Reference) Result {
+	kindName, value, ok := strings.Cut(ref.Norm, "|")
+	if !ok {
+		return Result{Skipped: true}
+	}
+	kind, name, ok := strings.Cut(kindName, ":")
+	if !ok {
+		return Result{Skipped: true}
+	}
+	code, ok := r.ix.Default(kind, name)
+	if !ok {
+		return Result{Skipped: true}
+	}
+	if defaults.Same(value, code) {
+		return Result{OK: true}
+	}
+	label := map[string]string{"flag": "flag `--" + name + "`", "key": "config key `" + name + "`", "env": "`" + name + "`"}[kind]
+	shown := code
+	if shown == "" {
+		shown = "(empty)"
+	}
+	msg := "the document says " + label + " defaults to `" + value + "`, the code says `" + shown + "`"
+	return Result{Finding: r.finding(model.RuleDefaultMismatch, model.SevWarning, ref, msg, []string{code})}
 }
 
 var reLowerBound = regexp.MustCompile(`(?:>=|\^|~=|~|==|^)\s*v?(\d+)\.(\d+)`)

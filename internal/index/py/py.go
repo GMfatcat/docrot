@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"docrot/internal/index/defaults"
 	"docrot/internal/index/literals"
 	"docrot/internal/index/routes"
 )
@@ -73,6 +74,7 @@ type Index struct {
 
 	routes []routes.Route // HTTP route registrations, in file order
 	lits   *literals.Set  // identifier-like string literals
+	defs   *defaults.Set  // typer/click/argparse option defaults, os.getenv defaults
 }
 
 var (
@@ -134,6 +136,7 @@ func Build(root string, exclude []string) (*Index, error) {
 		syms   []symbol
 		routes []routes.Route
 		lits   []string
+		defs   [][3]string
 		ok     bool
 	}
 	results := make([]parsed, len(files))
@@ -166,7 +169,7 @@ func Build(root string, exclude []string) (*Index, error) {
 				for _, l := range lines {
 					lits = append(lits, literals.Scan(l)...)
 				}
-				results[i] = parsed{module: mod, syms: syms, routes: rts, lits: lits, ok: true}
+				results[i] = parsed{module: mod, syms: syms, routes: rts, lits: lits, defs: parseDefaults(lines), ok: true}
 			}
 		}()
 	}
@@ -181,6 +184,7 @@ func Build(root string, exclude []string) (*Index, error) {
 		byClassMethod: make(map[string][]symbol),
 		byName:        make(map[string][]symbol),
 		lits:          literals.New(),
+		defs:          defaults.New(),
 	}
 	modSet := make(map[string]bool)
 	seenAll := make(map[string]bool)
@@ -193,6 +197,9 @@ func Build(root string, exclude []string) (*Index, error) {
 		modSet[r.module] = true
 		ix.routes = append(ix.routes, r.routes...)
 		ix.lits.AddAll(r.lits)
+		for _, d := range r.defs {
+			ix.defs.Add(d[0], d[1], d[2])
+		}
 		for _, s := range r.syms {
 			s.module = r.module
 			ix.stats.Symbols++
@@ -503,6 +510,9 @@ func isExamplePath(rel string) bool {
 
 // Literals returns the identifier-like string literals of the tree.
 func (ix *Index) Literals() *literals.Set { return ix.lits }
+
+// Defaults returns the option and environment-variable defaults found.
+func (ix *Index) Defaults() *defaults.Set { return ix.defs }
 
 // Routes returns every HTTP route registration found (FastAPI/Flask
 // decorators, add_api_route, Starlette Route/Mount, Django path), in file

@@ -65,6 +65,8 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleToolchain, "README.md", "Go 1.22 or later", model.SevWarning, "1.26"},
 		{model.RuleToolchain, "README.md", "Python 3.10+", model.SevWarning, "3.11"},
 		{model.RuleMissingTarget, "README.md", "make lint", model.SevWarning, ""},
+		{model.RuleDefaultMismatch, "README.md", "addr default :9090", model.SevWarning, ":8080"},
+		{model.RuleDefaultMismatch, "README.md", "server.timeout_ms default 3000", model.SevWarning, "5000"},
 		{model.RuleMissingSymbol, "docs/api.rst", "helper.summarise", model.SevError, "helper.summarize"},
 		{model.RuleBrokenAnchor, "docs/api.rst", "#nope-label", model.SevWarning, ""},
 		{model.RuleMissingCommand, "docs/api.rst", "./scripts/build.ps1", model.SevError, ""},

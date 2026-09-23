@@ -71,6 +71,7 @@ func Extract(doc *markdown.Doc, h Hints, opts Options) []model.Reference {
 	x.fences()
 	x.bare()
 	x.routes()
+	x.defaultsPass()
 	if !opts.NoToolchain {
 		x.toolchainRefs()
 	}

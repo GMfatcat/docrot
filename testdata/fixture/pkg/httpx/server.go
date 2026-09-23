@@ -7,14 +7,14 @@ import "net/http"
 type Config struct {
 	Server struct {
 		Addr    string `json:"addr"`
-		Timeout int    `json:"timeout_ms"`
+		Timeout int    `json:"timeout_ms" default:"5000"`
 	} `json:"server"`
 	Log LogConfig `json:"log"`
 }
 
 // LogConfig controls logging.
 type LogConfig struct {
-	Level  string `json:"level"`
+	Level  string `json:"level" default:"info"`
 	Format string `json:"format"`
 }
 

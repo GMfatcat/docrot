@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"docrot/internal/index/defaults"
 )
 
 // maxKeyDepth caps how deep nested struct types are followed when building
@@ -17,16 +19,29 @@ var tagKeys = [...]string{"json", "yaml", "toml"}
 
 // collectJSONKeys walks every named struct type of one package and records the
 // dotted key paths its fields describe, including every prefix.
-func collectJSONKeys(structs map[string]*ast.StructType, out map[string]bool) {
+func collectJSONKeys(structs map[string]*ast.StructType, out map[string]bool, defs *defaults.Set) {
 	for name, st := range structs {
 		visiting := map[string]bool{name: true}
-		walkStructKeys(st, "", 0, structs, visiting, out)
+		walkStructKeys(st, "", 0, structs, visiting, out, defs)
 		delete(visiting, name)
 	}
 }
 
+// tagDefault returns the value of a `default:"…"` struct tag.
+func tagDefault(fld *ast.Field) string {
+	if fld.Tag == nil {
+		return ""
+	}
+	raw, err := strconv.Unquote(fld.Tag.Value)
+	if err != nil {
+		return ""
+	}
+	v, _ := reflect.StructTag(raw).Lookup("default")
+	return v
+}
+
 // walkStructKeys records the keys of one struct below prefix.
-func walkStructKeys(st *ast.StructType, prefix string, depth int, structs map[string]*ast.StructType, visiting map[string]bool, out map[string]bool) {
+func walkStructKeys(st *ast.StructType, prefix string, depth int, structs map[string]*ast.StructType, visiting map[string]bool, out map[string]bool, defs *defaults.Set) {
 	if st == nil || st.Fields == nil || depth >= maxKeyDepth {
 		return
 	}
@@ -39,7 +54,7 @@ func walkStructKeys(st *ast.StructType, prefix string, depth int, structs map[st
 			// An embedded field with no tag is inlined by encoding/json, so
 			// its own fields live at this level.
 			if len(fld.Names) == 0 {
-				descend(fld.Type, prefix, depth, structs, visiting, out)
+				descend(fld.Type, prefix, depth, structs, visiting, out, defs)
 			}
 			continue
 		}
@@ -52,14 +67,17 @@ func walkStructKeys(st *ast.StructType, prefix string, depth int, structs map[st
 			if isMapType(fld.Type) {
 				out[key+".*"] = true // a map: any child key is valid
 			}
-			descend(fld.Type, key, depth+1, structs, visiting, out)
+			if d := tagDefault(fld); d != "" && defs != nil {
+				defs.Add("key", key, d)
+			}
+			descend(fld.Type, key, depth+1, structs, visiting, out, defs)
 		}
 	}
 }
 
 // descend follows a field type into a struct declared in the same package, an
 // inline struct literal, or one wrapped in a pointer, slice, array or map.
-func descend(t ast.Expr, prefix string, depth int, structs map[string]*ast.StructType, visiting map[string]bool, out map[string]bool) {
+func descend(t ast.Expr, prefix string, depth int, structs map[string]*ast.StructType, visiting map[string]bool, out map[string]bool, defs *defaults.Set) {
 	if depth >= maxKeyDepth {
 		return
 	}
@@ -74,7 +92,7 @@ func descend(t ast.Expr, prefix string, depth int, structs map[string]*ast.Struc
 		visiting[name] = true
 		defer delete(visiting, name)
 	}
-	walkStructKeys(st, prefix, depth, structs, visiting, out)
+	walkStructKeys(st, prefix, depth, structs, visiting, out, defs)
 }
 
 // isMapType reports whether a field type is a map, through pointers and

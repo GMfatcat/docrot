@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"docrot/internal/index/literals"
 	"docrot/internal/index/routes"
@@ -58,7 +59,8 @@ type fileResult struct {
 	flags   []string
 	envs    []string
 	routes  []routes.Route
-	lits    []string // identifier-like string literals and struct tag values
+	lits    []string    // identifier-like string literals and struct tag values
+	defs    [][3]string // {kind, name, default} for flags declared with a literal default
 	structs map[string]*ast.StructType
 	err     error
 }
@@ -294,6 +296,9 @@ func (r *fileResult) collectCalls(f *ast.File, fset *token.FileSet) {
 		}
 		if name, ok := flagName(call); ok {
 			r.flags = append(r.flags, name)
+			if v, ok := flagDefault(call); ok {
+				r.defs = append(r.defs, [3]string{"flag", name, v})
+			}
 		}
 		if name, ok := envName(call); ok {
 			r.envs = append(r.envs, name)
@@ -337,6 +342,107 @@ func flagName(call *ast.CallExpr) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// flagDefault renders the default value of a flag definition when it is a
+// literal: flag.Int("port", 8080, …) → "8080", flag.StringVar(&v, "addr",
+// ":8080", …) → ":8080", flag.Duration("t", 30*time.Second, …) → "30s".
+func flagDefault(call *ast.CallExpr) (string, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	method := sel.Sel.Name
+	idx := 1
+	if strings.HasSuffix(method, "Var") {
+		idx = 2
+	}
+	if method == "Func" || method == "BoolFunc" || method == "Var" || idx >= len(call.Args) {
+		return "", false
+	}
+	return renderLiteral(call.Args[idx])
+}
+
+// renderLiteral spells a constant expression the way a document would:
+// numbers and strings as written, true/false/nil by name, -x, and
+// n*time.Unit as a duration string.
+func renderLiteral(e ast.Expr) (string, bool) {
+	switch v := e.(type) {
+	case *ast.BasicLit:
+		if v.Kind == token.STRING {
+			s, err := strconv.Unquote(v.Value)
+			return s, err == nil
+		}
+		return v.Value, true
+	case *ast.Ident:
+		switch v.Name {
+		case "true", "false", "nil":
+			return v.Name, true
+		}
+	case *ast.UnaryExpr:
+		if v.Op == token.SUB {
+			if s, ok := renderLiteral(v.X); ok {
+				return "-" + s, true
+			}
+		}
+	case *ast.ParenExpr:
+		return renderLiteral(v.X)
+	case *ast.BinaryExpr:
+		if v.Op == token.MUL {
+			if d, ok := durationOf(v.X, v.Y); ok {
+				return d, true
+			}
+			if d, ok := durationOf(v.Y, v.X); ok {
+				return d, true
+			}
+		}
+	case *ast.SelectorExpr:
+		if d, ok := durationUnit(v); ok {
+			return d.String(), true
+		}
+	}
+	return "", false
+}
+
+func durationOf(n, unit ast.Expr) (string, bool) {
+	lit, ok := n.(*ast.BasicLit)
+	if !ok || lit.Kind != token.INT && lit.Kind != token.FLOAT {
+		return "", false
+	}
+	u, ok := durationUnit(unit)
+	if !ok {
+		return "", false
+	}
+	f, err := strconv.ParseFloat(lit.Value, 64)
+	if err != nil {
+		return "", false
+	}
+	return time.Duration(f * float64(u)).String(), true
+}
+
+func durationUnit(e ast.Expr) (time.Duration, bool) {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return 0, false
+	}
+	if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "time" {
+		return 0, false
+	}
+	switch sel.Sel.Name {
+	case "Nanosecond":
+		return time.Nanosecond, true
+	case "Microsecond":
+		return time.Microsecond, true
+	case "Millisecond":
+		return time.Millisecond, true
+	case "Second":
+		return time.Second, true
+	case "Minute":
+		return time.Minute, true
+	case "Hour":
+		return time.Hour, true
+	}
+	return 0, false
 }
 
 // envName reports the environment variable a call reads or writes. Known

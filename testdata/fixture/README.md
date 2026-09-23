@@ -42,6 +42,9 @@ s := httpx.NewServer(":8080")
 Flags: `--addr`, `--config`, `--confg`, `--port`.
 Environment variables: `FIXTURE_DEBUG`, `FIXTURE_TRACE`.
 Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
+The `--addr` flag defaults to `:9090`.
+Also `--verbose` (default: `false`).
+And `server.timeout_ms` (default: `3000`).
 
 ```json
 {

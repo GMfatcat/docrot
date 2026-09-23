@@ -31,13 +31,14 @@ const (
 	KindInstall   Kind = "install"   // install line: "go:example.com/x", "pip:httpx", "npm:@acme/x"
 	KindToolchain Kind = "toolchain" // version requirement in prose: "go:1.21", "python:3.9"
 	KindTarget    Kind = "target"    // task-runner target: "make:build", "npm:lint", "just:x", "task:x"
+	KindDefault   Kind = "default"   // documented default value: "flag:port|8080", "key:log.level|info", "env:X|1"
 )
 
 // AllKinds lists every Kind in a stable order.
 var AllKinds = []Kind{
 	KindPath, KindGoSymbol, KindOdinSym, KindPySym, KindFlag, KindEnv,
 	KindConfigKey, KindAnchor, KindURL, KindCommand, KindImport, KindRoute,
-	KindInstall, KindToolchain, KindTarget,
+	KindInstall, KindToolchain, KindTarget, KindDefault,
 }
 
 // Confidence expresses how sure the extractor is that a piece of text
@@ -213,6 +214,7 @@ const (
 	RuleToolchain        = "toolchain-mismatch"
 	RuleMissingTarget    = "missing-target"
 	RuleStaleSymbol      = "stale-symbol"
+	RuleDefaultMismatch  = "default-mismatch"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -222,7 +224,7 @@ var AllRules = []string{
 	RuleMissingImport, RuleStaleSection, RulePairHeading, RulePairCode,
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
 	RuleStaleComment, RuleCommentMentions, RuleMissingRoute,
-	RuleInstallMismatch, RuleToolchain, RuleMissingTarget, RuleStaleSymbol,
+	RuleInstallMismatch, RuleToolchain, RuleMissingTarget, RuleStaleSymbol, RuleDefaultMismatch,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -251,6 +253,7 @@ var RuleDescriptions = map[string]string{
 	RuleToolchain:        "The Go or Python version the document requires differs from go.mod / pyproject.toml.",
 	RuleMissingTarget:    "A make/npm/just/task target mentioned in the document is not defined.",
 	RuleStaleSymbol:      "The body of a function or type this section names changed in several commits after the section was last edited.",
+	RuleDefaultMismatch:  "The default value the document gives for a flag, config key or environment variable differs from the one the code declares.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.
@@ -365,6 +368,12 @@ type Index interface {
 	// (or struct tag value), spelled exactly so: the last resort before a
 	// documented name is reported missing.
 	HasLiteral(s string) bool
+
+	// --- declared defaults ---
+	// Default returns the default the code declares for a flag ("flag"),
+	// a config key ("key") or an environment variable ("env"), as spelled
+	// in the code.
+	Default(kind, name string) (string, bool)
 
 	// --- project identity ---
 	// Project returns what the manifests declare: module path and Go

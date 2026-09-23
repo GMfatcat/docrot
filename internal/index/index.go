@@ -477,6 +477,22 @@ func (ix *Index) ConfigKeys() []string {
 
 func (ix *Index) Project() model.Project { return ix.proj }
 
+// --- declared defaults ---
+
+func (ix *Index) Default(kind, name string) (string, bool) {
+	if ix.gos != nil {
+		if v, ok := ix.gos.Defaults().Get(kind, name); ok {
+			return v, true
+		}
+	}
+	if ix.pys != nil {
+		if v, ok := ix.pys.Defaults().Get(kind, name); ok {
+			return v, true
+		}
+	}
+	return "", false
+}
+
 // --- string literals ---
 
 func (ix *Index) HasLiteral(s string) bool {
@@ -570,6 +586,16 @@ func (ix *Index) Symbols(kind string) []string {
 			for _, t := range list {
 				out = append(out, tool+" "+t)
 			}
+		}
+		sort.Strings(out)
+		return out
+	case "defaults":
+		var out []string
+		if ix.gos != nil {
+			out = append(out, ix.gos.Defaults().List()...)
+		}
+		if ix.pys != nil {
+			out = append(out, ix.pys.Defaults().List()...)
 		}
 		sort.Strings(out)
 		return out
