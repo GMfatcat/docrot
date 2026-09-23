@@ -60,6 +60,13 @@ func (x *extractor) defaultSubject(spans []string) (kind, name string, ok bool) 
 			k = "env"
 		case model.KindConfigKey:
 			k = "key"
+		case model.KindOdinSym, model.KindPySym:
+			// a lower-case dotted name in an Odin/Python repo is the same
+			// ambiguity the resolver treats as a config key
+			if r.Confidence != model.Low || !strings.Contains(r.Norm, ".") || strings.ToLower(r.Norm) != r.Norm {
+				continue
+			}
+			k = "key"
 		default:
 			continue
 		}
