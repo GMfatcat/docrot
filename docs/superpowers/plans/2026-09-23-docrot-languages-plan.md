@@ -1,0 +1,73 @@
+<!-- docrot:ignore-file -->
+<!-- An implementation plan: it names packages and paths that do not exist
+     yet, so docrot skips this file. -->
+# docrot 多語言實作計畫
+
+對應規格：[`../specs/2026-09-23-docrot-languages-design.md`](../specs/2026-09-23-docrot-languages-design.md)
+
+原則同主計畫：只用標準庫；每個套件獨立可測；每個波次各自 commit；
+`python scripts/verify.py` 綠、自檢 0 error 0 warning 才算完成。
+
+## Wave 0 — 語言外掛重構（0.5.0 前半，行為不變）
+
+- [ ] 0A `internal/index/lang`：`Index` 介面、`Stats`。
+- [ ] 0B `internal/model`：`Lang`、`Langs`、`LangOf`、`Kind.IsSymbol`、新 Kind 常數；
+      `Index` 介面換成 `Languages`／`HasLang`／`Namespaces`／`IsNamespace`／`IsExample`／
+      `HasSymbol`／`SimilarSymbols`。
+- [ ] 0C `internal/index/odin`、`internal/index/py` 滿足 `lang.Index`（`IsNamespace`、
+      `IsExample`、`Symbols`、`Defaults`／`Routes` 的空實作）。
+- [ ] 0D `internal/index`：`langs` 表、`Build` 迴圈、`Stats.Langs`、`SymbolSpan`／
+      `AllSpans`／`Symbols(kind)` 迴圈、`parsedExt` 由語言表組成。
+- [ ] 0E `internal/extract`：`Hints` 換介面；`symbolRef` 改用命名規則表；`reColons`。
+- [ ] 0F `internal/resolve`：`resolveLangSymbol`；`comments.Lookup`；`engine` 統計；
+      `cmd` 的 `--kind`。
+- [ ] 0G 全部測試改用新 API；golden test 不變；verify 綠。commit。
+
+## Wave 1 — Rust（0.5.0 後半）
+
+- [ ] 1A `internal/index/rust`：宣告、模組樹、`impl` 方法、span（`///`、`#[…]`）、
+      字串常值、clap 屬性 → flag／env／default、`std::env::var`、axum／actix／rocket 路由。
+- [ ] 1B `internal/index/project`：`Cargo.toml` 的 `[package] name`、`rust-version`；
+      `resolveInstall` 的 `cargo add`／`cargo install`；`toolchainRefs` 認得 "Rust 1.70"。
+- [ ] 1C fixture：`testdata/fixture/rs/`（lib.rs、一個模組、一個 impl、clap 選項、
+      一條 axum 路由）與 README 裡種的錯誤行；golden test 更新。
+- [ ] 1D 實地：shallow clone 兩個 Rust repo 到 `surprise-pytest` 旁（ripgrep、
+      一個 axum 專案），`docrot explain` 看噪音，調整；寫 `docs/field-report-rust.md`。
+- [ ] 1E 文件：rules.md、how-it-works、llms.txt、README 兩語、CHANGELOG 0.5.0；
+      `release = "0.5.0"`；tag。
+
+## Wave 2 — JavaScript／TypeScript（0.6.0）
+
+- [ ] 2A `internal/index/js`：宣告、class 方法、`module.exports`、副檔名與排除、
+      字串常值、`process.env`、express／hono／fastify／NestJS 路由、commander／yargs
+      預設值。
+- [ ] 2B `internal/extract`＋`resolve`：code fence 裡 `import … from './x'`／
+      `require('./x')` 的相對路徑解析（`.js .ts .tsx .jsx .mjs .cjs`、`index.*`）。
+- [ ] 2C `project`：`package.json` 的 `engines.node` → toolchain。
+- [ ] 2D fixture `testdata/fixture/web/`；golden test。
+- [ ] 2E 實地：meowboard（混合語言主場）、兩個 TS 專案（hono、一個 express 專案）；
+      `docs/field-report-js.md`。
+- [ ] 2F 文件與 0.6.0。
+
+## Wave 3 — C#（0.7.0）
+
+- [ ] 3A `internal/index/csharp`：namespace、型別、方法、屬性、泛型去角括號、巢狀
+      類別、`Exported`；ASP.NET 路由含 `[controller]`；`GetEnvironmentVariable`；
+      `Configuration["A:B"]` → config key；System.CommandLine 選項與預設值。
+- [ ] 3B `config`：預設 `configSamples` 加 `appsettings*.json`；`project`：`.csproj`
+      的名字與 `TargetFramework`；`dotnet add package`。
+- [ ] 3C fixture `testdata/fixture/dotnet/`；golden test。
+- [ ] 3D 實地：兩個 C# repo（一個 ASP.NET minimal API、一個 library）；
+      `docs/field-report-csharp.md`。
+- [ ] 3E 文件與 0.7.0。
+
+## Wave 4 — C／C++（0.8.0）
+
+- [ ] 4A `internal/index/c`：標頭原型、巨集、typedef、struct／enum／class、namespace、
+      `Class::method` 定義、排除目錄；`getenv`；getopt／CLI11／cxxopts flag。
+- [ ] 4B `extract`＋`resolve`：fence 裡 `#include "…"` → path（根、`include/`、`src/`）。
+- [ ] 4C `project`：`CMakeLists.txt` 的 target、`option()`／`set(… CACHE)` →
+      config key 與 default、`project()` 名字、`cmake_minimum_required` → toolchain。
+- [ ] 4D fixture `testdata/fixture/native/`；golden test。
+- [ ] 4E 實地：meowboard 的 C++、curl 或 sqlite；`docs/field-report-c.md`。
+- [ ] 4F 文件與 0.8.0；roadmap 更新。
