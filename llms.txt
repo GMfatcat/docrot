@@ -12,6 +12,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `docrot baseline [dir]` — freeze current findings into `.docrot-baseline.json`; later runs only fail on new ones.
 - `docrot coverage [dir]` — exported symbols / flags / env vars never mentioned by any document.
 - `docrot pairs [dir]` — only the source/translation checks.
+- `docrot comments [dir]` — comment checks over every exported declaration, not only documented ones.
 - `docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python` — dump an index.
 - `docrot init [dir]` — write a default `.docrot.json`.
 
@@ -24,6 +25,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `internal/gitx` — git CLI wrapper: blame line times, commits since, renames, check-ignore; cached, bounded concurrency, graceful when git is absent.
 - `internal/stale` — section edit time (blame) vs churn of referenced files (log).
 - `internal/pairs` — pair detection (`{stem}-zh.md` patterns, en/zh directory conventions, explicit config) and fingerprint diff; `pair-lag` via git.
+- `internal/comments` — comment checks for documented declarations: body churn after the comment's last edit (git) and comment mentions that resolve nowhere.
 - `internal/coverage` — documented vs exported.
 - `internal/baseline` — fingerprints exclude line numbers.
 - `internal/report` — text, agent-facing markdown, json, sarif 2.1.0, self-contained html.

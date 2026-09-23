@@ -72,6 +72,9 @@ type Index struct {
 	types    map[string]bool   // bare names of declared types
 	members  map[string]bool   // names of fields/methods of any type
 
+	spans     map[string]model.SymbolSpan // lookup form -> span, non-test files
+	testSpans map[string]model.SymbolSpan // the same forms, from _test.go files
+
 	entries []entry // counted declarations, in file order (fuzzy candidates)
 
 	flags    map[string]bool
@@ -104,6 +107,8 @@ func Build(root string, opts Options) (*Index, []error) {
 		importDir: map[string]string{},
 		syms:      map[string]symbol{},
 		testSyms:  map[string]symbol{},
+		spans:     map[string]model.SymbolSpan{},
+		testSpans: map[string]model.SymbolSpan{},
 		types:     map[string]bool{},
 		members:   map[string]bool{},
 		flags:     map[string]bool{},
@@ -147,11 +152,14 @@ func Build(root string, opts Options) (*Index, []error) {
 			ix.types[name] = true
 		}
 		target := ix.syms
+		spanTarget := ix.spans
 		if !counted {
 			target = ix.testSyms
+			spanTarget = ix.testSpans
 		}
 		for _, e := range r.entries {
 			ix.addEntry(target, e)
+			addSpan(spanTarget, e)
 			if e.owner != "" {
 				ix.members[e.name] = true
 			}

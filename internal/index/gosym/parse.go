@@ -31,6 +31,9 @@ type entry struct {
 	file  string // relative to the root, forward slashes
 	line  int
 	test  bool
+	// span carries the comment/body geometry of the declaration. It is nil
+	// for declarations that have none of interest (struct fields).
+	span *declSpan
 }
 
 // qual returns the fully qualified lookup key of the entry.
@@ -84,7 +87,8 @@ func parseFile(root, rel string) *fileResult {
 		test: strings.HasSuffix(rel, "_test.go"),
 	}
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, filepath.Join(root, filepath.FromSlash(rel)), nil, parser.SkipObjectResolution)
+	mode := parser.SkipObjectResolution | parser.ParseComments // doc comments feed Span
+	f, err := parser.ParseFile(fset, filepath.Join(root, filepath.FromSlash(rel)), nil, mode)
 	if err != nil {
 		r.err = wrapParseError(rel, err)
 		return r
@@ -101,10 +105,11 @@ func parseFile(root, rel string) *fileResult {
 // line returns the 1-based line of a position.
 func lineOf(fset *token.FileSet, p token.Pos) int { return fset.Position(p).Line }
 
-// add appends an entry, filling in the file, package and test flag.
-func (r *fileResult) add(owner, name string, kind symKind, fset *token.FileSet, pos token.Pos) {
+// add appends an entry, filling in the file, package and test flag. It
+// returns the index of the new entry, or -1 when the name was skipped.
+func (r *fileResult) add(owner, name string, kind symKind, fset *token.FileSet, pos token.Pos) int {
 	if name == "" || name == "_" {
-		return
+		return -1
 	}
 	r.entries = append(r.entries, entry{
 		pkg:   r.pkg,
@@ -115,6 +120,15 @@ func (r *fileResult) add(owner, name string, kind symKind, fset *token.FileSet, 
 		line:  lineOf(fset, pos),
 		test:  r.test,
 	})
+	return len(r.entries) - 1
+}
+
+// addSpanned is add plus the declaration's span. One *declSpan may be shared
+// by several entries (the names of one ValueSpec); it is never mutated.
+func (r *fileResult) addSpanned(owner, name string, kind symKind, fset *token.FileSet, pos token.Pos, sp *declSpan) {
+	if i := r.add(owner, name, kind, fset, pos); i >= 0 {
+		r.entries[i].span = sp
+	}
 }
 
 // collectDecls walks the top level declarations of a file.
@@ -122,12 +136,13 @@ func (r *fileResult) collectDecls(f *ast.File, fset *token.FileSet) {
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
+			sp := funcDeclSpan(d, fset)
 			if d.Recv == nil || len(d.Recv.List) == 0 {
-				r.add("", d.Name.Name, kindFunc, fset, d.Name.Pos())
+				r.addSpanned("", d.Name.Name, kindFunc, fset, d.Name.Pos(), sp)
 				continue
 			}
 			if owner := recvBase(d.Recv.List[0].Type); owner != "" {
-				r.add(owner, d.Name.Name, kindMethod, fset, d.Name.Pos())
+				r.addSpanned(owner, d.Name.Name, kindMethod, fset, d.Name.Pos(), sp)
 			}
 		case *ast.GenDecl:
 			r.collectGenDecl(d, fset)
@@ -148,8 +163,9 @@ func (r *fileResult) collectGenDecl(d *ast.GenDecl, fset *token.FileSet) {
 			if !ok {
 				continue
 			}
+			sp := specSpan(d.Doc, vs.Doc, vs.Pos(), vs.End(), fset)
 			for _, n := range vs.Names {
-				r.add("", n.Name, kind, fset, n.Pos())
+				r.addSpanned("", n.Name, kind, fset, n.Pos(), sp)
 			}
 		}
 	case token.TYPE:
@@ -159,7 +175,7 @@ func (r *fileResult) collectGenDecl(d *ast.GenDecl, fset *token.FileSet) {
 				continue
 			}
 			name := ts.Name.Name
-			r.add("", name, kindType, fset, ts.Name.Pos())
+			r.addSpanned("", name, kindType, fset, ts.Name.Pos(), specSpan(d.Doc, ts.Doc, ts.Pos(), ts.End(), fset))
 			r.types = append(r.types, name)
 			switch t := ts.Type.(type) {
 			case *ast.StructType:
@@ -202,8 +218,9 @@ func (r *fileResult) collectInterfaceMethods(owner string, it *ast.InterfaceType
 			r.add(owner, embeddedName(m.Type), kindField, fset, m.Pos())
 			continue
 		}
+		sp := ifaceMethodSpan(m, fset)
 		for _, n := range m.Names {
-			r.add(owner, n.Name, kindMethod, fset, n.Pos())
+			r.addSpanned(owner, n.Name, kindMethod, fset, n.Pos(), sp)
 		}
 	}
 }

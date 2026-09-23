@@ -64,6 +64,8 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 | `stale-section` | 某章節最後編輯於 2026-06-01 | 它引用的程式碼此後沒有大幅變動（git） |
 | `pair-*` | `README.md` ↔ `README-zh.md` | 標題相同、程式碼區塊相同、連結／表格／數字相同、翻譯沒有落後原文（git） |
 | `undocumented` | — | 每個 exported 符號／flag／環境變數都有文件提到（`docrot coverage`） |
+| `stale-comment` | 文件指到的符號上的 doc comment／docstring | 註解最後修改之後，函式本體沒有連續好幾個 commit 的變動（git） |
+| `comment-mentions-missing` | 函式上方的 `// raw is re-read on retry` | `raw` 仍存在於簽名、同檔案或索引中 |
 
 每條規則的說明與消除方法都在 [docs/rules.md](docs/rules.md)。
 
@@ -166,6 +168,7 @@ docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
+docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
 docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python
 docrot init [dir]

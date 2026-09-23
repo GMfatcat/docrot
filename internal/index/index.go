@@ -390,6 +390,48 @@ func (ix *Index) SimilarPySymbols(q string, n int) []string {
 	return ix.pys.Similar(q, n)
 }
 
+// --- declaration spans ---
+
+// SymbolSpan returns the declaration span of a qualified symbol in the
+// language selected by kind (model.KindGoSymbol, model.KindPySym or
+// model.KindOdinSym). Other kinds never resolve.
+func (ix *Index) SymbolSpan(kind model.Kind, qualified string) (model.SymbolSpan, bool) {
+	switch kind {
+	case model.KindGoSymbol:
+		if ix.gos != nil {
+			return ix.gos.Span(qualified)
+		}
+	case model.KindPySym:
+		if ix.pys != nil {
+			return ix.pys.Span(qualified)
+		}
+	case model.KindOdinSym:
+		if ix.od != nil {
+			return ix.od.Span(qualified)
+		}
+	}
+	return model.SymbolSpan{}, false
+}
+
+// AllSpans returns the documented declaration surface of every language:
+// exported Go funcs, methods and types (internal/ packages only when
+// includeInternal), exported Python defs and classes outside example trees,
+// and every Odin proc and type. Each language's spans are sorted by
+// qualified name.
+func (ix *Index) AllSpans(includeInternal bool) []model.SymbolSpan {
+	var out []model.SymbolSpan
+	if ix.gos != nil {
+		out = append(out, ix.gos.AllSpans(includeInternal)...)
+	}
+	if ix.pys != nil {
+		out = append(out, ix.pys.AllSpans()...)
+	}
+	if ix.od != nil {
+		out = append(out, ix.od.AllSpans()...)
+	}
+	return out
+}
+
 // --- anchors ---
 
 func (ix *Index) HasAnchor(docRel, slug string) bool { return ix.anch.Has(docRel, slug) }

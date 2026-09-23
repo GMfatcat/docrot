@@ -96,6 +96,37 @@ a test.
   `https://…/ja/benchmarks/` is now handled; fully different targets are
   not, and should not be).
 
+## Code comments (`docrot comments`, full sweep of exported declarations)
+
+| project | declarations | stale-comment | comment-mentions-missing | time |
+|---|---|---|---|---|
+| httpx | 339 | 0 (shallow clone) | 0 | 3.5 s |
+| starlette | 385 | 0 (shallow clone) | 1 | 5.7 s |
+| typer | 445 | 0 (shallow clone) | 4 | 3.3 s |
+| pydantic | 3,835 | 0 (shallow clone) | 22 | 25 s |
+| fastapi | 347 | 0 (shallow clone) | 2 | 14 s |
+
+`stale-comment` needs history; the clones are `--depth 1`, so every line
+has the same commit and nothing can be newer than anything. The unit test
+covers the Python path with a real three-commit repository.
+
+Verified hit: `pydantic/v1/generics.py:252` — the docstring of
+`replace_types` says "`typevar_map` keys recursively replaced"; the
+parameter has been `type_map` since the signature was last touched.
+Plausible hits: Typer's `callback` docstring names `--install-completion`,
+which no `typer.Option` in the tree declares by that literal; Pydantic's
+`TypedDictExtraConfigWarning` names `extra_items`, which appears nowhere.
+Noise that remains: `SimpleCookie.load` (a stdlib method cited by class
+name), `TaggedUnion` (a pydantic-core type), `app/main.py` (an illustrative
+layout in FastAPI's `frontend()` docstring).
+
+What Python docstrings taught the check: FastAPI writes parameter docs as
+`Annotated[..., Doc("""…""")]` *inside the signature*, so the signature
+scanner has to understand multi-line triple-quoted strings; doctest and
+example blocks (`>>>`, fenced code, `x = …`) inside docstrings are not
+claims and are skipped; JSON-schema vocabulary (`anyOf`, `additionalProperties`)
+and HTTP words (`GET`, `Cookie`) are not identifiers.
+
 ## How to reproduce
 
 ```sh

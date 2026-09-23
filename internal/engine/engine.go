@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"docrot/internal/baseline"
+	"docrot/internal/comments"
 	"docrot/internal/config"
 	"docrot/internal/coverage"
 	"docrot/internal/extract"
@@ -45,6 +46,7 @@ type Options struct {
 	ShowAll       bool             // include baselined findings in output
 	MinConfidence model.Confidence // 0 → from config
 	Coverage      bool             // compute the coverage section
+	AllComments   bool             // run the comment checks on every exported symbol, not only documented ones
 	BaselinePath  string           // "" → <root>/.docrot-baseline.json
 	NoBaseline    bool             // ignore any baseline file (used by `docrot baseline`)
 	Verbose       bool
@@ -76,6 +78,8 @@ type Run struct {
 	// directory) and always with forward slashes. Empty when nothing was
 	// written, because OutDir was off or every write failed.
 	Written []string
+	// CommentSpans counts the declarations whose comments were checked.
+	CommentSpans int
 }
 
 // Check runs the full pipeline.
@@ -213,6 +217,7 @@ func Check(opts Options) (*Run, error) {
 	}
 	results := make([]docResult, len(docs))
 	mentioned := map[string]bool{}
+	symbolRefs := map[string]model.Reference{} // kind|norm → one reference that resolved
 	var mu sync.Mutex
 	parallel(len(docs), func(i int) {
 		d := docs[i]
@@ -235,6 +240,9 @@ func Check(opts Options) (*Run, error) {
 				}
 				mu.Lock()
 				mentioned[string(ref.Kind)+"|"+ref.Norm] = true
+				if ref.Kind == model.KindGoSymbol || ref.Kind == model.KindPySym || ref.Kind == model.KindOdinSym {
+					symbolRefs[string(ref.Kind)+"|"+ref.Norm] = ref
+				}
 				mu.Unlock()
 			}
 		}
@@ -277,6 +285,33 @@ func Check(opts Options) (*Run, error) {
 		})
 		for _, fs := range staleOut {
 			findings = append(findings, fs...)
+		}
+	}
+
+	// 5b. comments attached to the symbols documents referred to
+	if cfg.Comments.Enabled {
+		var spans []model.SymbolSpan
+		if opts.AllComments {
+			spans = ix.AllSpans(cfg.Coverage.IncludeInternal)
+		} else {
+			for _, ref := range symbolRefs {
+				if sp, ok := ix.SymbolSpan(ref.Kind, ref.Norm); ok {
+					spans = append(spans, sp)
+				}
+			}
+		}
+		if len(spans) > 0 {
+			copts := comments.Options{MinChurn: cfg.Comments.MinChurn, MinFrac: cfg.Comments.MinFrac}
+			if s, ok := sevOverrides[model.RuleStaleComment]; ok {
+				copts.StaleSeverity = s
+			}
+			if s, ok := sevOverrides[model.RuleCommentMentions]; ok {
+				copts.MentionSeverity = s
+			}
+			read := sourceReader(root, cfg.MaxFileBytes())
+			findings = append(findings, comments.Analyze(run.Git, spans, ix, read, copts)...)
+			sum := len(spans)
+			run.CommentSpans = sum
 		}
 	}
 
@@ -714,6 +749,31 @@ func parallel(n int, fn func(i int)) {
 	}
 	close(ch)
 	wg.Wait()
+}
+
+// sourceReader returns a cached, size-capped line reader for source files.
+func sourceReader(root string, maxSize int64) comments.ReadLines {
+	var mu sync.Mutex
+	cache := map[string][]string{}
+	return func(rel string) []string {
+		mu.Lock()
+		if l, ok := cache[rel]; ok {
+			mu.Unlock()
+			return l
+		}
+		mu.Unlock()
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		var lines []string
+		if st, err := os.Stat(p); err == nil && (maxSize <= 0 || st.Size() <= maxSize) {
+			if b, err := os.ReadFile(p); err == nil {
+				lines = strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
+			}
+		}
+		mu.Lock()
+		cache[rel] = lines
+		mu.Unlock()
+		return lines
+	}
 }
 
 // absSiblings resolves sibling repo roots relative to root, keeping only

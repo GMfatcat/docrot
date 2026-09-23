@@ -87,6 +87,16 @@ type Config struct {
 	// skipped with a warning. Binaries are never read regardless — only
 	// their names go into the path index. 0 means the default (8).
 	MaxFileMB int `json:"maxFileMB"`
+	// Comments controls the code-comment checks that run for every symbol a
+	// document referred to (stale-comment, comment-mentions-missing).
+	Comments Comments `json:"comments"`
+}
+
+// Comments tunes the comment checks.
+type Comments struct {
+	Enabled  bool    `json:"enabled"`
+	MinChurn int     `json:"minChurn"` // commits newer than the comment before the body counts as moved on
+	MinFrac  float64 `json:"minFrac"`  // or one commit that rewrote this fraction of the body
 }
 
 // DefaultMaxFileMB is the content-read cap when MaxFileMB is 0.
@@ -124,15 +134,18 @@ func Default() Config {
 		}},
 		Coverage: Coverage{Report: false, IncludeInternal: false},
 		Severity: map[string]string{
-			"stale-section": "warning",
-			"pair-lag":      "warning",
-			"pair-number":   "info",
+			"stale-section":            "warning",
+			"pair-lag":                 "warning",
+			"pair-number":              "info",
+			"stale-comment":            "info",
+			"comment-mentions-missing": "warning",
 		},
 		Net:           false,
 		FailOn:        "error",
 		MinConfidence: "low",
 		OutDir:        DefaultOutDir,
 		MaxFileMB:     DefaultMaxFileMB,
+		Comments:      Comments{Enabled: true, MinChurn: 2, MinFrac: 0.5},
 	}
 }
 

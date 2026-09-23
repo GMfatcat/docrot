@@ -72,6 +72,8 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RulePairLink, "README-zh.md", "docs/guid.md", model.SevWarning, ""},
 		{model.RulePairLink, "README-zh.md", "docs/guide.md#instal", model.SevWarning, ""},
 		{model.RulePairLink, "README-zh.md", "https://example.com/zh-only", model.SevWarning, ""},
+		{model.RuleCommentMentions, "pkg/httpx/server.go", "tlsConfig", model.SevWarning, ""},
+		{model.RuleCommentMentions, "tools/helper.py", "count_items", model.SevWarning, ""},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))

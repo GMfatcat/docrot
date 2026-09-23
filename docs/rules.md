@@ -80,6 +80,18 @@ Findings are reported on the translation file.
 | `pair-number` | A number or version string appears in only one of the two files (info). |
 | `pair-lag` | Requires git. The source has commits newer than the translation's last change. The message lists them. |
 
+## Code comments
+
+These run "on the side": only for the declarations that some document
+referred to (`docrot check`), or for every exported declaration with
+`docrot comments`. Go doc comments, Python docstrings and Odin `//` blocks
+are supported.
+
+| Rule | Meaning |
+|---|---|
+| `stale-comment` | Requires git. The comment attached to a function/type was last edited at time *T*; the body has `comments.minChurn` (default 2) or more distinct commits after *T*, or one commit that rewrote `comments.minFrac` (default 50%) of it. Whitespace-only changes never count. Info by default: it means "re-read this comment", not "this comment is wrong". |
+| `comment-mentions-missing` | The comment names something code-like — a backticked token, `snake_case`, `camelCase`, `pkg.Name`, `--flag`, a path — that appears neither in the declaration, nor elsewhere in the file, nor anywhere in the index. Plain English words are never candidates. Typical hit: a parameter that was renamed while the comment kept the old name. |
+
 ## Coverage
 
 | Rule | Meaning |

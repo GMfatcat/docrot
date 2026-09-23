@@ -23,7 +23,8 @@ type Server struct {
 	addr string
 }
 
-// NewServer creates a Server.
+// NewServer creates a Server listening on addr. The tlsConfig argument
+// was removed in v2; see docs/guide.md for migration notes.
 func NewServer(addr string) *Server { return &Server{addr: addr} }
 
 // Addr returns the listen address.

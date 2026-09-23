@@ -41,6 +41,9 @@ type symbol struct {
 	name      string // bare last-part identifier, e.g. "method" or "CONST"
 	file      string // relative file path (forward slashes)
 	line      int    // 1-based line number
+	// span is the docstring/body geometry of a def or class declaration;
+	// nil for constants and imported names.
+	span *pySpan
 }
 
 // Index is a queryable snapshot of every recognised Python declaration under
@@ -261,7 +264,10 @@ func parseFile(content, rel string) []symbol {
 			if len(stack) > 0 {
 				qualified = stack[len(stack)-1].name + "." + name
 			}
-			syms = append(syms, symbol{qualified: qualified, name: name, file: rel, line: i + 1})
+			syms = append(syms, symbol{
+				qualified: qualified, name: name, file: rel, line: i + 1,
+				span: declSpan(lines, i, indent, false),
+			})
 			stack = append(stack, frame{indent: indent, name: name})
 			continue
 		}
@@ -272,7 +278,10 @@ func parseFile(content, rel string) []symbol {
 			if len(stack) > 0 {
 				qualified = stack[len(stack)-1].name + "." + name
 			}
-			syms = append(syms, symbol{qualified: qualified, name: name, file: rel, line: i + 1})
+			syms = append(syms, symbol{
+				qualified: qualified, name: name, file: rel, line: i + 1,
+				span: declSpan(lines, i, indent, true),
+			})
 			continue
 		}
 

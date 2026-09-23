@@ -12,4 +12,8 @@ class Runner:
 
 
 def summarize(items):
+    """Return the item count.
+
+    Delegates to count_items() and honours the --verbose flag.
+    """
     return len(items)

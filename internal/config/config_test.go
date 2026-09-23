@@ -29,7 +29,8 @@ func TestDefaultIsValid(t *testing.T) {
 		{"failOn", d.FailOn, "error"},
 		{"minConfidence", d.MinConfidence, "low"},
 		{"severity", d.Severity, map[string]string{
-			"stale-section": "warning", "pair-lag": "warning", "pair-number": "info"}},
+			"stale-section": "warning", "pair-lag": "warning", "pair-number": "info",
+			"stale-comment": "info", "comment-mentions-missing": "warning"}},
 		{"pairPatterns", d.PairPatterns, []string{
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"}},
 		{"configSamples", d.ConfigSamples, []string{
@@ -66,13 +67,13 @@ func TestDefaultRoundTrip(t *testing.T) {
 	}
 	for _, key := range []string{"docs", "exclude", "ignore", "pairs", "pairPatterns",
 		"configSamples", "stale", "coverage", "severity", "net", "failOn", "minConfidence",
-		"outDir", "maxFileMB"} {
+		"outDir", "maxFileMB", "comments"} {
 		if _, ok := raw[key]; !ok {
 			t.Errorf("default JSON is missing key %q", key)
 		}
 	}
-	if len(raw) != 15 {
-		t.Errorf("default JSON has %d keys, want 15: %v", len(raw), raw)
+	if len(raw) != 16 {
+		t.Errorf("default JSON has %d keys, want 16: %v", len(raw), raw)
 	}
 }
 
@@ -135,10 +136,12 @@ func TestParseOverlay(t *testing.T) {
 			json: `{"severity": {"missing-path": "info", "pair-lag": "error"}}`,
 			check: func(t *testing.T, c Config) {
 				want := map[string]string{
-					"stale-section": "warning",
-					"pair-lag":      "error",
-					"pair-number":   "info",
-					"missing-path":  "info",
+					"stale-section":            "warning",
+					"pair-lag":                 "error",
+					"pair-number":              "info",
+					"missing-path":             "info",
+					"stale-comment":            "info",
+					"comment-mentions-missing": "warning",
 				}
 				if !reflect.DeepEqual(c.Severity, want) {
 					t.Errorf("Severity = %v, want %v", c.Severity, want)

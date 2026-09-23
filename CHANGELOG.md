@@ -30,6 +30,9 @@
   with a message that says so; `README.MD` and `readme.md` are discovered
   by `**/*.md`.
 - HTML/JSON reports no longer contain U+FFFD from mid-rune truncation.
+- Comment checks, piggybacking on documented symbols (`stale-comment`,
+  `comment-mentions-missing`), plus `docrot comments` for a full sweep;
+  Go doc comments, Python docstrings and Odin comments.
 - `maxFileMB` (default 8): documents and sources above the cap are skipped
   with a warning instead of being parsed; binaries were never opened and
   still are not — only their names are indexed.

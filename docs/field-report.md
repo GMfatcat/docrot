@@ -128,6 +128,31 @@ reports 49 and 52. Every change below is in `internal/extract` or
 - Suggestions for symbols that moved into a struct are sometimes the wrong
   member (`backup.NewTask` → `backup.Config.newFilename`).
 
+## Code comments
+
+The comment checks run for every Go/Odin/Python declaration a document
+refers to (`docrot check`) or for every exported declaration (`docrot
+comments`). On this corpus, with full history available:
+
+| repo | declarations | stale-comment | comment-mentions-missing |
+|---|---|---|---|
+| meowbase | 179 | 0 | 0 |
+| meowshare | 16 | 3 | 0 |
+
+meowshare's three `stale-comment` findings are `client.Client.Pull`,
+`PullFile` and `PullDir`: comments last edited 2026-09-09, bodies changed in
+2–6 commits since. Reading them, the comments still describe the contract
+(the bodies gained retry budgets and error mapping), which is why the rule
+is info by default — it says "re-read this", not "this is wrong". A spike
+over *all* 288 documented functions of meowbase (not just exported ones)
+found 4 with a newer body and none with two or more newer commits, so
+mature repositories stay quiet.
+
+The first version of the mention check reported 8 findings per repository
+that were all noise (`errors.Is`, `logger.Info`, `VERIFYING/COMPLETED/FAILED`,
+`env:"NAME"`, `golang.org`, the same grouped `var` comment four times); the
+filters that removed them are described in `docs/rules.md`.
+
 ## How to reproduce
 
 ```sh

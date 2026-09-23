@@ -70,6 +70,8 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 		return cmdCoverage(rest, stdout, stderr)
 	case "pairs":
 		return cmdPairs(rest, stdout, stderr)
+	case "comments":
+		return cmdComments(rest, stdout, stderr)
 	case "explain":
 		return cmdExplain(rest, stdout, stderr)
 	case "index":
@@ -96,6 +98,7 @@ Usage:
   docrot baseline [dir]           write .docrot-baseline.json with the current findings
   docrot coverage [dir]           list exported symbols / flags / env vars no document mentions
   docrot pairs [dir]              only the source/translation pair checks
+  docrot comments [dir]           comment checks over every exported symbol (not only documented ones)
   docrot explain <doc>            show every reference extracted from one document
   docrot index [dir] --kind K     dump an index: symbols|flags|env|paths|anchors|config|odin|python
   docrot init [dir]               write a default .docrot.json
@@ -296,6 +299,54 @@ func cmdBaseline(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	fmt.Fprintf(stdout, "baseline written to %s (%d findings)\n", out, len(run.Report.Findings))
+	return exitOK
+}
+
+func cmdComments(args []string, stdout, stderr io.Writer) int {
+	c := newCommon("comments")
+	var format string
+	c.fs.StringVar(&format, "format", "text", "output format: text|md|json")
+	root, cfg, ok := c.parse(args, stderr)
+	if !ok {
+		return c.exitCode()
+	}
+	cfg.Stale.Enabled = false
+	cfg.Comments.Enabled = true
+	opts := c.engineOptions(root, cfg, stderr)
+	opts.AllComments = true
+	run, err := engine.Check(opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "docrot: %v\n", err)
+		return exitUsage
+	}
+	var keep []model.Finding
+	for _, f := range run.Report.Findings {
+		if f.Rule == model.RuleStaleComment || f.Rule == model.RuleCommentMentions {
+			keep = append(keep, f)
+		}
+	}
+	r := *run.Report
+	r.Findings = keep
+	r.Summary.Errors, r.Summary.Warnings, r.Summary.Infos = 0, 0, 0
+	for _, f := range keep {
+		switch f.Severity {
+		case model.SevError:
+			r.Summary.Errors++
+		case model.SevWarning:
+			r.Summary.Warnings++
+		default:
+			r.Summary.Infos++
+		}
+	}
+	r.Summary.Extra = map[string]string{"declarations checked": fmt.Sprint(run.CommentSpans)}
+	if len(keep) == 0 && format == "text" {
+		fmt.Fprintf(stdout, "no comment findings (%d declarations checked)\n", run.CommentSpans)
+		return exitOK
+	}
+	if err := report.Write(format, stdout, &r, report.Options{Color: report.ColorEnabled(stdout), Root: root, ShowInfo: true}); err != nil {
+		fmt.Fprintf(stderr, "docrot: %v\n", err)
+		return exitUsage
+	}
 	return exitOK
 }
 

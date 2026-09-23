@@ -40,6 +40,9 @@ type symbol struct {
 	file string // relative file path (forward slashes)
 	line int    // 1-based line number
 	proc bool   // true when this is a "NAME :: proc" declaration
+	// span is the comment/body geometry of a proc or type declaration; nil
+	// for constants, aliases and globals.
+	span *odinSpan
 }
 
 // Index is a queryable snapshot of every recognised Odin declaration under a
@@ -220,12 +223,17 @@ func parseFile(content, rel string) (pkgName string, syms []symbol) {
 		if m := reDoubleColon.FindStringSubmatch(trimmed); m != nil {
 			name := m[1]
 			rest := strings.TrimSpace(m[2])
-			syms = append(syms, symbol{
+			isProc := reProcDecl.MatchString(rest)
+			sym := symbol{
 				name: name,
 				file: rel,
 				line: i + 1,
-				proc: reProcDecl.MatchString(rest),
-			})
+				proc: isProc,
+			}
+			if isProc || reTypeDecl.MatchString(rest) {
+				sym.span = declSpan(lines, i, isProc)
+			}
+			syms = append(syms, sym)
 			continue
 		}
 		if indent == 0 {

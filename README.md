@@ -73,6 +73,8 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 | `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
 | `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
 | `undocumented` | — | every exported symbol / flag / env var is mentioned somewhere (`docrot coverage`) |
+| `stale-comment` | a doc comment / docstring on a symbol the docs point at | the function body has not churned in several commits since the comment was edited (git) |
+| `comment-mentions-missing` | `// raw is re-read on retry` above a function | `raw` still exists in the signature, the file, or the index |
 
 Every rule is described in [docs/rules.md](docs/rules.md), including how to
 silence it.
@@ -195,6 +197,7 @@ docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
 docrot baseline [dir]            write .docrot-baseline.json
 docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
+docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
 docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python
 docrot init [dir]

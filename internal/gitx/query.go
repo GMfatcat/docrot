@@ -124,26 +124,49 @@ func (r *Repo) CommitsSince(rel string, since time.Time) ([]Commit, error) {
 //
 // The error wraps [ErrUnavailable] when rel is not known to git.
 func (r *Repo) BlameLineTimes(rel string) ([]time.Time, error) {
+	lines, err := r.BlameLines(rel)
+	if err != nil {
+		return nil, err
+	}
+	times := make([]time.Time, len(lines))
+	for i, bl := range lines {
+		times[i] = bl.Time
+	}
+	return times, nil
+}
+
+// BlameLine is one line's last-change record: the abbreviated commit hash
+// ("" for uncommitted lines) and its committer time (zero when uncommitted).
+type BlameLine struct {
+	Hash string
+	Time time.Time
+}
+
+// BlameLines returns, for each line of rel at HEAD (index 0 unused), the
+// commit that last changed it. Whitespace-only changes are ignored (-w), so
+// reformatting does not count as editing. Cached per file.
+func (r *Repo) BlameLines(rel string) ([]BlameLine, error) {
 	v, err := r.once("blame:"+rel, func() (any, error) {
-		out, err := r.run("blame", "--line-porcelain", "--", r.resolve(rel))
+		out, err := r.run("blame", "-w", "--line-porcelain", "--", r.resolve(rel))
 		if err != nil {
-			return []time.Time(nil), fmt.Errorf("%w: cannot blame %s: %v", ErrUnavailable, rel, err)
+			return []BlameLine(nil), fmt.Errorf("%w: cannot blame %s: %v", ErrUnavailable, rel, err)
 		}
 		return parseBlame(out), nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	times, _ := v.([]time.Time)
-	return times, nil
+	lines, _ := v.([]BlameLine)
+	return lines, nil
 }
 
 // parseBlame reads `git blame --line-porcelain` output into a 1-based slice
-// of committer times.
-func parseBlame(out []byte) []time.Time {
-	times := []time.Time{{}} // index 0 unused
+// of per-line commit records.
+func parseBlame(out []byte) []BlameLine {
+	lines := []BlameLine{{}} // index 0 unused
 	var (
 		cur     time.Time
+		hash    string
 		zeroSHA bool
 		line    int
 	)
@@ -154,11 +177,11 @@ func parseBlame(out []byte) []time.Time {
 			if line <= 0 {
 				continue
 			}
-			for len(times) <= line {
-				times = append(times, time.Time{})
+			for len(lines) <= line {
+				lines = append(lines, BlameLine{})
 			}
 			if !zeroSHA {
-				times[line] = cur
+				lines[line] = BlameLine{Hash: hash, Time: cur}
 			}
 			line = 0
 		case strings.HasPrefix(l, "committer-time "):
@@ -168,12 +191,16 @@ func parseBlame(out []byte) []time.Time {
 		default:
 			if h, n, ok := parseBlameHeader(l); ok {
 				zeroSHA = isZeroHash(h)
+				hash = h
+				if len(hash) > 12 {
+					hash = hash[:12]
+				}
 				cur = time.Time{}
 				line = n
 			}
 		}
 	}
-	return times
+	return lines
 }
 
 // parseBlameHeader recognises a porcelain header line
