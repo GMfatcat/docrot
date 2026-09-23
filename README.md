@@ -74,7 +74,7 @@ docrot baseline                 # freeze today's findings; fail only on new ones
   kept changing after the section was last edited.
 - 🌏 **Bilingual pairs** — `README.md` ↔ `README-zh.md` keep the same
   headings, code blocks, links, tables and numbers, the translation is
-  not behind the source, and a `docs/en/` ↔ `docs/zh/` tree has no
+  not behind the source, and a `docs/en/` ↔ `docs/zh/` tree has no <!-- docrot:ignore missing-path -->
   untranslated or orphaned page.
 - 💬 **Code comments** — the doc comment of a documented symbol names
   things that still exist, and its body has not moved on since the comment

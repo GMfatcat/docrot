@@ -62,7 +62,7 @@ docrot baseline                 # freeze today's findings; fail only on new ones
   「requires Go 1.21」與 `go.mod` 一致、`make lint` 是真的目標。 <!-- docrot:ignore toolchain-mismatch -->
 - ⏳ **過期判定（git）** —— 章節最後編輯之後，它引用的檔案或宣告仍持續變動。
 - 🌏 **雙語配對** —— `README.md` ↔ `README-zh.md` 標題、程式碼區塊、連結、表格、數字
-  一致，翻譯沒有落後原文；`docs/en/` ↔ `docs/zh/` 這種樹沒有漏翻或孤兒頁。
+  一致，翻譯沒有落後原文；`docs/en/` ↔ `docs/zh/` 這種樹沒有漏翻或孤兒頁。 <!-- docrot:ignore missing-path -->
 - 💬 **程式碼註解** —— 被文件提到的符號，其 doc comment 提到的東西仍然存在，本體也沒有
   在註解寫完之後獨自往前走。
 - 📊 **覆蓋率** —— 沒有任何文件提到的 exported 符號、flag 與環境變數。
