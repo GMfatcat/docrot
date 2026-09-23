@@ -56,17 +56,34 @@ type lastCommit struct {
 // Renames are not followed (plain git log, which is cheaper).
 func (r *Repo) LastCommitTime(rel string) (time.Time, bool, error) {
 	v, err := r.once("lastcommit:"+rel, func() (any, error) {
+		type stored struct {
+			T  int64 `json:"t"`
+			OK bool  `json:"ok"`
+		}
+		key, cached := r.logKey("last", rel)
+		if cached {
+			var st stored
+			if r.cache.getLog(key, &st) {
+				return lastCommit{t: time.Unix(st.T, 0), ok: st.OK}, nil
+			}
+		}
 		out, err := r.run("log", "-1", "--format=%ct", "--", r.resolve(rel))
 		if err != nil {
 			return lastCommit{}, err
 		}
 		line := firstLine(out)
 		if line == "" {
+			if cached {
+				r.cache.putLog(key, stored{})
+			}
 			return lastCommit{}, nil
 		}
 		secs, perr := strconv.ParseInt(line, 10, 64)
 		if perr != nil {
 			return lastCommit{}, fmt.Errorf("gitx: bad committer time %q for %s: %w", line, rel, perr)
+		}
+		if cached {
+			r.cache.putLog(key, stored{T: secs, OK: true})
 		}
 		return lastCommit{t: time.Unix(secs, 0), ok: true}, nil
 	})
@@ -83,6 +100,13 @@ func (r *Repo) LastCommitTime(rel string) (time.Time, bool, error) {
 func (r *Repo) CommitsSince(rel string, since time.Time) ([]Commit, error) {
 	key := "since:" + strconv.FormatInt(since.Unix(), 10) + ":" + rel
 	v, err := r.once(key, func() (any, error) {
+		ckey, cached := r.logKey("since", strconv.FormatInt(since.Unix(), 10), rel)
+		if cached {
+			var commits []Commit
+			if r.cache.getLog(ckey, &commits) {
+				return commits, nil
+			}
+		}
 		args := []string{"log", "--format=%h%x00%ct%x00%s"}
 		if !since.IsZero() && since.Unix() > 0 {
 			args = append(args, "--since=@"+strconv.FormatInt(since.Unix(), 10))
@@ -107,6 +131,9 @@ func (r *Repo) CommitsSince(rel string, since time.Time) ([]Commit, error) {
 				continue
 			}
 			commits = append(commits, Commit{Hash: parts[0], Time: t, Subject: parts[2]})
+		}
+		if cached {
+			r.cache.putLog(ckey, commits)
 		}
 		return commits, nil
 	})
@@ -147,11 +174,21 @@ type BlameLine struct {
 // reformatting does not count as editing. Cached per file.
 func (r *Repo) BlameLines(rel string) ([]BlameLine, error) {
 	v, err := r.once("blame:"+rel, func() (any, error) {
+		blob, cacheable := r.cacheableBlob(rel)
+		if cacheable {
+			if lines, ok := r.cache.getBlame(blob); ok {
+				return lines, nil
+			}
+		}
 		out, err := r.run("blame", "-w", "--line-porcelain", "--", r.resolve(rel))
 		if err != nil {
 			return []BlameLine(nil), fmt.Errorf("%w: cannot blame %s: %v", ErrUnavailable, rel, err)
 		}
-		return parseBlame(out), nil
+		lines := parseBlame(out)
+		if cacheable {
+			r.cache.putBlame(blob, lines)
+		}
+		return lines, nil
 	})
 	if err != nil {
 		return nil, err

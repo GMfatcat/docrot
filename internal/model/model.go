@@ -168,6 +168,10 @@ type Reference struct {
 	// Lang is the fenced-block language the reference came from, if any
 	// (e.g. "go", "sh"). Empty for spans/links/prose.
 	Lang string `json:"lang,omitempty"`
+	// Rooted marks a path written relative to a documentation source root
+	// that is not the repository root (Sphinx "/topics/x", written from
+	// docs/): the resolver tries every ancestor of the document.
+	Rooted bool `json:"rooted,omitempty"`
 }
 
 // Finding is one problem docrot wants a human to look at.
@@ -328,6 +332,9 @@ type Index interface {
 	// PyModuleIsExample reports whether a Python module lives under a tests,
 	// docs or examples tree (so claims about it are weaker).
 	PyModuleIsExample(module string) bool
+	// PyIsModule reports whether a dotted name is a module or package (as
+	// opposed to a class, function or module-level object).
+	PyIsModule(qualified string) bool
 	SimilarPySymbols(qualified string, n int) []string
 
 	// --- Markdown anchors ---
@@ -374,6 +381,10 @@ type Project struct {
 	NPMName     string              `json:"npmName,omitempty"`
 	Targets     map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
 	TargetFiles map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
+	// Intersphinx is set when a Sphinx conf.py maps other projects'
+	// inventories: a :ref: label that no local document defines may be
+	// theirs.
+	Intersphinx bool `json:"intersphinx,omitempty"`
 }
 
 // HasTarget reports whether tool defines name.

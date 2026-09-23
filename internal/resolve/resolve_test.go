@@ -20,6 +20,7 @@ type fakeIndex struct {
 	cfgKeys     []string
 	anchors     map[string][]string
 	odin, py    map[string]bool
+	pyMods      map[string]bool
 	routes      []string // "GET /x" or "/x"
 	literals    map[string]bool
 	project     model.Project
@@ -132,6 +133,7 @@ func (f *fakeIndex) HasPython() bool                         { return len(f.py) 
 func (f *fakeIndex) PyModules() []string                     { return nil }
 func (f *fakeIndex) HasPySymbol(q string) bool               { return f.py[q] }
 func (f *fakeIndex) PyModuleIsExample(string) bool           { return false }
+func (f *fakeIndex) PyIsModule(q string) bool                { return f.pyMods[q] }
 func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
 func (f *fakeIndex) HasLiteral(s string) bool                { return f.literals[s] }
 func (f *fakeIndex) Project() model.Project                  { return f.project }

@@ -19,11 +19,11 @@ func TestDefaultIsValid(t *testing.T) {
 		got  any
 		want any
 	}{
-		{"docs", d.Docs, []string{"**/*.md", "llms.txt"}},
+		{"docs", d.Docs, []string{"**/*.md", "**/*.rst", "**/*.adoc", "llms.txt"}},
 		{"exclude", d.Exclude, []string{"vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"}},
 		{"ignore", d.Ignore, []string{}},
 		{"pairs", d.Pairs, []Pair{}},
-		{"stale", d.Stale, Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"}}},
+		{"stale", d.Stale, Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"}}},
 		{"coverage", d.Coverage, Coverage{Report: false, IncludeInternal: false}},
 		{"net", d.Net, false},
 		{"failOn", d.FailOn, "error"},

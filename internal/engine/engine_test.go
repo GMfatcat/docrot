@@ -65,6 +65,11 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleToolchain, "README.md", "Go 1.22 or later", model.SevWarning, "1.26"},
 		{model.RuleToolchain, "README.md", "Python 3.10+", model.SevWarning, "3.11"},
 		{model.RuleMissingTarget, "README.md", "make lint", model.SevWarning, ""},
+		{model.RuleMissingSymbol, "docs/api.rst", "helper.summarise", model.SevError, "helper.summarize"},
+		{model.RuleBrokenAnchor, "docs/api.rst", "#nope-label", model.SevWarning, ""},
+		{model.RuleMissingCommand, "docs/api.rst", "./scripts/build.ps1", model.SevError, ""},
+		{model.RuleMissingSymbol, "docs/notes.adoc", "httpx.WriteDatum", model.SevError, "httpx.WriteData"},
+		{model.RuleBrokenAnchor, "docs/notes.adoc", "#nope-anchor", model.SevError, ""},
 		{model.RuleUnknownEnv, "README.md", "FIXTURE_TRACE", model.SevWarning, ""},
 		{model.RuleMissingSymbol, "README.md", "render_frames()", model.SevWarning, "fixture_odin.render_frame"},
 		{model.RuleMissingSymbol, "README.md", "helper.summarise", model.SevError, "helper.summarize"},
@@ -151,8 +156,8 @@ func TestFixtureGolden(t *testing.T) {
 		}
 	}
 	s := run.Report.Summary
-	if s.Docs != 4 {
-		t.Errorf("docs = %d, want 4", s.Docs)
+	if s.Docs != 6 {
+		t.Errorf("docs = %d, want 6", s.Docs)
 	}
 	if s.References < 40 {
 		t.Errorf("references = %d, suspiciously low", s.References)

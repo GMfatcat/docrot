@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"docrot/internal/asciidoc"
 	"docrot/internal/baseline"
 	"docrot/internal/comments"
 	"docrot/internal/config"
@@ -34,6 +35,7 @@ import (
 	"docrot/internal/pairs"
 	"docrot/internal/report"
 	"docrot/internal/resolve"
+	"docrot/internal/rst"
 	"docrot/internal/stale"
 )
 
@@ -177,7 +179,17 @@ func Check(opts Options) (*Run, error) {
 	// 3. git
 	gitState := report.GitDisabled
 	if !opts.NoGit {
-		repo, err := gitx.Open(root, gitx.Options{})
+		gopts := gitx.Options{}
+		if opts.OutDir != "" && !opts.NoOut {
+			// blame and log answers survive between runs inside the output
+			// directory (its .gitignore covers them)
+			dir := opts.OutDir
+			if !filepath.IsAbs(dir) {
+				dir = filepath.Join(root, filepath.FromSlash(dir))
+			}
+			gopts.CacheFile = filepath.Join(dir, "git-cache.json")
+		}
+		repo, err := gitx.Open(root, gopts)
 		if err != nil {
 			gitState = report.GitUnavailable
 			if opts.Verbose {
@@ -462,6 +474,14 @@ func Check(opts Options) (*Run, error) {
 	if st.Routes > 0 {
 		sum.Extra["routes"] = strconv.Itoa(st.Routes)
 	}
+	if run.Git != nil {
+		if err := run.Git.SaveCache(); err != nil {
+			warn("git cache: %v", err)
+		}
+		if h := run.Git.CacheHits(); h > 0 {
+			sum.Extra["git cache hits"] = strconv.Itoa(h)
+		}
+	}
 	if opts.Changed {
 		sum.Extra["changed"] = strconv.Itoa(len(checked)) + " of " + strconv.Itoa(len(docs)) + " docs"
 	}
@@ -623,7 +643,7 @@ func Explain(opts Options, doc string) ([]ExplainRow, error) {
 	for d, p := range parseDocs(root, docs, cfg.MaxFileBytes(), func(string, ...any) {}) {
 		ix.AddDoc(d, p)
 	}
-	p := markdown.Parse(rel, data)
+	p := parseDoc(rel, data)
 	ix.AddDoc(rel, p)
 	ignoreRes, err := cfg.IgnoreRegexps()
 	if err != nil {
@@ -785,7 +805,7 @@ func parseDocs(root string, docs []string, maxSize int64, warn func(string, ...a
 			warn("read %s: %v", docs[i], err)
 			return
 		}
-		out[i] = markdown.Parse(docs[i], data)
+		out[i] = parseDoc(docs[i], data)
 	})
 	m := make(map[string]*markdown.Doc, len(docs))
 	for i, d := range docs {
@@ -794,6 +814,24 @@ func parseDocs(root string, docs []string, maxSize int64, warn func(string, ...a
 		}
 	}
 	return m
+}
+
+// parseDoc tokenizes one document with the parser its format calls for:
+// reStructuredText (.rst, .rest, and .txt files that look like it — Django
+// keeps Sphinx sources as .txt), AsciiDoc (.adoc, .asciidoc, .asc), and
+// Markdown for everything else (llms.txt included).
+func parseDoc(rel string, data []byte) *markdown.Doc {
+	switch strings.ToLower(path.Ext(rel)) {
+	case ".rst", ".rest":
+		return rst.Parse(rel, data)
+	case ".adoc", ".asciidoc", ".asc":
+		return asciidoc.Parse(rel, data)
+	case ".txt":
+		if rst.Looks(data) {
+			return rst.Parse(rel, data)
+		}
+	}
+	return markdown.Parse(rel, data)
 }
 
 // parallel runs fn(i) for i in [0,n) on a bounded worker pool.

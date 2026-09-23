@@ -406,6 +406,8 @@ func (ix *Index) HasPySymbol(q string) bool { return ix.pys != nil && ix.pys.Has
 
 func (ix *Index) PyModuleIsExample(m string) bool { return ix.pys != nil && ix.pys.IsExampleModule(m) }
 
+func (ix *Index) PyIsModule(q string) bool { return ix.pys != nil && ix.pys.IsModule(q) }
+
 func (ix *Index) SimilarPySymbols(q string, n int) []string {
 	if ix.pys == nil {
 		return nil

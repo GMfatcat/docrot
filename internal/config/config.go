@@ -120,7 +120,7 @@ const DefaultOutDir = ".docrot"
 // Default returns the settings docrot uses when there is no config file.
 func Default() Config {
 	return Config{
-		Docs:     []string{"**/*.md", "llms.txt"},
+		Docs:     []string{"**/*.md", "**/*.rst", "**/*.adoc", "llms.txt"},
 		Exclude:  []string{"vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"},
 		Ignore:   []string{},
 		Siblings: []string{},
@@ -132,7 +132,7 @@ func Default() Config {
 			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json",
 		},
 		Stale: Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{
-			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**",
+			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**",
 		}},
 		Coverage: Coverage{Report: false, IncludeInternal: false},
 		Severity: map[string]string{

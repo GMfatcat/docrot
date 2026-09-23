@@ -113,6 +113,11 @@ type Doc struct {
 	// IgnoreFile is set by a <!-- docrot:ignore-file --> comment.
 	IgnoreFile bool
 
+	// Labels are explicit anchor targets that are global to a documentation
+	// set rather than local to the page: reStructuredText ".. _label:" and
+	// AsciiDoc "[[id]]". The anchors index accepts them from any document.
+	Labels []string
+
 	// BarePaths holds prose tokens that look like file paths. Kind is
 	// always "bare".
 	BarePaths []Span
@@ -1005,17 +1010,47 @@ func (p *parser) scanProse() {
 }
 
 func (p *parser) collectBarePaths(i int, line string) {
+	p.doc.BarePaths = append(p.doc.BarePaths, BarePathSpans(line, i+1)...)
+}
+
+// BarePathSpans returns the prose tokens of one line (1-based lineNo, with
+// code spans and links already blanked out) that look like file paths.
+func BarePathSpans(line string, lineNo int) []Span {
+	var out []Span
 	for _, m := range barePathRe.FindAllStringSubmatchIndex(line, -1) {
 		a := m[2]
 		tok := strings.TrimRight(line[a:m[3]], ".-@")
 		if !plausiblePath(tok) {
 			continue
 		}
-		p.doc.BarePaths = append(p.doc.BarePaths, Span{
-			Line: i + 1, Col: a + 1, Text: tok, Kind: "bare",
-		})
+		out = append(out, Span{Line: lineNo, Col: a + 1, Text: tok, Kind: "bare"})
 	}
+	return out
 }
+
+// FindBareURLs returns the [start, end) byte ranges of the bare http(s)
+// URLs in line, trailing punctuation excluded.
+func FindBareURLs(line string) [][2]int {
+	var out [][2]int
+	for i := 0; i < len(line); i++ {
+		if line[i] != 'h' {
+			continue
+		}
+		if _, end, ok := parseBareURL(line, i); ok {
+			out = append(out, [2]int{i, end})
+			i = end - 1
+		}
+	}
+	return out
+}
+
+// SetNumberLines sets the per-line prose text that Numbers scans (link
+// targets and code blanked out). Parsers of other formats call it.
+func (d *Doc) SetNumberLines(lines []string) { d.numLines = lines }
+
+// SplitLines splits content into lines the way Parse does: "\n" or
+// "\r\n" endings, no trailing empty line.
+func SplitLines(content []byte) []string { return splitLines(content) }
 
 // plausiblePath keeps the bare-path heuristic conservative: one or more
 // slashes, no scheme, no "//", not a trailing slash, and at least one
@@ -1035,8 +1070,12 @@ func plausiblePath(tok string) bool {
 	return false
 }
 
-func (p *parser) assignSections() {
-	d := p.doc
+func (p *parser) assignSections() { p.doc.AssignSections() }
+
+// AssignSections fills the Section of every span, bare path, link, image
+// and reference definition from the headings. Parsers of other formats call
+// it once their tokens are in place.
+func (d *Doc) AssignSections() {
 	for i := range d.Spans {
 		d.Spans[i].Section = d.SectionAt(d.Spans[i].Line)
 	}
@@ -1064,8 +1103,15 @@ const (
 
 // applyIgnores turns docrot:ignore comments into the Ignored predicate.
 // The tokenizer still records every token; callers decide what to drop.
-func (p *parser) applyIgnores() {
-	d := p.doc
+func (p *parser) applyIgnores() { p.doc.ApplyIgnores(p.commentAlone) }
+
+// ApplyIgnores derives Ignored and RuleIgnored from the docrot:ignore
+// directives among d.Comments. alone reports whether a comment is the only
+// content on its line(s), which selects the "ignore the next non-blank
+// line" behaviour; parsers whose comments always stand alone pass a
+// function that returns true. Both predicates are set even when there is
+// no directive at all.
+func (d *Doc) ApplyIgnores(alone func(Comment) bool) {
 	ignored := map[int]bool{}
 	scoped := map[int]map[string]bool{} // line → rules ignored there
 	n := len(d.Lines)
@@ -1103,7 +1149,7 @@ func (p *parser) applyIgnores() {
 				inRange = false
 			}
 		case directiveIgnore:
-			if p.commentAlone(c) {
+			if alone(c) {
 				for l := c.EndLine + 1; l <= n; l++ {
 					if strings.TrimSpace(d.Lines[l-1]) != "" {
 						mark(l, l, rules)

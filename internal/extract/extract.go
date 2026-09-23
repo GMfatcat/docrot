@@ -10,6 +10,7 @@ package extract
 
 import (
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -168,6 +169,12 @@ func (x *extractor) links() {
 		if i := strings.Index(t, "#"); i >= 0 {
 			file, frag = t[:i], t[i+1:]
 		}
+		// Sphinx and AsciiDoc write "/topics/x" for a path under the
+		// documentation source root, which is rarely the repository root
+		rooted := false
+		if strings.HasPrefix(file, "/") && isSourceDoc(x.doc.Path) {
+			file, rooted = strings.TrimPrefix(file, "/"), true
+		}
 		if file != "" {
 			dec, err := url.PathUnescape(file)
 			if err == nil {
@@ -175,20 +182,26 @@ func (x *extractor) links() {
 			}
 			if r := x.pathRef(file, false); r != nil {
 				r.Confidence = model.High
+				r.Rooted = rooted
 				x.emit(*r, l.Line, l.Col, l.Section, "")
 			} else if !strings.HasPrefix(file, "/") && !strings.ContainsAny(file, rejectChars) {
 				// links are explicit: even an odd-looking target is a path claim
 				p := cleanPath(file)
 				if p != "" && p != "." && p != ".." {
-					x.emit(model.Reference{Kind: model.KindPath, Text: file, Norm: p, Confidence: model.High}, l.Line, l.Col, l.Section, "")
+					x.emit(model.Reference{Kind: model.KindPath, Text: file, Norm: p, Confidence: model.High, Rooted: rooted}, l.Line, l.Col, l.Section, "")
 				}
 			}
 		}
-		if frag != "" && (file == "" || strings.HasSuffix(strings.ToLower(file), ".md")) {
+		if frag != "" && (file == "" || isDocFile(file)) {
 			if reAnchorLine.MatchString(strings.ToLower(frag)) {
 				continue // #L12 / #L10-L20 line anchors
 			}
-			r := x.anchorRef(file, frag, model.High)
+			conf := model.High
+			if l.Text == ":ref:" {
+				conf = model.Medium // a Sphinx label may come from another project's inventory
+			}
+			r := x.anchorRef(file, frag, conf)
+			r.Rooted = rooted
 			x.emit(*r, l.Line, l.Col, l.Section, "")
 		}
 	}
@@ -241,6 +254,26 @@ func (x *extractor) bare() {
 			x.emit(*r, sp.Line, sp.Col, sp.Section, "")
 		}
 	}
+}
+
+// isSourceDoc reports whether a document is reStructuredText or AsciiDoc,
+// whose absolute link targets are relative to a source root.
+func isSourceDoc(p string) bool {
+	switch strings.ToLower(path.Ext(p)) {
+	case ".rst", ".rest", ".txt", ".adoc", ".asciidoc", ".asc":
+		return true
+	}
+	return false
+}
+
+// isDocFile reports whether a link target is a document whose anchors
+// docrot indexes.
+func isDocFile(file string) bool {
+	switch strings.ToLower(path.Ext(file)) {
+	case ".md", ".rst", ".rest", ".adoc", ".asciidoc", ".txt":
+		return true
+	}
+	return false
 }
 
 func sortRefs(refs []model.Reference) {

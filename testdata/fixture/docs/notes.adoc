@@ -1,0 +1,8 @@
+= Notes
+
+See link:guide.md[the guide], `httpx.WriteData` and `httpx.WriteDatum`, <<api-ref>> and <<nope-anchor>>.
+
+[source,sh]
+----
+./scripts/verify.ps1
+----

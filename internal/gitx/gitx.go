@@ -48,6 +48,10 @@ type Options struct {
 	// Concurrency is the maximum number of git processes running at once.
 	// Zero means DefaultConcurrency. Negative is treated as 1.
 	Concurrency int
+	// CacheFile, when set, is a JSON file where blame and log answers are
+	// kept between runs (blame by blob hash, log by HEAD). Call SaveCache
+	// at the end of a run to write it back.
+	CacheFile string
 }
 
 func (o Options) normalized() Options {
@@ -112,6 +116,8 @@ type Repo struct {
 
 	statsMu sync.Mutex
 	stats   Stats
+
+	cache *cache // nil without Options.CacheFile
 }
 
 // Open prepares a Repo for the work tree containing root.
@@ -136,6 +142,9 @@ func Open(root string, opts Options) (*Repo, error) {
 		calls:    make(map[string]*call),
 	}
 	r.sem = make(chan struct{}, r.opts.Concurrency)
+	if opts.CacheFile != "" {
+		r.cache = openCache(opts.CacheFile)
+	}
 
 	out, err := r.run("rev-parse", "--show-toplevel", "--show-prefix")
 	if err != nil {

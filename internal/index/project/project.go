@@ -94,6 +94,17 @@ func Build(root string) model.Project {
 			delete(p.TargetFiles, tool)
 		}
 	}
+	for _, conf := range []string{"docs/conf.py", "doc/conf.py", "docs/source/conf.py", "doc/source/conf.py", "conf.py", "source/conf.py"} {
+		if lines, ok := read(root, conf); ok {
+			for _, l := range lines {
+				if strings.Contains(l, "intersphinx_mapping") {
+					p.Intersphinx = true
+					break
+				}
+			}
+			break
+		}
+	}
 	return p
 }
 

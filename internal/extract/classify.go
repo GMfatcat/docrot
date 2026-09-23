@@ -95,12 +95,17 @@ var placeholderSegments = map[string]bool{
 // name such as foo, x or path/to; the resolver skips such paths when they
 // do not exist.
 func IsPlaceholderPath(p string) bool {
-	for _, seg := range strings.Split(p, "/") {
+	for i, seg := range strings.Split(p, "/") {
 		stem := seg
-		if i := strings.LastIndex(stem, "."); i > 0 {
-			stem = stem[:i]
+		if k := strings.LastIndex(stem, "."); k > 0 {
+			stem = stem[:k]
 		}
-		if placeholderSegments[strings.ToLower(stem)] {
+		low := strings.ToLower(stem)
+		if placeholderSegments[low] {
+			return true
+		}
+		// "myapp/models.py", "mysite/settings.py": the reader's project
+		if i == 0 && len(low) > 2 && strings.HasPrefix(low, "my") && low != "mypy" {
 			return true
 		}
 	}

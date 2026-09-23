@@ -127,6 +127,18 @@ func (r *Resolver) candidates(ref model.Reference) []string {
 	norm := ref.Norm
 	docDir := path.Dir(ref.Loc.File)
 	var cands []string
+	if ref.Rooted {
+		// "/topics/x" from docs/howto/y.txt: the source root is docs/, or
+		// some other ancestor of the document
+		for d := docDir; ; d = path.Dir(d) {
+			if d == "." || d == "" {
+				cands = append(cands, path.Clean(norm))
+				break
+			}
+			cands = append(cands, path.Clean(d+"/"+norm))
+		}
+		return cands
+	}
 	if docDir != "." && docDir != "" {
 		cands = append(cands, path.Clean(docDir+"/"+norm))
 	}
@@ -267,11 +279,23 @@ func (r *Resolver) resolvePath(ref model.Reference) Result {
 				break
 			}
 		}
-		// The same relative path exists under a sub-tree (a template, an
-		// example): the doc is probably describing that tree.
-		if len(cands) > 0 && strings.HasSuffix(cands[0], "/"+path.Clean(ref.Norm)) && sev == model.SevError {
-			sev = model.SevWarning
-			msg = "`" + ref.Text + "` not found at the repo root (exists under " + strings.TrimSuffix(cands[0], "/"+path.Clean(ref.Norm)) + "/)"
+		// The same relative path exists under a sub-tree (a template
+		// directory, an example, a package): the doc is describing that tree.
+		if sev == model.SevError && strings.Contains(ref.Norm, "/") {
+			under := ""
+			if len(cands) > 0 && strings.HasSuffix(cands[0], "/"+path.Clean(ref.Norm)) {
+				under = cands[0]
+			} else if m := r.ix.Glob("**/" + path.Clean(ref.Norm)); len(m) > 0 {
+				under = m[0]
+				cands = append([]string{under}, cands...)
+				if len(cands) > 3 {
+					cands = cands[:3]
+				}
+			}
+			if under != "" {
+				sev = model.SevWarning
+				msg = "`" + ref.Text + "` not found at the repo root (exists under " + strings.TrimSuffix(under, "/"+path.Clean(ref.Norm)) + "/)"
+			}
 		}
 		// A bare file name ("main.go", "config.json") is a weak claim: it
 		// usually means "the main.go of whatever we are talking about".
@@ -291,6 +315,15 @@ var genericManifests = map[string]bool{
 	"Dockerfile": true, "docker-compose.yml": true, "compose.yml": true, ".gitignore": true,
 	".dockerignore": true, ".editorconfig": true, "tsconfig.json": true, "Gemfile": true,
 	"pom.xml": true, "build.gradle": true, "CMakeLists.txt": true, "poetry.lock": true, "uv.lock": true,
+}
+
+// cleanRel strips a leading "/" and "./" from a link target.
+func cleanRel(p string) string {
+	p = strings.TrimPrefix(strings.TrimSpace(p), "/")
+	for strings.HasPrefix(p, "./") {
+		p = p[2:]
+	}
+	return p
 }
 
 func isCapitalized(s string) bool { return s != "" && s[0] >= 'A' && s[0] <= 'Z' }
@@ -444,6 +477,16 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 	if dotted && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
 		return Result{OK: true}
 	}
+	// owner.attr where the owner is a known class, function or module-level
+	// object (not a module): an attribute the declaration index cannot see
+	// (set in __init__, a proxy, a descriptor). A missing name *in a module*
+	// stays a finding.
+	if i := strings.LastIndex(ref.Norm, "."); i > 0 {
+		owner := strings.TrimSuffix(ref.Norm[:i], "()")
+		if (has(owner) || r.ix.HasPySymbol(owner) || r.ix.HasOdinSymbol(owner)) && !r.ix.PyIsModule(owner) {
+			return Result{OK: true}
+		}
+	}
 	if r.ix.HasLiteral(strings.TrimSuffix(ref.Norm, "()")) {
 		return Result{OK: true} // a name the code spells as a string (an event, a command, a key)
 	}
@@ -474,7 +517,24 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		}
 	}
 	msg := lang + " symbol `" + ref.Text + "` not found"
-	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, sim(ref.Norm, 3))}
+	cands := sim(ref.Norm, 3)
+	if ref.Kind == model.KindPySym && dotted {
+		// "pydantic.utils.to_camel": the module exists, the name lives in
+		// another module of the same package (moved, or reachable through a
+		// compatibility shim) — worth a look, not a build break
+		if i := strings.LastIndex(ref.Norm, "."); i > 0 && r.ix.PyIsModule(ref.Norm[:i]) {
+			bare := strings.TrimSuffix(ref.Norm[i+1:], "()")
+			for _, c := range cands {
+				if strings.HasSuffix(c, "."+bare) && sev == model.SevError {
+					sev = model.SevWarning
+					msg = lang + " symbol `" + ref.Text + "` not found in module `" + ref.Norm[:i] + "` (a `" + bare + "` exists at " + c + ")"
+					cands = append([]string{c}, cands...)
+					break
+				}
+			}
+		}
+	}
+	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, cands)}
 }
 
 // --- flags -----------------------------------------------------------------
@@ -676,6 +736,19 @@ func (r *Resolver) resolveAnchor(ref model.Reference) Result {
 	if target == "" {
 		target = ref.Loc.File
 	}
+	if ref.Rooted {
+		alt, _, _ := strings.Cut(ref.Text, "#")
+		target = ""
+		for _, c := range r.candidates(model.Reference{Norm: cleanRel(alt), Loc: ref.Loc, Rooted: true}) {
+			if r.ix.FileExists(c) {
+				target = c
+				break
+			}
+		}
+		if target == "" {
+			return Result{Skipped: true} // the path reference reports the missing file
+		}
+	}
 	if !r.ix.FileExists(target) {
 		// The target is doc-relative; the path resolver also accepts a
 		// root-relative spelling, so try that before giving up. Otherwise
@@ -695,7 +768,12 @@ func (r *Resolver) resolveAnchor(ref model.Reference) Result {
 		cands = append(cands, "#"+c.Text)
 	}
 	msg := "no heading `#" + slug + "` in " + target
-	return Result{Finding: r.finding(model.RuleBrokenAnchor, model.SeverityFor(ref.Confidence), ref, msg, cands)}
+	sev := model.SeverityFor(ref.Confidence)
+	if ref.Confidence == model.Medium && r.ix.Project().Intersphinx {
+		sev = model.SevInfo // a :ref: label may come from another project's inventory
+		msg = "no label `" + slug + "` in this documentation set (intersphinx is configured, so it may be external)"
+	}
+	return Result{Finding: r.finding(model.RuleBrokenAnchor, sev, ref, msg, cands)}
 }
 
 // --- imports ---------------------------------------------------------------

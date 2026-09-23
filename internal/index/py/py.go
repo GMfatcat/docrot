@@ -47,6 +47,10 @@ type symbol struct {
 	// span is the docstring/body geometry of a def or class declaration;
 	// nil for constants and imported names.
 	span *pySpan
+	// assign marks a module-level assignment that is not an ALL_CAPS
+	// constant (a type alias, a proxy object): it names something in its
+	// own module but is not treated as re-exported by parent packages.
+	assign bool
 }
 
 // Index is a queryable snapshot of every recognised Python declaration under
@@ -62,6 +66,10 @@ type Index struct {
 	byName        map[string][]symbol // bare last-part name -> declarations
 
 	all []symbol // every recognised declaration, deduplicated by "module.qualified"
+	// byLen groups indexes into all by the byte length of the lower-cased
+	// bare name, so Similar only scores names whose length is within the
+	// edit-distance budget.
+	byLen map[int][]int
 
 	routes []routes.Route // HTTP route registrations, in file order
 	lits   *literals.Set  // identifier-like string literals
@@ -70,7 +78,7 @@ type Index struct {
 var (
 	reClass = regexp.MustCompile(`^class\s+(\w+)\s*[:(]`)
 	reDef   = regexp.MustCompile(`^(?:async\s+)?def\s+(\w+)\s*\(`)
-	reConst = regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)\s*=[^=]`)
+	reConst = regexp.MustCompile(`^([A-Za-z_]\w*)\s*(?::[^=]*)?=[^=]`) // module-level name (any case), annotated or not
 	reFrom  = regexp.MustCompile(`^from\s+[\w.]+\s+import\s+(.+)$`)
 	reImp   = regexp.MustCompile(`^import\s+(.+)$`)
 )
@@ -207,6 +215,11 @@ func Build(root string, exclude []string) (*Index, error) {
 		}
 	}
 
+	ix.byLen = map[int][]int{}
+	for i, s := range ix.all {
+		n := len(strings.ToLower(s.name))
+		ix.byLen[n] = append(ix.byLen[n], i)
+	}
 	ix.modSet = modSet
 	ix.example = map[string]bool{}
 	for _, sym := range ix.all {
@@ -306,7 +319,7 @@ func parseFile(content, rel string) []symbol {
 		if indent == 0 {
 			if m := reConst.FindStringSubmatch(trimmed); m != nil {
 				name := m[1]
-				syms = append(syms, symbol{qualified: name, name: name, file: rel, line: i + 1})
+				syms = append(syms, symbol{qualified: name, name: name, file: rel, line: i + 1, assign: strings.ToUpper(name) != name})
 				continue
 			}
 			// top-level imports become names of this module ("from starlette
@@ -461,10 +474,14 @@ func (ix *Index) resolve(qualified string) []symbol {
 		pkg := strings.Join(parts[:len(parts)-1], ".")
 		if ix.modSet[pkg] {
 			for _, sym := range ix.byName[parts[len(parts)-1]] {
-				if sym.module == pkg || strings.HasPrefix(sym.module, pkg+".") {
+				if sym.module == pkg || strings.HasPrefix(sym.module, pkg+".") && !sym.assign {
 					return []symbol{sym}
 				}
 			}
+			// the prefix is a module of this tree and the name is not in it
+			// (nor re-exported from below): a same-named object elsewhere
+			// does not make "pkg.Name" true
+			return nil
 		}
 	}
 	last := parts[len(parts)-1]
@@ -493,7 +510,7 @@ func (ix *Index) Literals() *literals.Set { return ix.lits }
 func (ix *Index) Routes() []routes.Route { return append([]routes.Route(nil), ix.routes...) }
 
 // IsModule reports whether qualified names a module or package of the tree.
-func (ix *Index) IsModule(qualified string) bool { return ix.modSet[qualified] }
+func (ix *Index) IsModule(qualified string) bool { return ix.modSet[stripParens(qualified)] }
 
 // Similar returns up to n existing candidates (formatted "module.qualified")
 // whose bare name is close (Damerau-Levenshtein distance <= max(2, len/4),
@@ -517,10 +534,14 @@ func (ix *Index) Similar(qualified string, n int) []string {
 		formatted string
 	}
 	var cands []cand
-	for _, s := range ix.all {
-		dist := damerauLevenshtein(lastLower, strings.ToLower(s.name))
-		if dist <= threshold {
-			cands = append(cands, cand{dist: dist, formatted: s.module + "." + s.qualified})
+	qLen := len(lastLower)
+	for n := qLen - threshold; n <= qLen+threshold; n++ {
+		for _, i := range ix.byLen[n] {
+			s := ix.all[i]
+			dist := damerauLevenshtein(lastLower, strings.ToLower(s.name))
+			if dist <= threshold {
+				cands = append(cands, cand{dist: dist, formatted: s.module + "." + s.qualified})
+			}
 		}
 	}
 	sort.Slice(cands, func(i, j int) bool {

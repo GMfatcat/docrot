@@ -20,9 +20,12 @@ import (
 	"docrot/internal/markdown"
 )
 
-// Index maps documents to the set of anchors they define.
+// Index maps documents to the set of anchors they define, plus the labels
+// that are global to the documentation set (Sphinx ".. _label:" targets,
+// AsciiDoc ids), which any document may link to.
 type Index struct {
-	docs map[string]*docAnchors
+	docs   map[string]*docAnchors
+	labels map[string]bool
 }
 
 var customIDAll = regexp.MustCompile(`\{\s*#([\w-]+)\s*\}`)
@@ -40,7 +43,7 @@ type docAnchors struct {
 
 // New returns an empty Index.
 func New() *Index {
-	return &Index{docs: map[string]*docAnchors{}}
+	return &Index{docs: map[string]*docAnchors{}, labels: map[string]bool{}}
 }
 
 // Add indexes the headings of d under docRel, a repo-relative path with
@@ -82,6 +85,12 @@ func (ix *Index) Add(docRel string, d *markdown.Doc) {
 			da.generated = true
 		}
 	}
+	for _, l := range d.Labels {
+		if l = strings.ToLower(strings.TrimSpace(l)); l != "" {
+			addSlug(l)
+			ix.labels[l] = true
+		}
+	}
 	for _, h := range d.Headings {
 		if id := markdown.CustomID(h.Text); id != "" {
 			addSlug(id)
@@ -104,7 +113,13 @@ func (ix *Index) Add(docRel string, d *markdown.Doc) {
 // heading text and to a '-'/'_'-insensitive comparison.
 func (ix *Index) Has(docRel, slug string) bool {
 	da := ix.docs[normPath(docRel)]
-	if da == nil || slug == "" {
+	if slug == "" {
+		return false
+	}
+	if ix.labels[strings.ToLower(slug)] {
+		return true // a global label: :ref:`label` resolves from any page
+	}
+	if da == nil {
 		return false
 	}
 	if da.generated {
