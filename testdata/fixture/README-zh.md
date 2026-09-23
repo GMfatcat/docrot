@@ -26,6 +26,10 @@ import (
 s := httpx.NewServer(":8080")
 ```
 
+## HTTP API
+
+- `GET /v1/items` 列出項目，`POST /v1/items` 建立一筆。
+
 ## 設定
 
 Flags：`--addr`、`--config`。

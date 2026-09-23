@@ -8,6 +8,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"docrot/internal/index/literals"
+	"docrot/internal/index/routes"
 )
 
 // symKind classifies an indexed declaration.
@@ -54,6 +57,8 @@ type fileResult struct {
 	types   []string
 	flags   []string
 	envs    []string
+	routes  []routes.Route
+	lits    []string // identifier-like string literals and struct tag values
 	structs map[string]*ast.StructType
 	err     error
 }
@@ -262,10 +267,27 @@ func embeddedName(e ast.Expr) string {
 	return ""
 }
 
-// collectCalls scans every call expression for flag definitions and
-// environment variable accesses.
-func (r *fileResult) collectCalls(f *ast.File, _ *token.FileSet) {
+// collectCalls scans every call expression for flag definitions,
+// environment variable accesses and route registrations, and every string
+// literal and struct tag for the literal index.
+func (r *fileResult) collectCalls(f *ast.File, fset *token.FileSet) {
 	ast.Inspect(f, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.BasicLit:
+			if v.Kind == token.STRING {
+				if s, err := strconv.Unquote(v.Value); err == nil && literals.IdentLike(s) {
+					r.lits = append(r.lits, s)
+				}
+			}
+			return false
+		case *ast.Field:
+			if v.Tag != nil {
+				if s, err := strconv.Unquote(v.Tag.Value); err == nil {
+					r.lits = append(r.lits, literals.TagValues(s)...)
+				}
+			}
+			return true
+		}
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
@@ -276,6 +298,7 @@ func (r *fileResult) collectCalls(f *ast.File, _ *token.FileSet) {
 		if name, ok := envName(call); ok {
 			r.envs = append(r.envs, name)
 		}
+		r.routes = append(r.routes, routeCalls(call, fset, r.rel)...)
 		return true
 	})
 }

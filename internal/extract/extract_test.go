@@ -20,6 +20,7 @@ type fakeHints struct {
 	hasOdin  bool
 	hasPy    bool
 	noModule bool
+	routes   bool
 }
 
 func (f fakeHints) ModulePath() string {
@@ -38,6 +39,7 @@ func (f fakeHints) HasOdin() bool             { return f.hasOdin }
 func (f fakeHints) OdinPackages() []string    { return f.odin }
 func (f fakeHints) HasPython() bool           { return f.hasPy }
 func (f fakeHints) PyModules() []string       { return f.py }
+func (f fakeHints) HasRoutes() bool           { return f.routes }
 
 func goHints() fakeHints {
 	return fakeHints{

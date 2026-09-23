@@ -32,6 +32,7 @@ func (f fakeLookup) HasFlag(n string) bool       { return f.flags[n] }
 func (f fakeLookup) HasEnv(n string) bool        { return false }
 func (f fakeLookup) HasJSONKey(d string) bool    { return false }
 func (f fakeLookup) HasConfigKey(d string) bool  { return false }
+func (f fakeLookup) HasLiteral(s string) bool    { return f.syms["lit:"+s] }
 
 func linesOf(s string) []string { return strings.Split(s, "\n") }
 

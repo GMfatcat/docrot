@@ -43,6 +43,7 @@ type Lookup interface {
 	HasEnv(name string) bool
 	HasJSONKey(dotted string) bool
 	HasConfigKey(dotted string) bool
+	HasLiteral(s string) bool
 }
 
 // ReadLines returns the lines of a source file (relative path) or nil.
@@ -594,6 +595,9 @@ func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Ki
 	}
 	if ix.HasGoSymbol(tok) || ix.HasPySymbol(tok) || ix.HasOdinSymbol(tok) {
 		return true
+	}
+	if ix.HasLiteral(tok) || ix.HasLiteral(strings.TrimSuffix(tok, "()")) {
+		return true // the code spells it as a string: a key, an event, a header
 	}
 	if strings.Contains(tok, "_") && (ix.HasJSONKey(tok) || ix.HasConfigKey(tok)) {
 		return true // a wire/config key named in the comment

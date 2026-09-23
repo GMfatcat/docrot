@@ -73,6 +73,7 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RulePairLink, "README-zh.md", "docs/guide.md#instal", model.SevWarning, ""},
 		{model.RulePairLink, "README-zh.md", "https://example.com/zh-only", model.SevWarning, ""},
 		{model.RuleCommentMentions, "pkg/httpx/server.go", "tlsConfig", model.SevWarning, ""},
+		{model.RuleMissingRoute, "README.md", "DELETE /v1/items/{id}", model.SevError, ""},
 		{model.RuleCommentMentions, "tools/helper.py", "count_items", model.SevWarning, ""},
 	}
 	got := run.Report.Findings
@@ -123,7 +124,7 @@ func TestFixtureGolden(t *testing.T) {
 		t.Errorf("unexpected error/warning findings:\n  %s", strings.Join(unexpected, "\n  "))
 	}
 	// info findings we do expect
-	infoWant := map[string]bool{"unknown-config-key|server.port": false, "pair-number|1.2.3": false, "pair-number|1.2.4": false}
+	infoWant := map[string]bool{"unknown-config-key|server.port": false, "pair-number|1.2.3": false, "pair-number|1.2.4": false, "missing-route|/readyz": false}
 	for _, f := range got {
 		if f.Severity != model.SevInfo {
 			continue

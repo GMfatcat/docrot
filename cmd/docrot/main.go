@@ -6,7 +6,7 @@
 //	docrot coverage [dir]          which exported symbols/flags/env are undocumented
 //	docrot pairs [dir]             only the bilingual source/translation checks
 //	docrot explain <doc>           every reference extracted from one document
-//	docrot index [dir] --kind K    dump an index (symbols|flags|env|paths|anchors|config|odin|python)
+//	docrot index [dir] --kind K    dump an index (symbols|flags|env|paths|anchors|config|odin|python|routes)
 //	docrot init [dir]              write a default .docrot.json
 //	docrot version
 package main
@@ -100,7 +100,7 @@ Usage:
   docrot pairs [dir]              only the source/translation pair checks
   docrot comments [dir]           comment checks over every exported symbol (not only documented ones)
   docrot explain <doc>            show every reference extracted from one document
-  docrot index [dir] --kind K     dump an index: symbols|flags|env|paths|anchors|config|odin|python
+  docrot index [dir] --kind K     dump an index: symbols|flags|env|paths|anchors|config|odin|python|routes
   docrot init [dir]               write a default .docrot.json
   docrot version
 
@@ -499,7 +499,7 @@ func cmdExplain(args []string, stdout, stderr io.Writer) int {
 func cmdIndex(args []string, stdout, stderr io.Writer) int {
 	c := newCommon("index")
 	var kind string
-	c.fs.StringVar(&kind, "kind", "symbols", "symbols|flags|env|paths|anchors|config|odin|python")
+	c.fs.StringVar(&kind, "kind", "symbols", "symbols|flags|env|paths|anchors|config|odin|python|routes")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
 		return c.exitCode()
@@ -513,7 +513,7 @@ func cmdIndex(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	items := run.Index.Symbols(kind)
-	if items == nil && !contains([]string{"symbols", "flags", "env", "paths", "anchors", "config", "odin", "python"}, kind) {
+	if items == nil && !contains([]string{"symbols", "flags", "env", "paths", "anchors", "config", "odin", "python", "routes"}, kind) {
 		fmt.Fprintf(stderr, "docrot: unknown index kind %q\n", kind)
 		return exitUsage
 	}

@@ -20,6 +20,8 @@ type fakeIndex struct {
 	cfgKeys     []string
 	anchors     map[string][]string
 	odin, py    map[string]bool
+	routes      []string // "GET /x" or "/x"
+	literals    map[string]bool
 }
 
 func (f *fakeIndex) FileExists(rel string) bool { return f.files[rel] }
@@ -130,6 +132,39 @@ func (f *fakeIndex) PyModules() []string                     { return nil }
 func (f *fakeIndex) HasPySymbol(q string) bool               { return f.py[q] }
 func (f *fakeIndex) PyModuleIsExample(string) bool           { return false }
 func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
+func (f *fakeIndex) HasLiteral(s string) bool                { return f.literals[s] }
+func (f *fakeIndex) HasRoutes() bool                         { return len(f.routes) > 0 }
+func (f *fakeIndex) MatchRoute(method, p string) model.RouteMatch {
+	var methods []string
+	for _, r := range f.routes { // "GET /x" or "/x"
+		m, rp, ok := strings.Cut(r, " ")
+		if !ok {
+			m, rp = "", r
+		}
+		if rp != p {
+			continue
+		}
+		if m == "" || method == "" || m == method {
+			return model.RouteMatch{OK: true, File: "routes.go"}
+		}
+		methods = append(methods, m)
+	}
+	return model.RouteMatch{Methods: methods}
+}
+func (f *fakeIndex) Routes() []string { return f.routes }
+func (f *fakeIndex) SimilarRoutes(p string, n int) []string {
+	var out []string
+	for _, r := range f.routes {
+		_, rp, ok := strings.Cut(r, " ")
+		if !ok {
+			rp = r
+		}
+		if len(p) > 3 && strings.HasPrefix(rp, p[:3]) && rp != p {
+			out = append(out, rp)
+		}
+	}
+	return out
+}
 func (f *fakeIndex) HasAnchor(doc, slug string) bool {
 	for _, a := range f.anchors[doc] {
 		if a == slug {
@@ -161,6 +196,8 @@ func newFake() *fakeIndex {
 		envs:     []string{"FIXTURE_DEBUG"},
 		jsonKeys: []string{"server", "server.addr"},
 		anchors:  map[string][]string{"docs/guide.md": {"setup", "install"}, "README.md": {"usage"}},
+		routes:   []string{"GET /v1/items", "POST /v1/items", "/healthz"},
+		literals: map[string]bool{"/openapi.json": true, "http.requests": true, "emit_event": true, "dry-run": true, "FIXTURE_HOME": true, "server.tls": true},
 	}
 }
 
@@ -225,6 +262,16 @@ func TestResolvePolicy(t *testing.T) {
 		{"anchor broken suggests", ref(model.KindAnchor, "docs/guide.md#instal", model.High, "README.md"), false, false, model.RuleBrokenAnchor, model.SevError, "#install", ""},
 		{"anchor missing file skipped", ref(model.KindAnchor, "docs/nope.md#x", model.High, "README.md"), false, true, "", "", "", ""},
 		{"anchor root-relative from a nested doc", rootAnchorRef("docs/README.md#nope", "README.md#nope"), false, false, model.RuleBrokenAnchor, model.SevError, "", ""},
+		{"route ok with method", ref(model.KindRoute, "GET /v1/items", model.High, "README.md"), true, false, "", "", "", "routes.go"},
+		{"route ok any method", ref(model.KindRoute, "/healthz", model.Medium, "README.md"), true, false, "", "", "", "routes.go"},
+		{"route missing high is error", ref(model.KindRoute, "GET /v1/item", model.High, "README.md"), false, false, model.RuleMissingRoute, model.SevError, "/v1/items", ""},
+		{"route missing medium is warning", ref(model.KindRoute, "/readyz", model.Medium, "README.md"), false, false, model.RuleMissingRoute, model.SevWarning, "", ""},
+		{"route method mismatch", ref(model.KindRoute, "DELETE /v1/items", model.High, "README.md"), false, false, model.RuleMissingRoute, model.SevError, "", ""},
+		{"route known as a literal", ref(model.KindRoute, "/openapi.json", model.Medium, "README.md"), true, false, "", "", "", ""},
+		{"gosym dotted literal", ref(model.KindGoSymbol, "http.requests", model.Low, "README.md"), true, false, "", "", "", ""},
+		{"flag known as a literal", ref(model.KindFlag, "dry-run", model.High, "README.md"), true, false, "", "", "", ""},
+		{"env known as a literal", envRef("FIXTURE_HOME", "set the FIXTURE_HOME env var"), true, false, "", "", "", ""},
+		{"configkey known as a literal", ref(model.KindConfigKey, "server.tls", model.Low, "README.md"), true, false, "", "", "", ""},
 		{"import ok", ref(model.KindImport, "example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"import missing", ref(model.KindImport, "example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleMissingImport, model.SevError, "", ""},
 		{"import foreign skipped", ref(model.KindImport, "github.com/x/y", model.High, "README.md"), false, true, "", "", "", ""},

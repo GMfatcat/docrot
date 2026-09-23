@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"docrot/internal/index/literals"
 )
 
 // Stats summarises what Build found.
@@ -50,6 +52,7 @@ type symbol struct {
 type Index struct {
 	stats    Stats
 	packages []string // sorted, unique
+	lits     *literals.Set
 
 	byQual map[string]symbol   // "pkg.name" -> first declaration
 	byName map[string][]symbol // "name" -> declarations across packages, insertion order
@@ -106,6 +109,7 @@ func Build(root string, exclude []string) (*Index, error) {
 	type fileResult struct {
 		pkg  string
 		syms []symbol
+		lits []string
 		ok   bool
 	}
 	results := make([]fileResult, len(files))
@@ -130,7 +134,11 @@ func Build(root string, exclude []string) (*Index, error) {
 					continue
 				}
 				pkg, syms := parseFile(string(data), rel)
-				results[i] = fileResult{pkg: pkg, syms: syms, ok: true}
+				var lits []string
+				for _, l := range strings.Split(string(data), "\n") {
+					lits = append(lits, literals.Scan(l)...)
+				}
+				results[i] = fileResult{pkg: pkg, syms: syms, lits: lits, ok: true}
 			}
 		}()
 	}
@@ -143,6 +151,7 @@ func Build(root string, exclude []string) (*Index, error) {
 	ix := &Index{
 		byQual: make(map[string]symbol),
 		byName: make(map[string][]symbol),
+		lits:   literals.New(),
 	}
 	pkgSet := make(map[string]bool)
 	seenAll := make(map[string]bool)
@@ -153,6 +162,7 @@ func Build(root string, exclude []string) (*Index, error) {
 			continue
 		}
 		ix.stats.Files++
+		ix.lits.AddAll(r.lits)
 		pkgName := r.pkg
 		if pkgName == "" {
 			dir := filepath.ToSlash(filepath.Dir(files[i]))
@@ -339,6 +349,9 @@ func (ix *Index) File(qualified string) (string, int, bool) {
 
 // Stats returns index-wide counters.
 func (ix *Index) Stats() Stats { return ix.stats }
+
+// Literals returns the identifier-like string literals of the tree.
+func (ix *Index) Literals() *literals.Set { return ix.lits }
 
 // Similar returns up to n existing "pkg.name" candidates whose bare name is
 // close (Damerau-Levenshtein distance <= max(2, len/4), case-insensitive)

@@ -91,6 +91,8 @@ func (r *Resolver) Resolve(ref model.Reference) Result {
 		return r.resolveURL(ref)
 	case model.KindImport:
 		return r.resolveImport(ref)
+	case model.KindRoute:
+		return r.resolveRoute(ref)
 	}
 	return Result{Skipped: true}
 }
@@ -314,6 +316,9 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	}
 	parts := strings.Split(q, ".")
 	first, last := parts[0], parts[len(parts)-1]
+	if r.ix.HasLiteral(q) {
+		return Result{OK: true} // "http.requests": a metric, logger or RPC name spelled as a string
+	}
 	sev := model.SeverityFor(ref.Confidence)
 	var msg string
 	switch {
@@ -419,6 +424,9 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 	if dotted && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
 		return Result{OK: true}
 	}
+	if r.ix.HasLiteral(strings.TrimSuffix(ref.Norm, "()")) {
+		return Result{OK: true} // a name the code spells as a string (an event, a command, a key)
+	}
 	sev := model.SeverityFor(ref.Confidence)
 	if ref.Kind == model.KindPySym {
 		switch {
@@ -461,6 +469,9 @@ func (r *Resolver) resolveFlag(ref model.Reference) Result {
 	}
 	if r.ix.HasFlag(ref.Norm) {
 		return Result{OK: true}
+	}
+	if r.ix.HasLiteral(ref.Norm) || r.ix.HasLiteral("--"+ref.Norm) || r.ix.HasLiteral("-"+ref.Norm) || r.ix.HasLiteral(strings.ReplaceAll(ref.Norm, "-", "_")) {
+		return Result{OK: true} // defined by a flag library the index does not parse (pflag, cobra, argparse…)
 	}
 	sev := model.SevWarning
 	if ref.Confidence == model.Medium {
@@ -520,8 +531,8 @@ func (r *Resolver) resolveEnv(ref model.Reference) Result {
 	if ref.Confidence <= model.Low {
 		return Result{Skipped: true}
 	}
-	if r.ix.HasEnv(ref.Norm) {
-		return Result{OK: true}
+	if r.ix.HasEnv(ref.Norm) || r.ix.HasLiteral(ref.Norm) {
+		return Result{OK: true} // read through a wrapper the index does not recognise
 	}
 	if len(r.ix.Envs()) == 0 || isExternalEnv(ref.Norm) || !envContext(ref.Context) {
 		return Result{Skipped: true}
@@ -572,8 +583,8 @@ func (r *Resolver) resolveConfigKey(ref model.Reference) Result {
 	if len(r.ix.JSONKeys()) == 0 && len(r.ix.ConfigKeys()) == 0 {
 		return Result{Skipped: true}
 	}
-	if r.ix.HasJSONKey(ref.Norm) || r.ix.HasConfigKey(ref.Norm) {
-		return Result{OK: true}
+	if r.ix.HasJSONKey(ref.Norm) || r.ix.HasConfigKey(ref.Norm) || r.ix.HasLiteral(ref.Norm) {
+		return Result{OK: true} // viper.Get("server.port")-style lookups spell the whole key
 	}
 	// only report when the top-level segment is a real config section;
 	// otherwise "rec.status" is just a variable in prose
@@ -647,6 +658,43 @@ func (r *Resolver) resolveImport(ref model.Reference) Result {
 	}
 	msg := "import path `" + ip + "` does not match any package directory"
 	return Result{Finding: r.finding(model.RuleMissingImport, model.SeverityFor(ref.Confidence), ref, msg, cands)}
+}
+
+// --- HTTP routes -----------------------------------------------------------
+
+// SplitRoute splits a route reference's Norm ("GET /v1/items" or
+// "/healthz") into method and path.
+func SplitRoute(norm string) (method, p string) {
+	if m, rest, ok := strings.Cut(norm, " "); ok {
+		return m, rest
+	}
+	return "", norm
+}
+
+func (r *Resolver) resolveRoute(ref model.Reference) Result {
+	if !r.ix.HasRoutes() {
+		return Result{Skipped: true} // not a web service; "/x" is just a path
+	}
+	method, p := SplitRoute(ref.Norm)
+	m := r.ix.MatchRoute(method, p)
+	if m.OK {
+		return Result{OK: true, File: m.File}
+	}
+	if len(m.Methods) == 0 && (r.ix.HasLiteral(p) || r.ix.HasLiteral(p+"/") || r.ix.HasLiteral(strings.TrimPrefix(p, "/"))) {
+		return Result{OK: true} // registered through a constant or a config default
+	}
+	sev := model.SeverityFor(ref.Confidence)
+	var msg string
+	if len(m.Methods) > 0 {
+		msg = "`" + p + "` is registered for " + strings.Join(m.Methods, "/") + ", not " + method
+	} else {
+		msg = "route `" + ref.Text + "` is not registered by any handler"
+	}
+	var cands []string
+	if len(m.Methods) == 0 {
+		cands = r.ix.SimilarRoutes(p, 3)
+	}
+	return Result{Finding: r.finding(model.RuleMissingRoute, sev, ref, msg, cands)}
 }
 
 // --- URLs ------------------------------------------------------------------

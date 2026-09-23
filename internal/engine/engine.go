@@ -403,6 +403,9 @@ func Check(opts Options) (*Run, error) {
 	if st.PyFiles > 0 {
 		sum.Extra["python symbols"] = strconv.Itoa(st.PySymbols)
 	}
+	if st.Routes > 0 {
+		sum.Extra["routes"] = strconv.Itoa(st.Routes)
+	}
 	if len(prs) > 0 {
 		sum.Extra["pairs"] = strconv.Itoa(len(prs))
 	}

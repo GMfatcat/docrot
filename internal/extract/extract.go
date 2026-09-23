@@ -28,6 +28,9 @@ type Hints interface {
 	OdinPackages() []string
 	HasPython() bool
 	PyModules() []string
+	// HasRoutes reports whether the code registers HTTP routes; without
+	// any, "/x" in a document is an absolute path, not a route claim.
+	HasRoutes() bool
 }
 
 // Options controls extraction.
@@ -59,6 +62,7 @@ func Extract(doc *markdown.Doc, h Hints, opts Options) []model.Reference {
 	x.links()
 	x.fences()
 	x.bare()
+	x.routes()
 	sortRefs(x.out)
 	return x.out
 }

@@ -25,6 +25,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"docrot/internal/index/literals"
+	"docrot/internal/index/routes"
 )
 
 // Stats summarises what Build found.
@@ -59,6 +62,9 @@ type Index struct {
 	byName        map[string][]symbol // bare last-part name -> declarations
 
 	all []symbol // every recognised declaration, deduplicated by "module.qualified"
+
+	routes []routes.Route // HTTP route registrations, in file order
+	lits   *literals.Set  // identifier-like string literals
 }
 
 var (
@@ -118,6 +124,8 @@ func Build(root string, exclude []string) (*Index, error) {
 	type parsed struct {
 		module string
 		syms   []symbol
+		routes []routes.Route
+		lits   []string
 		ok     bool
 	}
 	results := make([]parsed, len(files))
@@ -142,8 +150,15 @@ func Build(root string, exclude []string) (*Index, error) {
 					continue
 				}
 				mod := moduleName(rel, initDirs)
-				syms := parseFile(string(data), rel)
-				results[i] = parsed{module: mod, syms: syms, ok: true}
+				content := string(data)
+				syms := parseFile(content, rel)
+				lines := strings.Split(content, "\n")
+				rts := parseRoutes(lines, rel)
+				var lits []string
+				for _, l := range lines {
+					lits = append(lits, literals.Scan(l)...)
+				}
+				results[i] = parsed{module: mod, syms: syms, routes: rts, lits: lits, ok: true}
 			}
 		}()
 	}
@@ -157,6 +172,7 @@ func Build(root string, exclude []string) (*Index, error) {
 		byFull:        make(map[string]symbol),
 		byClassMethod: make(map[string][]symbol),
 		byName:        make(map[string][]symbol),
+		lits:          literals.New(),
 	}
 	modSet := make(map[string]bool)
 	seenAll := make(map[string]bool)
@@ -167,6 +183,8 @@ func Build(root string, exclude []string) (*Index, error) {
 		}
 		ix.stats.Files++
 		modSet[r.module] = true
+		ix.routes = append(ix.routes, r.routes...)
+		ix.lits.AddAll(r.lits)
 		for _, s := range r.syms {
 			s.module = r.module
 			ix.stats.Symbols++
@@ -465,6 +483,14 @@ func isExamplePath(rel string) bool {
 	}
 	return false
 }
+
+// Literals returns the identifier-like string literals of the tree.
+func (ix *Index) Literals() *literals.Set { return ix.lits }
+
+// Routes returns every HTTP route registration found (FastAPI/Flask
+// decorators, add_api_route, Starlette Route/Mount, Django path), in file
+// order.
+func (ix *Index) Routes() []routes.Route { return append([]routes.Route(nil), ix.routes...) }
 
 // IsModule reports whether qualified names a module or package of the tree.
 func (ix *Index) IsModule(qualified string) bool { return ix.modSet[qualified] }

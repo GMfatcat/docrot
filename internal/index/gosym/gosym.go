@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 
+	"docrot/internal/index/literals"
+	"docrot/internal/index/routes"
 	"docrot/internal/model"
 )
 
@@ -80,6 +82,8 @@ type Index struct {
 	flags    map[string]bool
 	envs     map[string]bool
 	jsonKeys map[string]bool
+	routes   []routes.Route // registrations, test files included, in file order
+	lits     *literals.Set  // identifier-like string literals, test files included
 
 	flagList []string
 	envList  []string
@@ -114,6 +118,7 @@ func Build(root string, opts Options) (*Index, []error) {
 		flags:     map[string]bool{},
 		envs:      map[string]bool{},
 		jsonKeys:  map[string]bool{},
+		lits:      literals.New(),
 	}
 	ix.modulePath = readModulePath(root)
 
@@ -168,6 +173,8 @@ func Build(root string, opts Options) (*Index, []error) {
 				quals[e.qual()] = true
 			}
 		}
+		ix.routes = append(ix.routes, r.routes...)
+		ix.lits.AddAll(r.lits)
 		if !counted {
 			continue
 		}
@@ -371,6 +378,13 @@ func (ix *Index) HasEnv(name string) bool { return ix.envs[strings.TrimSpace(nam
 
 // Envs returns every environment variable name found, sorted.
 func (ix *Index) Envs() []string { return append([]string(nil), ix.envList...) }
+
+// Literals returns the identifier-like string literals of the code base.
+func (ix *Index) Literals() *literals.Set { return ix.lits }
+
+// Routes returns every HTTP route registration found (mux.HandleFunc,
+// r.Get, r.Mount…), test files included, in file order.
+func (ix *Index) Routes() []routes.Route { return append([]routes.Route(nil), ix.routes...) }
 
 // HasJSONKey reports whether a dotted configuration path appears in a struct
 // tag (json, yaml or toml) or as an untagged struct field name.

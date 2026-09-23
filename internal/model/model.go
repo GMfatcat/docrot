@@ -27,12 +27,13 @@ const (
 	KindURL       Kind = "url"       // http(s)://
 	KindCommand   Kind = "command"   // executable path in a shell block
 	KindImport    Kind = "import"    // Go import path in a go block
+	KindRoute     Kind = "route"     // HTTP route: "GET /v1/items" or "/healthz"
 )
 
 // AllKinds lists every Kind in a stable order.
 var AllKinds = []Kind{
 	KindPath, KindGoSymbol, KindOdinSym, KindPySym, KindFlag, KindEnv,
-	KindConfigKey, KindAnchor, KindURL, KindCommand, KindImport,
+	KindConfigKey, KindAnchor, KindURL, KindCommand, KindImport, KindRoute,
 }
 
 // Confidence expresses how sure the extractor is that a piece of text
@@ -199,6 +200,7 @@ const (
 	RuleUndocumented     = "undocumented"
 	RuleStaleComment     = "stale-comment"
 	RuleCommentMentions  = "comment-mentions-missing"
+	RuleMissingRoute     = "missing-route"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -207,7 +209,7 @@ var AllRules = []string{
 	RuleUnknownConfigKey, RuleBrokenAnchor, RuleBrokenURL, RuleMissingCommand,
 	RuleMissingImport, RuleStaleSection, RulePairHeading, RulePairCode,
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
-	RuleStaleComment, RuleCommentMentions,
+	RuleStaleComment, RuleCommentMentions, RuleMissingRoute,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -231,6 +233,7 @@ var RuleDescriptions = map[string]string{
 	RuleUndocumented:     "An exported symbol, flag or environment variable is not mentioned by any document.",
 	RuleStaleComment:     "The body of a documented function changed in several commits after its comment was last edited.",
 	RuleCommentMentions:  "A code comment names a parameter, symbol, flag or path that no longer exists.",
+	RuleMissingRoute:     "An HTTP route mentioned in the document is not registered by any handler in the code.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.
@@ -325,6 +328,32 @@ type Index interface {
 	// --- config samples ---
 	HasConfigKey(dotted string) bool
 	ConfigKeys() []string
+
+	// --- HTTP routes ---
+	// HasRoutes reports whether the code registers any HTTP route at all;
+	// when it does not, route claims in documents are not checked.
+	HasRoutes() bool
+	// MatchRoute checks a documented path for a method ("" = any).
+	MatchRoute(method, path string) RouteMatch
+	// Routes lists every registration as "METHOD /path" or "/path", sorted.
+	Routes() []string
+	// SimilarRoutes returns up to n registered paths close to path. Best first.
+	SimilarRoutes(path string, n int) []string
+
+	// --- string literals ---
+	// HasLiteral reports whether the code contains s as a string literal
+	// (or struct tag value), spelled exactly so: the last resort before a
+	// documented name is reported missing.
+	HasLiteral(s string) bool
+}
+
+// RouteMatch is the outcome of Index.MatchRoute.
+type RouteMatch struct {
+	OK      bool
+	Methods []string // when the path exists but only for other methods
+	File    string   // registering file (relative) when OK
+	Line    int
+	Mounted bool // matched by its trailing segments (a router mounted under a prefix)
 }
 
 // Exported describes one exported code surface item for coverage.

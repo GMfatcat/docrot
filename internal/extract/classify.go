@@ -140,7 +140,15 @@ const rejectChars = "<>{}$%|\"'"
 // It returns nil when the span is not a single reference.
 func (x *extractor) classifyWhole(s string) *model.Reference {
 	s = strings.TrimSpace(s)
-	if s == "" || len(s) > 120 || strings.ContainsAny(s, rejectChars) {
+	if s == "" || len(s) > 120 {
+		return nil
+	}
+	// `GET /v1/items`, `/items/{item_id}`: before the template check, since
+	// route parameters use braces
+	if r := x.routeSpan(s); r != nil {
+		return r
+	}
+	if strings.ContainsAny(s, rejectChars) {
 		return nil
 	}
 	if strings.ContainsAny(s, " \t") {

@@ -42,6 +42,12 @@ Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
 <!-- docrot:ignore -->
 Ignored line mentions `docs/nonexistent.md` and `--nope`.
 
+## HTTP API
+
+- `GET /v1/items` lists items, `POST /v1/items` creates one, `GET /v1/items/{id}` fetches one.
+- `DELETE /v1/items/{id}` was never implemented; `/healthz` and `/readyz` are the probes.
+- Python side: `GET /py/items` and `POST /py/items/{item_id}`.
+
 ## Other languages
 
 Odin: `fixture_odin.render_frame` and `render_frames()`. Python: `helper.summarize`,

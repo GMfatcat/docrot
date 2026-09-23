@@ -38,3 +38,11 @@ func WriteError(w http.ResponseWriter, err error) {}
 
 // Undocumented is never mentioned in any doc.
 func Undocumented() {}
+
+// Routes registers the HTTP API on mux.
+func Routes(mux *http.ServeMux) {
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("GET /v1/items", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("POST /v1/items", func(w http.ResponseWriter, r *http.Request) {})
+	mux.HandleFunc("GET /v1/items/{id}", func(w http.ResponseWriter, r *http.Request) {})
+}

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"docrot/internal/fuzzy"
 	"docrot/internal/globx"
 	"docrot/internal/index/anchors"
 	"docrot/internal/index/config"
@@ -17,6 +18,7 @@ import (
 	"docrot/internal/index/gosym"
 	"docrot/internal/index/odin"
 	"docrot/internal/index/py"
+	"docrot/internal/index/routes"
 	"docrot/internal/markdown"
 	"docrot/internal/model"
 )
@@ -36,6 +38,8 @@ type Options struct {
 // Stats summarises the built index for the report.
 type Stats struct {
 	Files       int
+	Routes      int
+	Literals    int
 	GoFiles     int
 	GoPackages  int
 	GoSymbols   int
@@ -65,6 +69,7 @@ type Index struct {
 	pys     *py.Index
 	cfg     *config.Index
 	anch    *anchors.Index
+	rts     *routes.Set
 	flagSet map[string]bool
 	pkgSet  map[string]bool
 	stats   Stats
@@ -76,7 +81,7 @@ var _ model.Index = (*Index)(nil)
 // never abort the build.
 func Build(root string, opts Options) (*Index, []error, error) {
 	start := time.Now()
-	ix := &Index{root: root, opts: opts, anch: anchors.New()}
+	ix := &Index{root: root, opts: opts, anch: anchors.New(), rts: routes.New()}
 	excl, large := expandExcludes(root, opts.Exclude, opts.MaxFileSize)
 	ix.stats.SkippedLarge = large
 	// content indexers never open oversized files; the path index still lists them
@@ -143,6 +148,18 @@ func Build(root string, opts Options) (*Index, []error, error) {
 
 	ix.flagSet = map[string]bool{}
 	ix.pkgSet = map[string]bool{}
+	if ix.gos != nil {
+		for _, r := range ix.gos.Routes() {
+			ix.rts.Add(r)
+		}
+	}
+	if ix.pys != nil {
+		for _, r := range ix.pys.Routes() {
+			ix.rts.Add(r)
+		}
+	}
+	ix.stats.Routes = ix.rts.Len()
+	ix.stats.Literals = ix.literalCount()
 	if ix.gos != nil {
 		for _, f := range ix.gos.Flags() {
 			ix.flagSet[normFlag(f)] = true
@@ -448,6 +465,54 @@ func (ix *Index) ConfigKeys() []string {
 	return ix.cfg.Keys()
 }
 
+// --- string literals ---
+
+func (ix *Index) HasLiteral(s string) bool {
+	if ix.gos != nil && ix.gos.Literals().Has(s) {
+		return true
+	}
+	if ix.pys != nil && ix.pys.Literals().Has(s) {
+		return true
+	}
+	return ix.od != nil && ix.od.Literals().Has(s)
+}
+
+func (ix *Index) literalCount() int {
+	n := 0
+	if ix.gos != nil {
+		n += ix.gos.Literals().Len()
+	}
+	if ix.pys != nil {
+		n += ix.pys.Literals().Len()
+	}
+	if ix.od != nil {
+		n += ix.od.Literals().Len()
+	}
+	return n
+}
+
+// --- HTTP routes ---
+
+func (ix *Index) HasRoutes() bool { return !ix.rts.Empty() }
+
+func (ix *Index) MatchRoute(method, p string) model.RouteMatch {
+	m := ix.rts.Lookup(method, p)
+	return model.RouteMatch{OK: m.OK, Methods: m.Methods, File: m.File, Line: m.Line, Mounted: m.Mounted}
+}
+
+func (ix *Index) Routes() []string { return ix.rts.List() }
+
+// SimilarRoutes ranks registered paths by edit distance to the normalised
+// form of p, parameters included ("/items/{}" for "/items/{id}").
+func (ix *Index) SimilarRoutes(p string, n int) []string {
+	q := routes.Display(routes.Normalize(p))
+	var out []string
+	for _, c := range fuzzy.Rank(q, ix.rts.Paths(), n, max(2, len(q)/5)) {
+		out = append(out, c.Text)
+	}
+	return out
+}
+
 // Symbols returns a sorted listing used by `docrot index`.
 func (ix *Index) Symbols(kind string) []string {
 	switch kind {
@@ -485,6 +550,8 @@ func (ix *Index) Symbols(kind string) []string {
 		return ix.od.ProcNames()
 	case "python":
 		return ix.PyModules()
+	case "routes":
+		return ix.Routes()
 	}
 	return nil
 }
