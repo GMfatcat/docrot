@@ -10,11 +10,17 @@
 linter 只看排版，沒有任何工具檢查文件裡的「主張」。
 
 docrot 把文件對 repo 的每一個主張——檔案路徑、Go/Odin/Python 符號、CLI flag、環境變數、
-設定鍵與 JSON 設定範例、標題錨點、shell 指令、Go import 路徑、HTTP 路由、安裝指令、`make` 目標、
-工具鏈版本需求——逐一抽出來，對照真正的程式碼。接著用 git
-歷史找出「散文最後一次修改之後，引用的程式碼已經大幅變動」的章節，並比對雙語文件的結構是否漂移。
+設定鍵與 JSON 設定範例、預設值、標題錨點、shell 指令、Go import 路徑、HTTP 路由、安裝指令、
+`make` 目標、工具鏈版本需求——逐一抽出來，對照真正的程式碼。Markdown、reStructuredText 與
+AsciiDoc 都讀得懂。接著用 git 歷史找出「文字最後一次修改之後，引用的程式碼已經大幅變動」的
+章節，並比對雙語文件的結構是否漂移。
 
-它是單一靜態執行檔，以 Go 撰寫，**除了標準庫沒有任何依賴**。
+它是單一靜態執行檔，以 Go 撰寫，**除了標準庫沒有任何依賴**；產出的 HTML 報告也是單一檔案，
+離線打開就能用。
+
+![docrot 對 fixture repo 執行 check 的輸出](docs/assets/terminal.svg)
+
+![HTML 報告：可依嚴重度、規則、檔案篩選](docs/assets/report.png)
 
 ```text
 CHANGELOG.md:91:5: error missing-symbol `httpx.Retry` not found in package httpx (did you mean httpx.ClientConfig.Retry?)
@@ -27,7 +33,8 @@ README-zh.md:1: warning pair-heading translation has 4 headings, source has 5
 
 這幾行來自對一個內部 Go repo 的真實執行；docrot 在八個 repo、三種語言上找到了什麼，
 見[實地報告](docs/field-report.md)；對 httpx、Starlette、Typer、Pydantic 與 FastAPI
-（1,692 份文件、372 組翻譯配對）的結果見 [Python 實地報告](docs/field-report-python.md)。
+（1,692 份文件、372 組翻譯配對）以及 requests 與 Django 的 Sphinx 文件（686 頁）的結果，
+見 [Python 實地報告](docs/field-report-python.md)。
 
 ## 安裝
 
@@ -67,9 +74,9 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 | `toolchain-mismatch` | 「requires Go 1.21+」、「Python 3.9 or later」 | `go` 指令／`requires-python` 要求的最低版本相同 | <!-- docrot:ignore toolchain-mismatch -->
 | `missing-target` | `make lint`、`npm run build`、`just release`、`task deploy` | Makefile／package.json scripts／justfile／Taskfile 有定義它 |
 | `default-mismatch` | `` `--port` ``（default: `` `8080` ``）、有 Default 欄的表格 | `flag.Int("port", 8080, …)`、`default:"…"` struct tag、`typer.Option(8080)` 或 `os.getenv("X", "…")` 說的是同一個值 |
-| `stale-symbol` | 某章節提到 `` `httpx.NewServer` `` | 該宣告的本體在章節最後編輯之後沒有連續好幾個 commit 的變動（git） |
 | `broken-url` | `https://…`（僅在 `--net` 時） | URL 回應 2xx/3xx |
 | `stale-section` | 某章節最後編輯於 2026-06-01 | 它引用的程式碼此後沒有大幅變動（git） |
+| `stale-symbol` | 某章節提到 `` `httpx.NewServer` `` | 該宣告的本體在章節最後編輯之後沒有連續好幾個 commit 的變動（git） |
 | `pair-*` | `README.md` ↔ `README-zh.md` | 標題相同、程式碼區塊相同、連結／表格／數字相同、翻譯沒有落後原文（git） |
 | `undocumented` | — | 每個 exported 符號／flag／環境變數都有文件提到（`docrot coverage`） |
 | `stale-comment` | 文件指到的符號上的 doc comment／docstring | 註解最後修改之後，函式本體沒有連續好幾個 commit 的變動（git） |
@@ -97,9 +104,9 @@ docrot check --changed          # only the documents you touched (pre-commit spe
    註解修改之後本體大幅變動也會標出來。
 8. **Baseline**：指紋不含行號，所以一般編輯不會讓 baseline 失效。
 
-嚴重度跟著信心值走：high → error、medium → warning、low → info。flag 與環境變數再軟一級，
-因為它們太常是在講*別的*程式；glob 沒命中、設定鍵與光禿禿的檔名一律 info。文字報告預設隱藏
-info，加 `--info` 才列出。
+嚴重度跟著信心值走：high → error、medium → warning、low → info。flag 與環境變數再放寬一級，
+因為它們太常是在講*別的*程式；glob 沒命中、內文裡的設定鍵與只有檔名的路徑一律 info。文字報告
+預設隱藏 info，加 `--info` 才列出。
 
 docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的東西：被 `.gitignore` 排除的路徑
 （建置產物）、`health/ready` 或 `net/http` 這類散文、外部程式後面的 flag（`go test -race`）、
@@ -149,7 +156,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   二進位檔完全不會被打開——只有檔名進入路徑索引，所以一個 4 GB 的模型檔不論有沒有被
   gitignore 都只花一筆目錄項目。超過上限的文字檔會跳過並警告；指向它的路徑仍然能解析。
 
-行內逃生口：
+要在原地壓掉一個誤報：
 
 ```markdown
 <!-- docrot:ignore -->            the next non-blank line
@@ -168,15 +175,17 @@ inline text <!-- docrot:ignore -->  this line
 .docrot/.gitignore   a single "*", so the reports never reach a commit
 .docrot/report.md    for agents: findings by file, how to read them, a checklist
 .docrot/report.html  for humans: the filterable single-file page
-.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 .docrot/report.json  the stable JSON schema
 .docrot/report.txt   the terminal report, with info findings
+.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 ```
 
 每個檔案都先寫到暫存檔再改名就位，所以中途被打斷的執行，不會在下一個讀者期待
 完整報告的地方留下半份。這個目錄會被排除在文件探索之外，所以昨天的報告永遠不會
 被當成文件來檢查。用 `--out-dir` 換個地方寫，用 `--no-out` 讓這次不寫，或把
-`outDir` 設成空字串永久關掉。
+`outDir` 設成空字串永久關掉。`git-cache.json` 存的是上一次執行的 blame 與 log 結果，
+以 blob hash 與 HEAD 為鍵；大型 repo 第二次執行只要十分之一的時間就是靠它，刪掉也只是
+損失這點速度。
 
 ## 指令
 
@@ -200,7 +209,7 @@ docrot version
 `--verbose` 印出索引與 git 警告、`--min-confidence` 丟掉弱引用。`check` 另有 `--format`、
 `--output`、`--fail-on`、`--info`、`--all`、`--coverage`、`--quiet`、`--out-dir` 與
 `--no-out`、`--changed`（只檢查 HEAD 之後修改過的文件，加上未追蹤的）與 `--since REF`（再加上
-這條分支自 merge base 以來改過的文件——PR 檢查用）；`explain` 另有 `--kind` 與 `--root`；`index` 接受 `--kind`。
+這條分支自 merge base 以來改過的文件——PR 檢查用）。`explain` 另有 `--kind` 與 `--root`；`index` 接受 `--kind`。
 
 Exit code：`0` 乾淨、`1` 有達到 `--fail-on` 的新 finding、`2` 用法或內部錯誤。SARIF 輸出可直接上傳
 GitHub code scanning；已 baseline 的 finding 會帶 `baselineState: unchanged`。
@@ -219,10 +228,11 @@ GitHub code scanning；已 baseline 的 finding 會帶 `baselineState: unchanged
 ```sh
 python scripts/verify.py        # gofmt, vet, test, build, self-check, fixture check, formats
 python scripts/demo.py ../some-repo --out reports
+python scripts/screenshots.py   # regenerate docs/assets/ from the fixture
 ```
 
 docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/` 下有日期的設計文件在那裡被排除，
-因為它們本來就充滿示意用路徑。
+因為它們本來就充滿示意用的路徑。
 
 設計：[docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/specs/2026-09-23-docrot-design.md)。
 計畫：[docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md)。

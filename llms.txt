@@ -1,6 +1,6 @@
 # docrot
 
-> docrot finds where documentation lies about the code. It extracts every claim a Markdown document makes about a repository (file paths, Go/Odin/Python symbols, CLI flags, environment variables, config keys and JSON config examples, default values, heading anchors, shell commands, Go import paths, HTTP routes, install lines, make/npm/just/task targets, Go/Python version requirements) — in Markdown, reStructuredText or AsciiDoc, checks each against the real code, uses git history to flag sections whose referenced code churned after the prose was last edited, and compares bilingual document pairs for structural drift. Single static Go binary, standard library only.
+> docrot finds where documentation lies about the code. It extracts every claim a document makes about a repository (file paths, Go/Odin/Python symbols, CLI flags, environment variables, config keys and JSON config examples, default values, heading anchors, shell commands, Go import paths, HTTP routes, install lines, make/npm/just/task targets, Go/Python version requirements) — in Markdown, reStructuredText or AsciiDoc, checks each against the real code, uses git history to flag sections whose referenced code churned after the prose was last edited, and compares bilingual document pairs for structural drift. Single static Go binary, standard library only.
 
 Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `internal/`.
 
@@ -43,7 +43,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - [README](README.md), [繁體中文 README](README-zh.md)
 - [Rules reference](docs/rules.md) — every rule, how it decides, how to silence it
 - [Field report](docs/field-report.md) — results on eight real Go/Odin repositories
-- [Python field report](docs/field-report-python.md) — results on httpx, Starlette, Typer, Pydantic and FastAPI
+- [Python field report](docs/field-report-python.md) — results on httpx, Starlette, Typer, Pydantic and FastAPI, plus the Sphinx docs of requests and Django
 - [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md)
 - [Roadmap](docs/roadmap.md) — claims docrot does not check yet, ranked by value/cost
 - Verify everything: `python scripts/verify.py`

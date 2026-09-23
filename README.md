@@ -13,14 +13,20 @@ formatting. Nothing checks the *claims*.
 
 docrot extracts every claim a document makes about the repository — file
 paths, Go/Odin/Python symbols, CLI flags, environment variables, config
-keys and JSON config examples, heading anchors, shell commands, Go import
-paths, HTTP routes, install lines, `make` targets, toolchain requirements —
-and checks each one against the real code. Then it uses git history to spot sections whose
-referenced code has churned since the prose was last touched, and compares
-bilingual document pairs for structural drift.
+keys and JSON config examples, default values, heading anchors, shell
+commands, Go import paths, HTTP routes, install lines, `make` targets,
+toolchain requirements — and checks each one against the real code. It
+reads Markdown, reStructuredText and AsciiDoc. Then it uses git history to
+spot sections whose referenced code has churned since the prose was last
+touched, and compares bilingual document pairs for structural drift.
 
 It is a single static binary written in Go with **no dependencies outside
-the standard library**.
+the standard library**, and the HTML report it writes is a single file that
+opens offline.
+
+![docrot check on the fixture repository](docs/assets/terminal.svg)
+
+![The HTML report: findings with filters by severity, rule and file](docs/assets/report.png)
 
 ```text
 CHANGELOG.md:91:5: error missing-symbol `httpx.Retry` not found in package httpx (did you mean httpx.ClientConfig.Retry?)
@@ -35,7 +41,8 @@ Those lines are from a real run on an internal Go repository; see the
 [field report](docs/field-report.md) for what docrot found across eight
 repositories in three languages, and the
 [Python field report](docs/field-report-python.md) for httpx, Starlette,
-Typer, Pydantic and FastAPI (1,692 documents, 372 translation pairs).
+Typer, Pydantic and FastAPI (1,692 documents, 372 translation pairs), plus
+the Sphinx documentation of requests and Django (686 pages).
 
 ## Install
 
@@ -76,9 +83,9 @@ docrot check --changed          # only the documents you touched (pre-commit spe
 | `toolchain-mismatch` | "requires Go 1.21+", "Python 3.9 or later" | the `go` directive / `requires-python` asks for the same minimum | <!-- docrot:ignore toolchain-mismatch -->
 | `missing-target` | `make lint`, `npm run build`, `just release`, `task deploy` | the Makefile / package.json scripts / justfile / Taskfile define it |
 | `default-mismatch` | `` `--port` `` (default: `` `8080` ``), a table with a Default column | `flag.Int("port", 8080, …)`, a `default:"…"` struct tag, `typer.Option(8080)` or `os.getenv("X", "…")` says the same |
-| `stale-symbol` | a section that names `` `httpx.NewServer` `` | the body of that declaration has not churned in several commits since the section was edited (git) |
 | `broken-url` | `https://…` (only with `--net`) | the URL answers 2xx/3xx |
 | `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
+| `stale-symbol` | a section that names `` `httpx.NewServer` `` | the body of that declaration has not churned in several commits since the section was edited (git) |
 | `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
 | `undocumented` | — | every exported symbol / flag / env var is mentioned somewhere (`docrot coverage`) |
 | `stale-comment` | a doc comment / docstring on a symbol the docs point at | the function body has not churned in several commits since the comment was edited (git) |
@@ -119,8 +126,9 @@ silence it.
 
 Severity follows confidence: high → error, medium → warning, low → info.
 Flags and environment variables are one step softer because they are so
-often about *other* programs; glob misses, config keys and bare file names
-are always info. The text report hides info unless you pass `--info`.
+often about *other* programs; glob misses, config keys in prose and bare
+file names are always info. The text report hides info unless you pass
+`--info`.
 
 docrot was tuned against real repositories, not synthetic examples. Things
 it deliberately ignores: paths matched by `.gitignore` (build artifacts),
@@ -184,7 +192,7 @@ scanned.
   file costs one directory entry, gitignored or not. A text file above the
   cap is skipped with a warning; paths to it still resolve.
 
-Inline escape hatches:
+To silence a false positive where it happens:
 
 ```markdown
 <!-- docrot:ignore -->            the next non-blank line
@@ -204,9 +212,9 @@ same place:
 .docrot/.gitignore   a single "*", so the reports never reach a commit
 .docrot/report.md    for agents: findings by file, how to read them, a checklist
 .docrot/report.html  for humans: the filterable single-file page
-.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 .docrot/report.json  the stable JSON schema
 .docrot/report.txt   the terminal report, with info findings
+.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
 ```
 
 Each file is rendered into a temporary file and renamed into place, so an
@@ -214,10 +222,10 @@ interrupted run never leaves half a report where the next reader expects a
 whole one. The directory is excluded from document discovery, so yesterday's
 report is never checked as though it were documentation. Pass `--out-dir` to
 put it somewhere else, `--no-out` to write nothing this run, or set `outDir`
-to the empty string to turn it off for good. The directory also keeps
-`git-cache.json`, the blame and log answers of the last run keyed by blob
-hash and HEAD, which is what makes a second run on a large repository take
-a tenth of the time; deleting it only costs that speed.
+to the empty string to turn it off for good. `git-cache.json` holds the
+blame and log answers of the last run, keyed by blob hash and HEAD; it is
+why a second run on a large repository takes a tenth of the time, and
+deleting it costs nothing but that speed.
 
 ## Commands
 
@@ -243,9 +251,8 @@ index and git warnings, `--min-confidence` drops weak references. `check`
 adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`,
 `--quiet`, `--out-dir`, `--no-out`, `--changed` (only documents modified
 since HEAD, plus untracked ones) and `--since REF` (also documents changed
-on this branch since the merge base with REF — a PR check); `explain` adds
-`--kind` and `--root`;
-`index` takes `--kind`.
+on this branch since the merge base with REF — a PR check). `explain` adds
+`--kind` and `--root`; `index` takes `--kind`.
 
 Exit codes: `0` clean, `1` a new finding at or above `--fail-on`, `2` usage
 or internal error. The SARIF output uploads directly to GitHub code
@@ -265,6 +272,7 @@ scanning; baselined findings carry `baselineState: unchanged`.
 ```sh
 python scripts/verify.py        # gofmt, vet, test, build, self-check, fixture check, formats
 python scripts/demo.py ../some-repo --out reports
+python scripts/screenshots.py   # regenerate docs/assets/ from the fixture
 ```
 
 docrot checks its own documentation as part of `scripts/verify.py`; the
