@@ -538,6 +538,12 @@ func isExamplePath(rel string) bool {
 // Literals returns the identifier-like string literals of the tree.
 func (ix *Index) Literals() *literals.Set { return ix.lits }
 
+// Flags returns nil: option names are caught by the string-literal index.
+func (ix *Index) Flags() []string { return nil }
+
+// Envs returns nil: environment reads are caught by the string-literal index.
+func (ix *Index) Envs() []string { return nil }
+
 // Defaults returns the option and environment-variable defaults found.
 func (ix *Index) Defaults() *defaults.Set { return ix.defs }
 

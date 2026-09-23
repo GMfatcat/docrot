@@ -48,13 +48,14 @@ type Options struct {
 }
 
 type extractor struct {
-	doc     *markdown.Doc
-	hints   Hints
-	opts    Options
-	topDirs map[string]bool
-	nsCache map[model.Kind]map[string]bool
-	seen    map[string]bool
-	out     []model.Reference
+	doc      *markdown.Doc
+	hints    Hints
+	opts     Options
+	topDirs  map[string]bool
+	nsCache  map[model.Kind]map[string]bool
+	extNames map[string]bool // names the document's examples import from other crates
+	seen     map[string]bool
+	out      []model.Reference
 }
 
 // Extract returns every reference found in doc, in document order.
@@ -156,6 +157,8 @@ func (x *extractor) links() {
 		}
 		low := strings.ToLower(t)
 		switch {
+		case strings.Contains(t, "://") && !reURL.MatchString(t):
+			continue // "]https://…": a broken link, not a path claim
 		case reURL.MatchString(t):
 			x.emit(model.Reference{Kind: model.KindURL, Text: t, Norm: t, Confidence: model.Low}, l.Line, l.Col, l.Section, "")
 			continue
@@ -174,6 +177,16 @@ func (x *extractor) links() {
 		rooted := false
 		if strings.HasPrefix(file, "/") && isSourceDoc(x.doc.Path) {
 			file, rooted = strings.TrimPrefix(file, "/"), true
+		}
+		if strings.Contains(file, "::") && !strings.ContainsAny(file, "/.") {
+			// a rustdoc intra-doc link: [text](crate::extract::Path)
+			if r := x.symbolRef(file); r != nil {
+				x.emit(*r, l.Line, l.Col, l.Section, "")
+			}
+			continue
+		}
+		if file == "crate" || file == "self" || file == "super" {
+			continue
 		}
 		if file != "" {
 			dec, err := url.PathUnescape(file)

@@ -118,7 +118,7 @@ func normSeg(seg string) string {
 	switch {
 	case seg == "{$}":
 		return "{$}"
-	case seg == "*" || seg == "**" || strings.HasSuffix(seg, "...}") || strings.HasSuffix(seg, ":.*}") || strings.HasSuffix(seg, ":*}") || strings.HasPrefix(seg, "*"):
+	case seg == "*" || seg == "**" || strings.HasSuffix(seg, "...}") || strings.HasSuffix(seg, ":.*}") || strings.HasSuffix(seg, ":*}") || strings.HasPrefix(seg, "*") || strings.HasSuffix(seg, "..>"):
 		return "**"
 	case strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}"):
 		return "{}"

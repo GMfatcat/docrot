@@ -56,7 +56,7 @@ rather than ignored.
   `minConfidence` drops references below a confidence.
 - `outDir` is the directory every run rewrites; see below.
 - `maxFileMB` caps the size of any file whose *contents* docrot reads
-  (documents, Go/Odin/Python sources, JSON samples). Binaries are never
+  (documents, Go/Odin/Python/Rust sources, JSON samples). Binaries are never
   opened at all — only their names enter the path index, so a 4 GB model
   file costs one directory entry, gitignored or not. A text file above the
   cap is skipped with a warning; paths to it still resolve.

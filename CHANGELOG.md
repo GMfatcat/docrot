@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.5.0 — 2026-09-23
+
+Language plugins, and Rust as the first language added through them.
+
+- Every language except Go now goes through one interface
+  (`internal/index/lang`) and one row in `model.Langs`; the extractor's
+  naming rules, the resolver, the comment checks, the report summary and
+  `docrot index --kind <language>` range over that table. Odin and Python
+  behave exactly as before (the golden test and the self-check did not
+  move). Adding a language is one index package plus one table row.
+- Rust: `crate::module::item`, `Type::method`, `io::read_all` (any
+  `::`-boundary suffix), enum variants and `name!()` macros resolve
+  against a declaration index that follows the file tree, `impl`
+  blocks, inline modules and `pub use` re-exports — single names, nested
+  trees and `pub use other::*` globs, so `clap::Command` finds
+  `clap_builder::Command`. rustdoc intra-doc links are symbol claims.
+  Skipped: `std::`/`core::`/`alloc::`, paths into other crates
+  (`hyper::Body`), types the document's own examples import from another
+  crate (`ServiceBuilder::layer` after `use tower::ServiceBuilder;`) and
+  generic parameters (`S::Error`).
+- Rust claims beyond symbols: clap flags (`#[arg(long)]`, `.long("x")`),
+  clap and `env::var` environment reads, `default_value`/`unwrap_or`
+  defaults, axum/actix-web/rocket/tide routes, `cargo add`/`cargo install`
+  against `Cargo.toml`'s package name, "requires Rust 1.70" against
+  `rust-version`, `///` comments in `docrot comments`.
+- Makefile pattern rules (`test-%`) satisfy `make test-full`; a link whose
+  target is a broken URL (`]https://…`) is no longer a path claim.
+- Field report on ripgrep (clean), axum and clap (every error and nearly
+  every warning names an API their changelogs say was removed):
+  `docs/field-report-rust.md`.
+
 ## 0.4.0 — 2026-09-23
 
 The rest of `docs/roadmap.md`'s tier 2 that was worth doing.

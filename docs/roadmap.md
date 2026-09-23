@@ -9,6 +9,16 @@ takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
 started; each item names the stage it would live in.
 
+## Done in 0.5.0: language plugins and Rust
+
+Every non-Go language is now one index package behind `internal/index/lang`
+plus a row in `model.Langs`; Rust shipped through it. JavaScript/TypeScript,
+C# and C/C++ follow the same path, in that order; the design is
+`docs/superpowers/specs/2026-09-23-docrot-languages-design.md`. Lessons
+from Rust: re-exports are the API (a facade crate's `pub use other::*`
+must be followed), a document's own `use` lines say which names belong to
+other crates, and changelogs are where removed APIs live.
+
 ## Done in 0.4.0 (from tier 2)
 
 reStructuredText and AsciiDoc input, the persistent git cache,

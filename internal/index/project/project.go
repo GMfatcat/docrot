@@ -1,5 +1,5 @@
 // Package project reads a repository's identity files — go.mod,
-// pyproject.toml, setup.cfg, package.json — and its task runners'
+// pyproject.toml, setup.cfg, package.json, Cargo.toml — and its task runners'
 // definitions (Makefile, justfile, Taskfile.yml, package.json scripts), so
 // that a document's install line, toolchain requirement and `make target`
 // can be checked against what the repository actually declares.
@@ -53,6 +53,9 @@ func Build(root string) model.Project {
 		if lines, ok := read(root, "setup.cfg"); ok {
 			p.PyName = setupCfgName(lines)
 		}
+	}
+	if lines, ok := read(root, "Cargo.toml"); ok {
+		p.CargoName, p.RustVersion = cargo(lines)
 	}
 	if b, err := os.ReadFile(filepath.Join(root, "package.json")); err == nil {
 		var pkg struct {
@@ -139,9 +142,10 @@ func makeTargets(lines []string) []string {
 			continue
 		}
 		for _, t := range strings.Fields(m[1]) {
-			if strings.ContainsAny(t, "%$(") || strings.HasPrefix(t, ".") && strings.ToUpper(t) == t {
-				continue // pattern rule, variable, .SUFFIXES-style special target
+			if strings.ContainsAny(t, "$(") || strings.HasPrefix(t, ".") && strings.ToUpper(t) == t || strings.HasPrefix(t, "%") {
+				continue // variable, .SUFFIXES-style special target, "%.o" compile rule
 			}
+			// a named pattern rule ("test-%") stays: HasTarget matches names against it
 			set[t] = true
 		}
 	}
@@ -210,6 +214,27 @@ func pyproject(lines []string) (name, requires string) {
 		}
 	}
 	return name, requires
+}
+
+// cargo returns [package] name and rust-version from Cargo.toml; a
+// workspace root without a [package] table yields nothing.
+func cargo(lines []string) (name, version string) {
+	sect := ""
+	for _, raw := range lines {
+		l := strings.TrimSpace(raw)
+		if m := reTOMLSect.FindStringSubmatch(l); m != nil {
+			sect = strings.TrimSpace(m[1])
+			continue
+		}
+		k, v := tomlKV(l)
+		switch {
+		case sect == "package" && k == "name" && name == "":
+			name = v
+		case sect == "package" && k == "rust-version" && version == "":
+			version = v
+		}
+	}
+	return name, version
 }
 
 func tomlKV(l string) (string, string) {

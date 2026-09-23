@@ -57,6 +57,12 @@ type Index interface {
 	Routes() []routes.Route
 	// Defaults returns the flag, key and environment defaults found.
 	Defaults() *defaults.Set
+	// Flags returns the long option names the code declares through a CLI
+	// library the index understands; nil when it understands none.
+	Flags() []string
+	// Envs returns the environment variables the code reads; nil when the
+	// index does not look for them (string literals still catch them).
+	Envs() []string
 	// Counts returns the index-wide counters.
 	Counts() Stats
 }

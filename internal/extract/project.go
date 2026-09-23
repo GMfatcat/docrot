@@ -12,7 +12,7 @@ import (
 
 var (
 	// "requires Go 1.21+", "Go 1.22 or later", "Python >= 3.9", "需要 Go 1.21 以上"
-	reToolchain = regexp.MustCompile(`(?i)\b(go|golang|python)\s*(?:>=|≥|version\s+)?\s*v?(\d+\.\d+)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
+	reToolchain = regexp.MustCompile(`(?i)\b(go|golang|python|rust|rustc)\s*(?:>=|≥|version\s+)?\s*v?(\d+\.\d+)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
 	// a negated sentence ("not supported on Python 3.14", "dropped Python 3.8")
 	// is not a requirement of this project
 	reNegated = regexp.MustCompile(`(?i)\b(not|no longer|n't|dropp?e?d?|removed?|unsupported|without|deprecated)\b|不支援|不再|移除|已停止`)
@@ -33,6 +33,7 @@ var installers = map[string]installer{
 	"pip": {"pip", "install"}, "pip3": {"pip", "install"}, "pipx": {"pip", "install"},
 	"uv": {"pip", ""}, "poetry": {"pip", "add"}, "conda": {"pip", "install"},
 	"npm": {"npm", "install"}, "yarn": {"npm", "add"}, "pnpm": {"npm", "add"},
+	"cargo": {"cargo", ""},
 }
 
 // runners maps a task runner to the sub-command that precedes the target.
@@ -110,6 +111,12 @@ func projectRefs(toks []string, conf model.Confidence) []model.Reference {
 		}
 	} else if cmd == "npm" && len(args) >= 2 && (args[0] == "i" || args[0] == "install" || args[0] == "add") {
 		args = args[1:]
+	} else if cmd == "cargo" {
+		// cargo add X / cargo install X; "cargo build" and friends are not installs
+		if len(args) < 2 || args[0] != "add" && args[0] != "install" {
+			return out
+		}
+		args = args[1:]
 	} else if ins.sub != "" {
 		if len(args) < 2 || args[0] != ins.sub {
 			return out
@@ -131,6 +138,16 @@ func projectRefs(toks []string, conf model.Confidence) []model.Reference {
 			continue
 		}
 		name := strings.Trim(t, `"'`)
+		if ins.kind == "cargo" {
+			// cargo add serde@1: the name is the first token; the rest are dependencies
+			if i := strings.IndexAny(name, "@="); i > 0 {
+				name = name[:i]
+			}
+			if m := rePipName.FindStringSubmatch(name); m != nil {
+				add(model.KindInstall, t, "cargo:"+m[1])
+			}
+			break
+		}
 		if ins.kind == "npm" {
 			if i := strings.LastIndex(name, "@"); i > 0 {
 				name = name[:i] // version suffix, keeps @scope/
@@ -168,8 +185,11 @@ func (x *extractor) toolchainRefs() {
 			}
 			for _, m := range reToolchain.FindAllStringSubmatch(sentence, -1) {
 				tool := strings.ToLower(m[1])
-				if tool == "golang" {
+				switch tool {
+				case "golang":
 					tool = "go"
+				case "rustc":
+					tool = "rust"
 				}
 				r := model.Reference{Kind: model.KindToolchain, Text: strings.TrimSpace(m[0]), Norm: tool + ":" + m[2], Confidence: model.Medium}
 				x.emit(r, ln, 0, x.doc.SectionAt(ln), "")

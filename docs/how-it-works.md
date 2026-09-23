@@ -14,10 +14,13 @@
    dotted name whose first part is an unknown lower-case word (`app.Run`) is
    low and never reported.
 3. **Index** the repository once: file tree, Go packages/symbols/flags/env/
-   tags (`go/parser`), Odin and Python declarations (regex), HTTP route
-   registrations, Markdown anchors, JSON sample keys, every identifier-like
-   string literal, and the manifests (`go.mod`, `pyproject.toml`,
-   `package.json`, Makefile, justfile, Taskfile).
+   tags (`go/parser`), Odin, Python and Rust declarations (line-level
+   patterns), HTTP route registrations, Markdown anchors, JSON sample keys,
+   every identifier-like string literal, and the manifests (`go.mod`,
+   `pyproject.toml`, `package.json`, `Cargo.toml`, Makefile, justfile,
+   Taskfile). Every language except Go goes through one interface
+   (`internal/index/lang`) and one row in `model.Langs`: the extractor's
+   naming rules, the resolver and the CLI range over that table.
 4. **Resolve** each reference and produce a finding with a *did-you-mean*
    suggestion (Damerau-Levenshtein over the right candidate set, plus git
    rename history for paths).
@@ -70,9 +73,10 @@ scanned.
 
 ## Where the heuristics came from
 
-The two field reports record every round of tuning: what the first run
-reported on eight Go and Odin repositories and on seven Python projects,
-which findings were real, which were noise, and the rule that removed each
-class of noise. See [field-report.md](field-report.md) and
-[field-report-python.md](field-report-python.md); every rule's exact
+The three field reports record every round of tuning: what the first run
+reported on eight Go and Odin repositories, seven Python projects and
+three Rust crates, which findings were real, which were noise, and the
+rule that removed each class of noise. See [field-report.md](field-report.md),
+[field-report-python.md](field-report-python.md) and
+[field-report-rust.md](field-report-rust.md); every rule's exact
 behaviour is in [rules.md](rules.md).

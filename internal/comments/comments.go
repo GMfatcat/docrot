@@ -37,9 +37,11 @@ type Lookup interface {
 	IsGoPackage(name string) bool
 	SimilarPaths(rel string, n int) []string
 	HasGoSymbol(qualified string) bool
-	// Languages and HasSymbol cover every other language (model.Langs).
+	// Languages, HasSymbol and IsNamespace cover every other language
+	// (model.Langs).
 	Languages() []model.Kind
 	HasSymbol(kind model.Kind, qualified string) bool
+	IsNamespace(kind model.Kind, qualified string) bool
 	HasFlag(name string) bool
 	HasEnv(name string) bool
 	HasJSONKey(dotted string) bool
@@ -534,6 +536,15 @@ func dirOf(rel string) string {
 }
 
 func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Kind, dir string) bool {
+	if i := strings.Index(tok, "::"); i > 0 && ix != nil {
+		if lg, ok := model.LangOf(kind); ok && lg.Sep == "::" {
+			first := tok[:i]
+			if first[0] >= 'a' && first[0] <= 'z' && first != "crate" && first != "self" && first != "super" && !ix.IsNamespace(kind, first) {
+				return true // tower::ServiceExt: another crate's item
+			}
+			return ix.HasSymbol(kind, tok)
+		}
+	}
 	// every identifier component must be present somewhere for a compound
 	parts := reWord.FindAllString(tok, -1)
 	if len(parts) == 0 {

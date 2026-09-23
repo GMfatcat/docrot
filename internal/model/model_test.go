@@ -101,9 +101,13 @@ func TestRuleTablesAgree(t *testing.T) {
 }
 
 func TestProjectHasTarget(t *testing.T) {
-	p := Project{Targets: map[string][]string{"make": {"build", "test"}}}
+	p := Project{Targets: map[string][]string{"make": {"build", "test", "test-%", "check-%-all"}, "just": {"run-%"}}}
 	if !p.HasTarget("make", "build") || p.HasTarget("make", "lint") || p.HasTarget("npm", "build") {
 		t.Error("HasTarget")
+	}
+	// a make pattern rule matches every name with something in place of %
+	if !p.HasTarget("make", "test-full") || !p.HasTarget("make", "check-wasm-all") || p.HasTarget("make", "test-") || p.HasTarget("make", "check--all") || p.HasTarget("just", "run-x") {
+		t.Error("HasTarget with a pattern rule")
 	}
 	if (Project{}).HasTarget("make", "build") {
 		t.Error("zero Project has targets")

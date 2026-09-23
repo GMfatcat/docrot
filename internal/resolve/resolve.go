@@ -449,6 +449,14 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 		}
 		return false
 	}
+	anyNamespace := func(q string) bool {
+		for _, k := range r.ix.Languages() {
+			if r.ix.IsNamespace(k, q) {
+				return true
+			}
+		}
+		return false
+	}
 	if anyHas(ref.Norm) {
 		return Result{OK: true}
 	}
@@ -457,15 +465,21 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 	if dotted && isCapitalized(first) && anyHas(first) {
 		return Result{OK: true}
 	}
+	if lg.Sep == "::" && dotted && !isCapitalized(first) && !r.ix.IsNamespace(ref.Kind, first) {
+		return Result{Skipped: true} // hyper::Body, tower::ServiceExt: a path into another crate
+	}
 	// owner.attr where the owner is a known class, function or module-level
 	// object (not a namespace): an attribute the declaration index cannot
 	// see (set in __init__, a proxy, a descriptor). A missing name *in a
 	// namespace* stays a finding.
 	if i := strings.LastIndex(ref.Norm, lg.Sep); i > 0 {
 		owner := strings.TrimSuffix(ref.Norm[:i], "()")
-		if anyHas(owner) && !r.ix.IsNamespace(ref.Kind, owner) {
+		if anyHas(owner) && !anyNamespace(owner) {
 			return Result{OK: true}
 		}
+	}
+	if lg.Sep == "::" && dotted && len(first) == 1 && isCapitalized(first) {
+		return Result{Skipped: true} // S::Error, T::Item: a generic parameter
 	}
 	if r.ix.HasLiteral(strings.TrimSuffix(ref.Norm, "()")) {
 		return Result{OK: true} // a name the code spells as a string (an event, a command, a key)

@@ -86,6 +86,20 @@ func (r *Resolver) resolveInstall(ref model.Reference) Result {
 		}
 		msg := "`" + ref.Text + "` installs `" + name + "` but pyproject.toml names the package `" + want + "`"
 		return Result{Finding: r.finding(model.RuleInstallMismatch, sev, ref, msg, []string{want})}
+	case "cargo":
+		want := proj.CargoName
+		if want == "" {
+			return Result{Skipped: true}
+		}
+		got, wantID := strings.ReplaceAll(name, "-", "_"), strings.ReplaceAll(want, "-", "_")
+		if got == wantID {
+			return Result{OK: true}
+		}
+		if len(got) < 4 || fuzzy.Distance(got, wantID) > 2 {
+			return Result{Skipped: true} // a dependency
+		}
+		msg := "`" + ref.Text + "` installs `" + name + "` but Cargo.toml names the package `" + want + "`"
+		return Result{Finding: r.finding(model.RuleInstallMismatch, sev, ref, msg, []string{want})}
 	case "npm":
 		want := proj.NPMName
 		if want == "" {
@@ -145,6 +159,8 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 		declared, source = proj.GoVersion, "go.mod"
 	case "python":
 		declared, source = proj.PyRequires, "pyproject.toml"
+	case "rust":
+		declared, source = proj.RustVersion, "Cargo.toml"
 	}
 	if declared == "" {
 		return Result{Skipped: true}
@@ -157,7 +173,7 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 	if dMaj == cMaj && dMin == cMin {
 		return Result{OK: true} // go.mod churns with every dependency bump; not a staleness signal
 	}
-	label := map[string]string{"go": "Go", "python": "Python"}[tool]
+	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust"}[tool]
 	need := strconv.Itoa(dMaj) + "." + strconv.Itoa(dMin)
 	var msg string
 	sev := model.SevWarning

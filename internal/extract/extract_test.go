@@ -337,3 +337,47 @@ func TestContextTruncationKeepsValidUTF8(t *testing.T) {
 		}
 	}
 }
+
+func TestRustSymbols(t *testing.T) {
+	h := fakeHints{noModule: true, langs: []model.Kind{model.KindRustSym}, ns: map[model.Kind][]string{model.KindRustSym: {"mycrate", "mycrate::io"}}}
+	src := strings.Join([]string{
+		"`mycrate::io::read_all` `crate::Config::new()` `Config::new()` `std::env::var` `ServiceBuilder::layer` `Poll::Ready` `shout_it!()`",
+		"",
+		"```rust",
+		"use tower::{ServiceBuilder, Layer};",
+		"use std::task::Poll;",
+		"use crate::Config;",
+		"```",
+		"",
+		"[the extractors](crate::extract) and [`Path`](crate::extract::Path) and [x](Router::fallback)",
+		"",
+	}, "\n")
+	refs := run(t, h, src)
+	if r := find(refs, model.KindRustSym, "mycrate::io::read_all"); r == nil || r.Confidence != model.High {
+		t.Errorf("crate path: %+v", r)
+	}
+	if r := find(refs, model.KindRustSym, "crate::Config::new"); r == nil || r.Confidence != model.High {
+		t.Errorf("crate:: path is High: %+v", r)
+	}
+	if r := find(refs, model.KindRustSym, "Config::new"); r == nil || r.Confidence != model.Medium {
+		t.Errorf("Type::method is Medium: %+v", r)
+	}
+	for _, norm := range []string{"std::env::var", "ServiceBuilder::layer", "Poll::Ready"} {
+		if r := find(refs, model.KindRustSym, norm); r != nil {
+			t.Errorf("%s should be skipped (std or imported from another crate): %+v", norm, r)
+		}
+	}
+	if r := find(refs, model.KindRustSym, "shout_it"); r == nil || r.Confidence != model.Medium {
+		t.Errorf("macro call: %+v", refs)
+	}
+	for _, norm := range []string{"crate::extract", "crate::extract::Path", "Router::fallback"} {
+		if r := find(refs, model.KindRustSym, norm); r == nil {
+			t.Errorf("intra-doc link %s should be a Rust symbol: %+v", norm, refs)
+		}
+	}
+	for _, r := range refs {
+		if r.Kind == model.KindPath && strings.Contains(r.Norm, "::") {
+			t.Errorf("a :: link target must not be a path claim: %+v", r)
+		}
+	}
+}

@@ -17,14 +17,14 @@ docrot does:
 - 📌 pulls every claim a document makes about the repository (paths, symbols, flags, environment variables, config keys, routes, defaults, install lines) and checks it against the real code
 - ⏳ uses git history to find the sections the code has moved on from
 - 🌏 keeps bilingual document pairs honest
-- 📦 reads Markdown, reStructuredText and AsciiDoc; one static Go binary, **standard library only**; an HTML report that opens offline
+- 📦 reads Markdown, reStructuredText and AsciiDoc about Go, Python, Odin and Rust code; one static Go binary, **standard library only**; an HTML report that opens offline
 
 ![docrot check on the fixture repository](docs/assets/terminal.svg)
 
 Both pictures come from the seeded test repository under `testdata/fixture`.
 For real runs — eight Go and Odin repositories, seven Python projects,
-FastAPI's 1,692 documents and Django's 686 Sphinx pages among them — see the
-[field reports](docs/field-report.md).
+three Rust crates, FastAPI's 1,692 documents and Django's 686 Sphinx pages
+among them — see the [field reports](docs/field-report.md).
 
 ## 🚀 Install
 
@@ -51,19 +51,20 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 
 - 📁 **Paths, symbols, imports** — `` `internal/gitx/gitx.go` ``,
   `` `report.WriteSARIF` ``, `` `render_frame()` `` and
-  `import "docrot/internal/model"` exist (Go through `go/parser`, Odin and
-  Python through a declaration index), with did-you-mean suggestions and
-  git rename history.
+  `import "docrot/internal/model"` exist (Go through `go/parser`; Odin,
+  Python and Rust through a declaration index that follows `pub use`
+  re-exports), with did-you-mean suggestions and git rename history.
 - 🎛️ **Flags, environment variables, config keys, defaults** — `--format`
   is defined, `DOCROT_DEBUG` is read, `stale.minChurn` is a struct tag or a
   sample key, a ```` ```json ```` config example has no dropped key, and
   "`--port` defaults to `8080`" says what the code says.
 - 🌐 **HTTP routes** — `GET /v1/items` is registered by a handler
-  (net/http, chi, gin, echo, FastAPI, Flask, Starlette, Django).
+  (net/http, chi, gin, echo, FastAPI, Flask, Starlette, Django, axum,
+  actix-web, rocket).
 - 🔗 **Anchors, commands, install lines, toolchain, targets** —
   `[x](docs/rules.md#exit-codes)` resolves, `python scripts/verify.py`
-  exists, `go get` / `pip install` name this project correctly, "requires
-  Go 1.21" agrees with `go.mod`, `make lint` is a target. <!-- docrot:ignore toolchain-mismatch -->
+  exists, `go get` / `pip install` / `cargo add` name this project correctly,
+  "requires Go 1.21" agrees with `go.mod`, `make lint` is a target. <!-- docrot:ignore toolchain-mismatch -->
 - ⏳ **Staleness (git)** — a section whose referenced files or declarations
   kept changing after the section was last edited.
 - 🌏 **Bilingual pairs** — `README.md` ↔ `README-zh.md` keep the same
@@ -80,7 +81,7 @@ Every rule, how it decides and how to silence it: [docs/rules.md](docs/rules.md)
 ## 🧠 How it decides
 
 Tokenize each document, extract references with a *kind* and a
-*confidence*, index the repository once (files, Go/Odin/Python
+*confidence*, index the repository once (files, Go/Odin/Python/Rust
 declarations, routes, string literals, manifests, anchors), resolve each
 reference, blame and log for staleness, diff pair fingerprints, check
 comments, apply the baseline. Severity follows confidence: high → error,
@@ -150,7 +151,7 @@ they are full of illustrative paths by design.
 - [How it works](docs/how-it-works.md) — the pipeline, confidence and severity, what is deliberately ignored
 - [Configuration](docs/configuration.md) — `.docrot.json`, the output directory, the git cache
 - [Commands](docs/commands.md) — flags, exit codes, CI
-- [Field report](docs/field-report.md) (Go and Odin) and [Python field report](docs/field-report-python.md) — what it found on real repositories, and what was noise
+- [Field report](docs/field-report.md) (Go and Odin), [Python field report](docs/field-report-python.md) and [Rust field report](docs/field-report-rust.md) — what it found on real repositories, and what was noise
 - [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md) · [Plan](docs/superpowers/plans/2026-09-23-docrot-plan.md) · [llms.txt](llms.txt) for agents
 
 ## 🚫 Non-goals

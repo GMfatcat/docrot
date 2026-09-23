@@ -21,6 +21,7 @@ import (
 	"docrot/internal/index/project"
 	"docrot/internal/index/py"
 	"docrot/internal/index/routes"
+	"docrot/internal/index/rust"
 	"docrot/internal/markdown"
 	"docrot/internal/model"
 )
@@ -72,8 +73,13 @@ type Index struct {
 	rts     *routes.Set
 	proj    model.Project
 	flagSet map[string]bool
+	envSet  map[string]bool // env vars of the other languages
 	pkgSet  map[string]bool
-	stats   Stats
+	// langFlags and langEnvs are the flags and env vars the other
+	// languages' indexes declare, in Languages() order.
+	langFlags []string
+	langEnvs  []string
+	stats     Stats
 }
 
 var _ model.Index = (*Index)(nil)
@@ -94,6 +100,13 @@ var builders = map[model.Kind]builder{
 	},
 	model.KindPySym: func(root string, ex []string) (lang.Index, error) {
 		ix, err := py.Build(root, ex)
+		if ix == nil {
+			return nil, err
+		}
+		return ix, err
+	},
+	model.KindRustSym: func(root string, ex []string) (lang.Index, error) {
+		ix, err := rust.Build(root, ex)
 		if ix == nil {
 			return nil, err
 		}
@@ -176,6 +189,7 @@ func Build(root string, opts Options) (*Index, []error, error) {
 	}
 
 	ix.flagSet = map[string]bool{}
+	ix.envSet = map[string]bool{}
 	ix.pkgSet = map[string]bool{}
 	if ix.gos != nil {
 		for _, r := range ix.gos.Routes() {
@@ -205,6 +219,22 @@ func Build(root string, opts Options) (*Index, []error, error) {
 	for kind, li := range ix.langs {
 		ix.stats.Langs[kind] = li.Counts()
 	}
+	for _, kind := range ix.Languages() {
+		for _, fl := range ix.langs[kind].Flags() {
+			if !ix.flagSet[normFlag(fl)] {
+				ix.flagSet[normFlag(fl)] = true
+				ix.langFlags = append(ix.langFlags, fl)
+			}
+		}
+		for _, e := range ix.langs[kind].Envs() {
+			if !ix.envSet[e] {
+				ix.envSet[e] = true
+				ix.langEnvs = append(ix.langEnvs, e)
+			}
+		}
+	}
+	ix.stats.Flags += len(ix.langFlags)
+	ix.stats.Envs += len(ix.langEnvs)
 	if ix.cfg != nil {
 		s := ix.cfg.Stats()
 		ix.stats.ConfigFiles, ix.stats.ConfigKeys = s.Files, s.Keys
@@ -346,24 +376,26 @@ func (ix *Index) HasGoMember(name string) bool {
 func (ix *Index) HasFlag(name string) bool { return ix.flagSet[normFlag(name)] }
 
 func (ix *Index) Flags() []string {
-	if ix.gos == nil {
-		return nil
+	var out []string
+	if ix.gos != nil {
+		out = ix.gos.Flags()
 	}
-	return ix.gos.Flags()
+	return append(out, ix.langFlags...)
 }
 
 func (ix *Index) HasEnv(name string) bool {
-	if ix.gos == nil {
-		return false
+	if ix.envSet[name] {
+		return true
 	}
-	return ix.gos.HasEnv(name)
+	return ix.gos != nil && ix.gos.HasEnv(name)
 }
 
 func (ix *Index) Envs() []string {
-	if ix.gos == nil {
-		return nil
+	var out []string
+	if ix.gos != nil {
+		out = ix.gos.Envs()
 	}
-	return ix.gos.Envs()
+	return append(out, ix.langEnvs...)
 }
 
 func (ix *Index) HasJSONKey(d string) bool {

@@ -8,32 +8,32 @@
 原則同主計畫：只用標準庫；每個套件獨立可測；每個波次各自 commit；
 `python scripts/verify.py` 綠、自檢 0 error 0 warning 才算完成。
 
-## Wave 0 — 語言外掛重構（0.5.0 前半，行為不變）
+## Wave 0 — 語言外掛重構（0.5.0 前半，行為不變）— 已完成
 
-- [ ] 0A `internal/index/lang`：`Index` 介面、`Stats`。
-- [ ] 0B `internal/model`：`Lang`、`Langs`、`LangOf`、`Kind.IsSymbol`、新 Kind 常數；
+- [x] 0A `internal/index/lang`：`Index` 介面、`Stats`。
+- [x] 0B `internal/model`：`Lang`、`Langs`、`LangOf`、`Kind.IsSymbol`、新 Kind 常數；
       `Index` 介面換成 `Languages`／`HasLang`／`Namespaces`／`IsNamespace`／`IsExample`／
       `HasSymbol`／`SimilarSymbols`。
-- [ ] 0C `internal/index/odin`、`internal/index/py` 滿足 `lang.Index`（`IsNamespace`、
+- [x] 0C `internal/index/odin`、`internal/index/py` 滿足 `lang.Index`（`IsNamespace`、
       `IsExample`、`Symbols`、`Defaults`／`Routes` 的空實作）。
-- [ ] 0D `internal/index`：`langs` 表、`Build` 迴圈、`Stats.Langs`、`SymbolSpan`／
+- [x] 0D `internal/index`：`langs` 表、`Build` 迴圈、`Stats.Langs`、`SymbolSpan`／
       `AllSpans`／`Symbols(kind)` 迴圈、`parsedExt` 由語言表組成。
-- [ ] 0E `internal/extract`：`Hints` 換介面；`symbolRef` 改用命名規則表；`reColons`。
-- [ ] 0F `internal/resolve`：`resolveLangSymbol`；`comments.Lookup`；`engine` 統計；
+- [x] 0E `internal/extract`：`Hints` 換介面；`symbolRef` 改用命名規則表；`reColons`。
+- [x] 0F `internal/resolve`：`resolveLangSymbol`；`comments.Lookup`；`engine` 統計；
       `cmd` 的 `--kind`。
-- [ ] 0G 全部測試改用新 API；golden test 不變；verify 綠。commit。
+- [x] 0G 全部測試改用新 API；golden test 不變；verify 綠。commit。
 
-## Wave 1 — Rust（0.5.0 後半）
+## Wave 1 — Rust（0.5.0 後半）— 已完成
 
-- [ ] 1A `internal/index/rust`：宣告、模組樹、`impl` 方法、span（`///`、`#[…]`）、
+- [x] 1A `internal/index/rust`：宣告、模組樹、`impl` 方法、span（`///`、`#[…]`）、
       字串常值、clap 屬性 → flag／env／default、`std::env::var`、axum／actix／rocket 路由。
-- [ ] 1B `internal/index/project`：`Cargo.toml` 的 `[package] name`、`rust-version`；
+- [x] 1B `internal/index/project`：`Cargo.toml` 的 `[package] name`、`rust-version`；
       `resolveInstall` 的 `cargo add`／`cargo install`；`toolchainRefs` 認得 "Rust 1.70"。
-- [ ] 1C fixture：`testdata/fixture/rs/`（lib.rs、一個模組、一個 impl、clap 選項、
-      一條 axum 路由）與 README 裡種的錯誤行；golden test 更新。
-- [ ] 1D 實地：shallow clone 兩個 Rust repo 到 `surprise-pytest` 旁（ripgrep、
-      一個 axum 專案），`docrot explain` 看噪音，調整；寫 `docs/field-report-rust.md`。
-- [ ] 1E 文件：rules.md、how-it-works、llms.txt、README 兩語、CHANGELOG 0.5.0；
+- [x] 1C fixture：`testdata/fixture/` 根目錄的 `Cargo.toml` 與 `src/`（lib.rs、一個模組、一個 impl、
+      clap 選項、兩條 axum 路由）與 README 裡種的錯誤行；golden test 更新。
+- [x] 1D 實地：shallow clone 三個 Rust repo 到 `../surprise-rust/`（ripgrep、axum、clap），
+      `docrot explain` 看噪音，調整；寫 `docs/field-report-rust.md`。
+- [x] 1E 文件：rules.md、how-it-works、llms.txt、README 兩語、CHANGELOG 0.5.0；
       `release = "0.5.0"`；tag。
 
 ## Wave 2 — JavaScript／TypeScript（0.6.0）

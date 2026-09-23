@@ -500,6 +500,8 @@ type Project struct {
 	PyName      string              `json:"pyName,omitempty"`     // [project] name
 	PyRequires  string              `json:"pyRequires,omitempty"` // ">=3.10", "^3.9"
 	NPMName     string              `json:"npmName,omitempty"`
+	CargoName   string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
+	RustVersion string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
 	Targets     map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
 	TargetFiles map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
 	// Intersphinx is set when a Sphinx conf.py maps other projects'
@@ -508,11 +510,18 @@ type Project struct {
 	Intersphinx bool `json:"intersphinx,omitempty"`
 }
 
-// HasTarget reports whether tool defines name.
+// HasTarget reports whether tool defines name. A make pattern rule
+// ("test-%") defines every name it matches.
 func (p Project) HasTarget(tool, name string) bool {
 	for _, t := range p.Targets[tool] {
 		if t == name {
 			return true
+		}
+		if i := strings.Index(t, "%"); i >= 0 && tool == "make" {
+			pre, suf := t[:i], t[i+1:]
+			if len(name) > len(pre)+len(suf) && strings.HasPrefix(name, pre) && strings.HasSuffix(name, suf) {
+				return true
+			}
 		}
 	}
 	return false

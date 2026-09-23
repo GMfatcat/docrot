@@ -393,6 +393,12 @@ func (ix *Index) Defaults() *defaults.Set { return defaults.New() }
 // Literals returns the identifier-like string literals of the tree.
 func (ix *Index) Literals() *literals.Set { return ix.lits }
 
+// Flags returns nil: option names are caught by the string-literal index.
+func (ix *Index) Flags() []string { return nil }
+
+// Envs returns nil: environment reads are caught by the string-literal index.
+func (ix *Index) Envs() []string { return nil }
+
 // Similar returns up to n existing "pkg.name" candidates whose bare name is
 // close (Damerau-Levenshtein distance <= max(2, len/4), case-insensitive)
 // to the last dot-separated part of qualified. Best (smallest distance)

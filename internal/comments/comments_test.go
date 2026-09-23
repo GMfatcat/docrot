@@ -24,15 +24,16 @@ func (f fakeLookup) SimilarPaths(rel string, n int) []string {
 	}
 	return out
 }
-func (f fakeLookup) DirExists(r string) bool               { return false }
-func (f fakeLookup) HasGoSymbol(q string) bool             { return f.syms[q] }
-func (f fakeLookup) Languages() []model.Kind               { return []model.Kind{model.KindPySym, model.KindOdinSym} }
-func (f fakeLookup) HasSymbol(_ model.Kind, q string) bool { return f.syms[q] }
-func (f fakeLookup) HasFlag(n string) bool                 { return f.flags[n] }
-func (f fakeLookup) HasEnv(n string) bool                  { return false }
-func (f fakeLookup) HasJSONKey(d string) bool              { return false }
-func (f fakeLookup) HasConfigKey(d string) bool            { return false }
-func (f fakeLookup) HasLiteral(s string) bool              { return f.syms["lit:"+s] }
+func (f fakeLookup) DirExists(r string) bool                 { return false }
+func (f fakeLookup) HasGoSymbol(q string) bool               { return f.syms[q] }
+func (f fakeLookup) Languages() []model.Kind                 { return []model.Kind{model.KindPySym, model.KindOdinSym} }
+func (f fakeLookup) HasSymbol(_ model.Kind, q string) bool   { return f.syms[q] }
+func (f fakeLookup) IsNamespace(_ model.Kind, q string) bool { return f.syms["ns:"+q] }
+func (f fakeLookup) HasFlag(n string) bool                   { return f.flags[n] }
+func (f fakeLookup) HasEnv(n string) bool                    { return false }
+func (f fakeLookup) HasJSONKey(d string) bool                { return false }
+func (f fakeLookup) HasConfigKey(d string) bool              { return false }
+func (f fakeLookup) HasLiteral(s string) bool                { return f.syms["lit:"+s] }
 
 func linesOf(s string) []string { return strings.Split(s, "\n") }
 

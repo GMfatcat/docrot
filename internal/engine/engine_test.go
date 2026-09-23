@@ -91,6 +91,12 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleUnknownConfigKey, "README-zh.md", "server.timeout", model.SevWarning, "server.timeout_ms"},
 		{model.RuleUnknownConfigKey, "README-zh.md", "log.fmt", model.SevWarning, "log.format"},
 		{model.RuleCommentMentions, "tools/helper.py", "count_items", model.SevWarning, ""},
+		{model.RuleMissingSymbol, "README.md", "fixture_rs::io::write_al", model.SevError, "fixture_rs::io::write_all"},
+		{model.RuleUnknownFlag, "README.md", "--worker", model.SevWarning, "--workers"},
+		{model.RuleDefaultMismatch, "README.md", "level default debug", model.SevWarning, "info"},
+		{model.RuleMissingRoute, "README.md", "DELETE /rs/items/{id}", model.SevError, ""},
+		{model.RuleToolchain, "README.md", "Rust 1.70+", model.SevWarning, "1.75"},
+		{model.RuleInstallMismatch, "README.md", "fixture-rss", model.SevError, "fixture-rs"},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))

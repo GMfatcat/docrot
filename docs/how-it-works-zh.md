@@ -11,8 +11,10 @@
    有目錄有副檔名的路徑是 high；只有檔名是 medium；第一段是不認識的小寫字的點號名稱
    （`app.Run`）是 low，永遠不會被報出來。
 3. **建索引**，整個 repo 只做一次：檔案樹、Go 套件／符號／flag／環境變數／tag（`go/parser`）、
-   Odin 與 Python 宣告（regex）、HTTP 路由註冊、Markdown 錨點、JSON 樣本鍵、每一個像識別字的
-   字串常值，以及各種 manifest（`go.mod`、`pyproject.toml`、`package.json`、Makefile、justfile、Taskfile）。
+   Odin、Python 與 Rust 宣告（逐行樣式）、HTTP 路由註冊、Markdown 錨點、JSON 樣本鍵、每一個像識別字的
+   字串常值，以及各種 manifest（`go.mod`、`pyproject.toml`、`package.json`、`Cargo.toml`、Makefile、justfile、Taskfile）。
+   Go 以外的每個語言都走同一個介面（`internal/index/lang`）加 `model.Langs` 表裡的一列：
+   抽取器的命名規則、解析器與 CLI 都是對這張表迴圈。
 4. **解析**每個引用，產生附「你是不是想找」建議的 finding（在正確的候選集合上做
    Damerau-Levenshtein，路徑另外參考 git 改名歷史）。
 5. **過期判定**：`git blame` 給每個章節一個編輯時間；`git log` 數出那之後每個被引用檔案的 commit 數，
@@ -49,6 +51,4 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 
 ## 啟發式規則從哪裡來
 
-兩份實地報告記錄了每一輪調校：第一次在八個 Go／Odin repo 與七個 Python 專案上跑出什麼、
-哪些是真的、哪些是噪音、以及消除每一類噪音的規則。見 [field-report.md](field-report.md) 與
-[field-report-python.md](field-report-python.md)；每條規則的精確行為在 [rules.md](rules.md)。
+三份實地報告記錄了每一輪調校：第一次跑在八個 Go／Odin repo、七個 Python 專案與三個 Rust crate 上報了什麼，哪些是真的、哪些是噪音、又是哪條規則消掉了哪一類噪音。見 [field-report.md](field-report.md)、[field-report-python.md](field-report-python.md) 與 [field-report-rust.md](field-report-rust.md)；每條規則的確切行為在 [rules.md](rules.md)。

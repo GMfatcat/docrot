@@ -45,10 +45,12 @@ var (
 	reFlag   = regexp.MustCompile(`^(--?)([A-Za-z][A-Za-z0-9_.-]*)(=.*)?$`)
 	reEnv    = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 	reDotted = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_]*)+)(\[[^\]]*\])?(\(.*\))?$`)
-	reCall   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\((.*)\)$`)
+	reCall   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)!?(\[[^\]]*\])?\((.*)\)$`)
 	// reColons matches a Rust or C++ path: crate::module::item, Type::new(),
 	// ns::func, a macro call name!().
-	reColons   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+)!?(\(.*\))?$`)
+	reColons = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+)!?(\(.*\))?$`)
+	// a Rust use line in a code example: use tower::{ServiceBuilder, Layer};
+	reUseLine  = regexp.MustCompile(`^(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);`)
 	reInToken  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+`)
 	reInFlag   = regexp.MustCompile(`(?:^|[\s,;(\[])(--?[A-Za-z][A-Za-z0-9_-]*)`)
 	reInEnv    = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`)
@@ -489,6 +491,9 @@ func (x *extractor) colonRef(s, norm string) *model.Reference {
 		if lg.Stdlib[parts[0]] {
 			return nil // std::io::Read
 		}
+		if isCapitalized(parts[0]) && x.externalNames(kind)[parts[0]] {
+			return nil // ServiceBuilder::new after "use tower::ServiceBuilder": another crate's type
+		}
 		conf := model.Medium
 		if x.isNamespace(kind, parts[0]) {
 			conf = model.High
@@ -496,6 +501,59 @@ func (x *extractor) colonRef(s, norm string) *model.Reference {
 		return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: conf}
 	}
 	return nil
+}
+
+// externalNames returns the names the document's code examples import
+// from crates the repository does not own ("use tower::ServiceBuilder;"):
+// a Type::method on such a name is a claim about that crate, not this one.
+func (x *extractor) externalNames(kind model.Kind) map[string]bool {
+	if x.extNames != nil {
+		return x.extNames
+	}
+	x.extNames = map[string]bool{}
+	for _, f := range x.doc.Fences {
+		for _, ln := range f.Content {
+			m := reUseLine.FindStringSubmatch(strings.TrimSpace(ln))
+			if m == nil {
+				continue
+			}
+			spec := strings.TrimSpace(m[1])
+			first, _, _ := strings.Cut(spec, "::")
+			if first == "crate" || first == "self" || first == "super" || x.isNamespace(kind, first) {
+				continue
+			}
+			for _, n := range useLeafNames(spec) {
+				x.extNames[n] = true
+			}
+		}
+	}
+	return x.extNames
+}
+
+// useLeafNames returns the names a use path binds: the alias when present,
+// otherwise the last segment of each item (one level of braces).
+func useLeafNames(spec string) []string {
+	items := []string{spec}
+	if i := strings.IndexByte(spec, '{'); i >= 0 {
+		inner := spec[i+1:]
+		if j := strings.LastIndexByte(inner, '}'); j >= 0 {
+			inner = inner[:j]
+		}
+		items = strings.Split(inner, ",")
+	}
+	var out []string
+	for _, it := range items {
+		it = strings.TrimSpace(it)
+		if k := strings.Index(it, " as "); k >= 0 {
+			it = strings.TrimSpace(it[k+4:])
+		} else if k := strings.LastIndex(it, "::"); k >= 0 {
+			it = it[k+2:]
+		}
+		if it != "" && it != "*" && it != "self" {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func isCapitalized(s string) bool { return s != "" && s[0] >= 'A' && s[0] <= 'Z' }
@@ -552,6 +610,9 @@ func (x *extractor) isNamespace(kind model.Kind, name string) bool {
 	if !ok {
 		set = map[string]bool{}
 		lg, _ := model.LangOf(kind)
+		if lg.Sep == "::" {
+			set["crate"], set["self"], set["super"] = true, true, true
+		}
 		for _, ns := range x.hints.Namespaces(kind) {
 			set[ns] = true
 			if i := strings.Index(ns, lg.Sep); i >= 0 {
