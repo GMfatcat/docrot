@@ -4,22 +4,21 @@
 
 **docrot 找出「文件在說謊」的地方。**
 
-README 裡那個函式，上個 sprint 是不是已經改名了？
-`llms.txt` 指給 AI agent 的檔案，還在嗎？
-快速上手裡的 `--config` flag，是不是早就刪了？
-指南裡的錨點還指得到嗎？中文 README 落後英文版幾個 commit 了？
+- README 裡那個函式，上個 sprint 是不是已經改名了？
+- `llms.txt` 指給 AI agent 的檔案，還在嗎？
+- 快速上手裡的 `--config` flag，是不是早就刪了？
+- 指南裡的錨點還指得到嗎？中文 README 落後英文版幾個 commit 了？
 
-沒有人知道——因為沒有工具在檢查文件裡的「主張」：連結檢查器只看 URL，Markdown linter
-只看排版。
+沒有人知道——連結檢查器只看 URL，Markdown linter 只看排版，沒有工具檢查文件裡的「主張」。
 
-docrot 就是做這件事的。它把文件對 repo 的每一個主張——路徑、符號、flag、環境變數、設定鍵、
-路由、預設值、安裝指令——逐一抽出來對照真正的程式碼；再用 git 歷史找出程式碼早已往前走的
-章節；也盯著雙語文件是否同步。Markdown、reStructuredText、AsciiDoc 都讀得懂。單一靜態 Go
-執行檔，**只用標準庫**；一份 HTML 報告，離線打開就能用。
+docrot 就是做這件事的：
+
+- 📌 抽出文件對 repo 的每一個主張（路徑、符號、flag、環境變數、設定鍵、路由、預設值、安裝指令），對照真正的程式碼
+- ⏳ 用 git 歷史找出程式碼早已往前走的章節
+- 🌏 盯著雙語文件是否同步
+- 📦 讀 Markdown、reStructuredText、AsciiDoc；單一靜態 Go 執行檔，**只用標準庫**；HTML 報告離線就能開
 
 ![docrot 對 fixture repo 執行 check 的輸出](docs/assets/terminal.svg)
-
-![HTML 報告：可依嚴重度、規則、檔案篩選](docs/assets/report.png)
 
 兩張圖都來自 `testdata/fixture` 這個故意種了錯誤的測試 repo。真實 repo 的結果——八個
 Go／Odin repo、七個 Python 專案，包括 FastAPI 的 1,692 份文件與 Django 的 686 頁 Sphinx
@@ -98,6 +97,10 @@ docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] 
 docrot explain <doc>             every extracted reference with its verdict
 docrot baseline | coverage | pairs | comments | index | init | version
 ```
+
+每次 `check` 都會把 HTML、Markdown、JSON 與文字報告寫進 `.docrot/`；HTML 版長這樣：
+
+![HTML 報告：可依嚴重度、規則、檔案篩選](docs/assets/report.png)
 
 所有 flag、exit code 與 CI 範例：[docs/commands.md](docs/commands.md)。
 

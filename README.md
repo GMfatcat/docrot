@@ -4,24 +4,22 @@
 
 **docrot finds where your documentation lies about your code.**
 
-Does your README still name the function you renamed last sprint?
-Does `llms.txt` send your AI agent to a file that no longer exists?
-Is the `--config` flag in the quick start still there?
-Do the anchors in the guide still land? Is the Chinese README three commits behind?
+- Does your README still name the function you renamed last sprint?
+- Does `llms.txt` send your AI agent to a file that no longer exists?
+- Is the `--config` flag in the quick start still there?
+- Do the anchors in the guide still land? Is the Chinese README three commits behind?
 
-Nobody knows, because nothing checks the *claims*: link checkers look at
-URLs, Markdown linters look at formatting.
+Nobody knows — link checkers look at URLs, Markdown linters look at
+formatting, nothing checks the *claims*.
 
-docrot does. It pulls every claim a document makes about the repository —
-paths, symbols, flags, environment variables, config keys, routes, defaults,
-install lines — and checks each one against the real code; then it uses git
-history to find the sections the code has moved on from, and keeps
-bilingual pairs honest. Markdown, reStructuredText, AsciiDoc. One static Go
-binary, **standard library only**; one HTML report that opens offline.
+docrot does:
+
+- 📌 pulls every claim a document makes about the repository (paths, symbols, flags, environment variables, config keys, routes, defaults, install lines) and checks it against the real code
+- ⏳ uses git history to find the sections the code has moved on from
+- 🌏 keeps bilingual document pairs honest
+- 📦 reads Markdown, reStructuredText and AsciiDoc; one static Go binary, **standard library only**; an HTML report that opens offline
 
 ![docrot check on the fixture repository](docs/assets/terminal.svg)
-
-![The HTML report: findings with filters by severity, rule and file](docs/assets/report.png)
 
 Both pictures come from the seeded test repository under `testdata/fixture`.
 For real runs — eight Go and Odin repositories, seven Python projects,
@@ -118,6 +116,10 @@ docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] 
 docrot explain <doc>             every extracted reference with its verdict
 docrot baseline | coverage | pairs | comments | index | init | version
 ```
+
+Every `check` writes the HTML, Markdown, JSON and text reports into `.docrot/`; the HTML one looks like this:
+
+![The HTML report: findings with filters by severity, rule and file](docs/assets/report.png)
 
 Every flag, the exit codes and the CI recipes: [docs/commands.md](docs/commands.md).
 
