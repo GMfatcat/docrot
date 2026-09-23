@@ -26,6 +26,9 @@ func TestHasAndAnchors(t *testing.T) {
 			"## Usage",
 			"## Usage",
 			"### foo_bar",
+			"### Implementing `__get_x__` <a name=\"implementing_get_x\"></a>",
+			"<h2 id=\"Manual-Heading\">Manual</h2>",
+			"<a id='raw'></a>",
 		},
 	})
 
@@ -45,6 +48,9 @@ func TestHasAndAnchors(t *testing.T) {
 		{"mixed case input", "README.md", "Getting-Started", true},
 		{"windows separator in path", "README.md", "docrot", true},
 		{"dot slash prefix", "./README.md", "docrot", true},
+		{"html a name", "README.md", "implementing_get_x", true},
+		{"html h2 id lower-cased", "README.md", "manual-heading", true},
+		{"html a id single quotes", "README.md", "raw", true},
 		{"missing slug", "README.md", "nope", false},
 		{"missing doc", "OTHER.md", "docrot", false},
 		{"empty slug", "README.md", "", false},
@@ -57,7 +63,7 @@ func TestHasAndAnchors(t *testing.T) {
 		})
 	}
 
-	want := []string{"-核心目標", "docrot", "foo_bar", "getting-started", "usage", "usage-1"}
+	want := []string{"-核心目標", "docrot", "foo_bar", "getting-started", "implementing-__get_x__-", "implementing_get_x", "manual-heading", "raw", "usage", "usage-1"}
 	if got := ix.Anchors("README.md"); !reflect.DeepEqual(got, want) {
 		t.Errorf("Anchors = %v, want %v", got, want)
 	}

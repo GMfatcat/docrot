@@ -401,6 +401,9 @@ func Check(opts Options) (*Run, error) {
 		}
 	}
 
+	// 7b. rule-scoped ignores (<!-- docrot:ignore missing-path -->)
+	findings = dropRuleIgnored(findings, parsed)
+
 	// 8. baseline
 	bpath := opts.BaselinePath
 	if bpath == "" {
@@ -697,6 +700,19 @@ func dropIgnoredPaths(repo *gitx.Repo, findings []model.Finding, warn func(strin
 		if !drop {
 			kept = append(kept, f)
 		}
+	}
+	return kept
+}
+
+// dropRuleIgnored removes findings that a rule-scoped ignore directive in
+// their document covers. Line 0 (whole-file findings) is never covered.
+func dropRuleIgnored(findings []model.Finding, parsed map[string]*markdown.Doc) []model.Finding {
+	kept := findings[:0]
+	for _, f := range findings {
+		if p := parsed[f.Loc.File]; p != nil && p.RuleIgnored != nil && f.Loc.Line > 0 && p.RuleIgnored(f.Loc.Line, f.Rule) {
+			continue
+		}
+		kept = append(kept, f)
 	}
 	return kept
 }

@@ -515,6 +515,11 @@ func TestIgnoreDirectives(t *testing.T) {
 			lines:      []string{"write " + bt + "<!-- docrot:ignore -->" + bt, "a"},
 			notIgnored: []int{1, 2},
 		},
+		{
+			name:       "rule-scoped directive does not set Ignored",
+			lines:      []string{"<!-- docrot:ignore missing-path -->", "a", "b <!-- docrot:ignore-start unknown-flag, unknown-env -->", "c", "<!-- docrot:ignore-end -->", "d"},
+			notIgnored: []int{1, 2, 3, 4, 5, 6},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -533,6 +538,24 @@ func TestIgnoreDirectives(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRuleScopedIgnores(t *testing.T) {
+	d := doc("<!-- docrot:ignore missing-path -->", "a", "b <!-- docrot:ignore-start unknown-flag, unknown-env -->", "c", "<!-- docrot:ignore-end -->", "d", "e <!-- docrot:ignore missing-symbol unknown-flag -->")
+	type key struct {
+		line int
+		rule string
+	}
+	want := map[key]bool{
+		{2, "missing-path"}: true, {2, "unknown-flag"}: false, {1, "missing-path"}: false,
+		{3, "unknown-flag"}: true, {4, "unknown-env"}: true, {5, "unknown-flag"}: true, {6, "unknown-flag"}: false,
+		{7, "missing-symbol"}: true, {7, "unknown-flag"}: true, {7, "missing-path"}: false,
+	}
+	for k, v := range want {
+		if got := d.RuleIgnored(k.line, k.rule); got != v {
+			t.Errorf("RuleIgnored(%d, %s) = %v, want %v", k.line, k.rule, got, v)
+		}
 	}
 }
 

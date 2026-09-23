@@ -48,6 +48,7 @@ Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
 
 <!-- docrot:ignore -->
 Ignored line mentions `docs/nonexistent.md` and `--nope`.
+Scoped: `docs/scoped.md` is ignored but `--scoped` is not. <!-- docrot:ignore missing-path -->
 
 ## HTTP API
 

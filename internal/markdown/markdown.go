@@ -103,6 +103,13 @@ type Doc struct {
 	// docrot:ignore directive. It is never nil.
 	Ignored func(line int) bool
 
+	// RuleIgnored reports whether findings of one rule are excluded on a
+	// line by a rule-scoped directive (<!-- docrot:ignore missing-path -->,
+	// <!-- docrot:ignore-start unknown-flag,unknown-env -->). Such a
+	// directive does not affect other rules and does not set Ignored. It
+	// is never nil.
+	RuleIgnored func(line int, rule string) bool
+
 	// IgnoreFile is set by a <!-- docrot:ignore-file --> comment.
 	IgnoreFile bool
 
@@ -1060,39 +1067,70 @@ const (
 func (p *parser) applyIgnores() {
 	d := p.doc
 	ignored := map[int]bool{}
+	scoped := map[int]map[string]bool{} // line → rules ignored there
 	n := len(d.Lines)
 	inRange, rangeStart := false, 0
+	var rangeRules []string
 
+	mark := func(from, to int, rules []string) {
+		if len(rules) == 0 {
+			markRange(ignored, from, to)
+			return
+		}
+		for l := from; l <= to; l++ {
+			m := scoped[l]
+			if m == nil {
+				m = map[string]bool{}
+				scoped[l] = m
+			}
+			for _, r := range rules {
+				m[r] = true
+			}
+		}
+	}
 	for _, c := range d.Comments {
-		switch strings.TrimSpace(c.Text) {
+		word, rules := splitDirective(c.Text)
+		switch word {
 		case directiveIgnoreFile:
 			d.IgnoreFile = true
 		case directiveIgnoreStart:
 			if !inRange {
-				inRange, rangeStart = true, c.StartLine
+				inRange, rangeStart, rangeRules = true, c.StartLine, rules
 			}
 		case directiveIgnoreEnd:
 			if inRange {
-				markRange(ignored, rangeStart, c.EndLine)
+				mark(rangeStart, c.EndLine, rangeRules)
 				inRange = false
 			}
 		case directiveIgnore:
 			if p.commentAlone(c) {
 				for l := c.EndLine + 1; l <= n; l++ {
 					if strings.TrimSpace(d.Lines[l-1]) != "" {
-						ignored[l] = true
+						mark(l, l, rules)
 						break
 					}
 				}
 			} else {
-				markRange(ignored, c.StartLine, c.EndLine)
+				mark(c.StartLine, c.EndLine, rules)
 			}
 		}
 	}
 	if inRange {
-		markRange(ignored, rangeStart, n)
+		mark(rangeStart, n, rangeRules)
 	}
 	d.Ignored = func(line int) bool { return ignored[line] }
+	d.RuleIgnored = func(line int, rule string) bool { return scoped[line][rule] }
+}
+
+// splitDirective splits a comment such as "docrot:ignore missing-path,
+// unknown-flag" into the directive word and the rule names that scope
+// it (none for the plain form). Rules are separated by commas or spaces.
+func splitDirective(text string) (word string, rules []string) {
+	f := strings.FieldsFunc(strings.TrimSpace(text), func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == ',' })
+	if len(f) == 0 {
+		return "", nil
+	}
+	return f[0], f[1:]
 }
 
 // commentAlone reports whether the comment is the only content on its

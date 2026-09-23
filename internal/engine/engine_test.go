@@ -60,6 +60,7 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleMissingImport, "README.md", "example.com/fixture/pkg/router", model.SevError, ""},
 		{model.RuleUnknownFlag, "README.md", "--confg", model.SevWarning, "--config"},
 		{model.RuleUnknownFlag, "README.md", "--port", model.SevWarning, ""},
+		{model.RuleUnknownFlag, "README.md", "--scoped", model.SevWarning, ""},
 		{model.RuleUnknownEnv, "README.md", "FIXTURE_TRACE", model.SevWarning, ""},
 		{model.RuleMissingSymbol, "README.md", "render_frames()", model.SevWarning, "fixture_odin.render_frame"},
 		{model.RuleMissingSymbol, "README.md", "helper.summarise", model.SevError, "helper.summarize"},

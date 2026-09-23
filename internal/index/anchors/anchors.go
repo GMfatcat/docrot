@@ -27,6 +27,10 @@ type Index struct {
 
 var customIDAll = regexp.MustCompile(`\{\s*#([\w-]+)\s*\}`)
 
+// htmlID finds explicit ids in raw HTML inside Markdown: <a id="x">,
+// <a name="x"></a> after a heading, <h2 id="x">, <div id="x">.
+var htmlID = regexp.MustCompile(`(?i)<(?:a|h[1-6]|div|span|section|p|td|th|li|dt)\b[^>]*?\s(?:id|name)\s*=\s*["']([^"']+)["']`)
+
 type docAnchors struct {
 	generated bool            // document contains mkdocstrings "::: " directives
 	slugs     []string        // sorted, unique
@@ -70,6 +74,9 @@ func (ix *Index) Add(docRel string, d *markdown.Doc) {
 	for _, line := range d.Lines {
 		for _, m := range customIDAll.FindAllStringSubmatch(line, -1) {
 			addSlug(strings.ToLower(m[1]))
+		}
+		for _, m := range htmlID.FindAllStringSubmatch(line, -1) {
+			addSlug(strings.ToLower(strings.TrimSpace(m[1])))
 		}
 		if strings.HasPrefix(strings.TrimSpace(line), "::: ") {
 			da.generated = true
