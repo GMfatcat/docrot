@@ -94,4 +94,5 @@ rule that removed each class of noise. See [field-report.md](field-report.md),
 [field-report-csharp.md](field-report-csharp.md),
 [field-report-c.md](field-report-c.md) and
 [field-report-examples.md](field-report-examples.md); every rule's exact behaviour is
-in [rules.md](rules.md).
+in [rules.md](rules.md), and every rule that changed because of a field run
+says so in `CHANGELOG.md`.
