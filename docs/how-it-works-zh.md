@@ -57,4 +57,4 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 
 ## 啟發式規則從哪裡來
 
-七份實地報告記錄了每一輪調校：第一次跑在八個 Go／Odin repo、七個 Python 專案、三個 Rust crate、三個 JavaScript／TypeScript 專案、三個 C# 專案、三個 C／C++ 專案，以及 Go 範例檢查在五個 Go repo 的 1,570 個範例區塊上報了什麼，哪些是真的、哪些是噪音、又是哪條規則消掉了哪一類噪音。見 [field-report.md](field-report.md)、[field-report-python.md](field-report-python.md)、[field-report-rust.md](field-report-rust.md)、[field-report-js.md](field-report-js.md)、[field-report-csharp.md](field-report-csharp.md)、[field-report-c.md](field-report-c.md) 與 [field-report-examples.md](field-report-examples.md)；每條規則的確切行為在 [rules.md](rules.md)。
+七份實地報告記錄了每一輪調校：第一次跑在八個 Go／Odin repo、七個 Python 專案、三個 Rust crate、三個 JavaScript／TypeScript 專案、三個 C# 專案、三個 C／C++ 專案，以及 Go 範例檢查在五個 Go repo 的 1,570 個範例區塊上報了什麼，哪些是真的、哪些是噪音、又是哪條規則消掉了哪一類噪音。見 [field-report.md](field-report.md)、[field-report-python.md](field-report-python.md)、[field-report-rust.md](field-report-rust.md)、[field-report-js.md](field-report-js.md)、[field-report-csharp.md](field-report-csharp.md)、[field-report-c.md](field-report-c.md) 與 [field-report-examples.md](field-report-examples.md)；每條規則的確切行為在 [rules.md](rules.md)，每一條因實地跑而改動的規則都記在 `CHANGELOG.md`。
