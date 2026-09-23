@@ -579,6 +579,10 @@ func (ix *Index) IsExample(module string) bool {
 // Has reports whether qualified exists (see lookup for the accepted forms).
 func (ix *Index) Has(qualified string) bool { return len(ix.lookup(qualified)) > 0 }
 
+// Opaque is true for every declaration: derived and blanket trait
+// methods (clone, to_string, into) are not in the index.
+func (ix *Index) Opaque(string) bool { return true }
+
 // File returns the declaring file (relative, forward slashes) and 1-based
 // line of qualified, if known.
 func (ix *Index) File(qualified string) (string, int, bool) {

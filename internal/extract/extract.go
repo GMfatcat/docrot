@@ -36,6 +36,9 @@ type Hints interface {
 	// configuration example worth checking key by key.
 	HasJSONKey(dotted string) bool
 	HasConfigKey(dotted string) bool
+	// Project names the repository's own packages (package.json name…), so
+	// that an example importing them is read as a claim about this code.
+	Project() model.Project
 }
 
 // Options controls extraction.
@@ -54,6 +57,9 @@ type extractor struct {
 	topDirs  map[string]bool
 	nsCache  map[model.Kind]map[string]bool
 	extNames map[string]bool // names the document's examples import from other crates
+	jsImp    *[]jsImport     // imports of the document's JavaScript blocks, parsed once
+	jsSelf   map[string]bool // names bound to this package by those imports
+	jsExt    map[string]bool // names bound to other packages by those imports
 	seen     map[string]bool
 	out      []model.Reference
 }
@@ -231,6 +237,15 @@ func (x *extractor) fences() {
 		case lang == "go" || lang == "golang":
 			for _, r := range x.goFenceRefs(f.Content) {
 				x.emit(r, f.StartLine, 0, section, lang)
+			}
+		case jsLangs[lang]:
+			for _, r := range x.jsFenceRefs(f) {
+				line := r.Loc.Line
+				r.Loc = model.Location{}
+				if x.ignored(line) {
+					continue
+				}
+				x.emit(r, line, 0, section, lang)
 			}
 		case jsonLangs[lang]:
 			for _, r := range x.jsonFenceRefs(f) {

@@ -16,6 +16,7 @@ import (
 	"docrot/internal/index/config"
 	"docrot/internal/index/files"
 	"docrot/internal/index/gosym"
+	"docrot/internal/index/js"
 	"docrot/internal/index/lang"
 	"docrot/internal/index/odin"
 	"docrot/internal/index/project"
@@ -107,6 +108,13 @@ var builders = map[model.Kind]builder{
 	},
 	model.KindRustSym: func(root string, ex []string) (lang.Index, error) {
 		ix, err := rust.Build(root, ex)
+		if ix == nil {
+			return nil, err
+		}
+		return ix, err
+	},
+	model.KindJSSym: func(root string, ex []string) (lang.Index, error) {
+		ix, err := js.Build(root, ex)
 		if ix == nil {
 			return nil, err
 		}
@@ -467,6 +475,11 @@ func (ix *Index) IsExample(kind model.Kind, ns string) bool {
 func (ix *Index) HasSymbol(kind model.Kind, q string) bool {
 	li, ok := ix.langs[kind]
 	return ok && li.Has(q)
+}
+
+func (ix *Index) Opaque(kind model.Kind, q string) bool {
+	li, ok := ix.langs[kind]
+	return ok && li.Opaque(q)
 }
 
 func (ix *Index) SimilarSymbols(kind model.Kind, q string, n int) []string {

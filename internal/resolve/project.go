@@ -145,7 +145,7 @@ func (r *Resolver) resolveDefault(ref model.Reference) Result {
 	return Result{Finding: r.finding(model.RuleDefaultMismatch, model.SevWarning, ref, msg, []string{code})}
 }
 
-var reLowerBound = regexp.MustCompile(`(?:>=|\^|~=|~|==|^)\s*v?(\d+)\.(\d+)`)
+var reLowerBound = regexp.MustCompile(`(?:>=|\^|~=|~|==|^)\s*v?(\d+)(?:\.(\d+))?`)
 
 func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 	tool, ver, ok := strings.Cut(ref.Norm, ":")
@@ -161,6 +161,8 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 		declared, source = proj.PyRequires, "pyproject.toml"
 	case "rust":
 		declared, source = proj.RustVersion, "Cargo.toml"
+	case "node":
+		declared, source = proj.NodeVersion, "package.json"
 	}
 	if declared == "" {
 		return Result{Skipped: true}
@@ -173,8 +175,11 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 	if dMaj == cMaj && dMin == cMin {
 		return Result{OK: true} // go.mod churns with every dependency bump; not a staleness signal
 	}
-	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust"}[tool]
+	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust", "node": "Node"}[tool]
 	need := strconv.Itoa(dMaj) + "." + strconv.Itoa(dMin)
+	if !strings.Contains(declared, ".") {
+		need = strconv.Itoa(dMaj) // engines.node ">=18"
+	}
 	var msg string
 	sev := model.SevWarning
 	if cMaj < dMaj || cMaj == dMaj && cMin < dMin {
@@ -194,6 +199,9 @@ func parseMajorMinor(spec string) (int, int, bool) {
 		return 0, 0, false
 	}
 	maj, err1 := strconv.Atoi(m[1])
+	if m[2] == "" {
+		return maj, 0, err1 == nil // ">=18": a major alone
+	}
 	min, err2 := strconv.Atoi(m[2])
 	return maj, min, err1 == nil && err2 == nil
 }

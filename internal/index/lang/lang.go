@@ -37,6 +37,11 @@ type Index interface {
 	IsExample(namespace string) bool
 	// Has reports whether qualified exists.
 	Has(qualified string) bool
+	// Opaque reports whether the members of qualified are not fully
+	// indexed (a Python class sets attributes in __init__, a Rust type
+	// gets methods from traits, a JavaScript class extends another), so
+	// that an unknown member of it is not a finding.
+	Opaque(qualified string) bool
 	// File returns the declaring file (relative, forward slashes) and
 	// 1-based line of qualified.
 	File(qualified string) (string, int, bool)

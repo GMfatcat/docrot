@@ -374,6 +374,10 @@ func (ix *Index) IsNamespace(qualified string) bool {
 // recognises.
 func (ix *Index) IsExample(string) bool { return false }
 
+// Opaque is always true: struct fields and enum values are not indexed,
+// so `Type.field` is never a finding.
+func (ix *Index) Opaque(string) bool { return true }
+
 // Symbols lists every declaration as "pkg.name", sorted.
 func (ix *Index) Symbols() []string {
 	out := make([]string, 0, len(ix.all))

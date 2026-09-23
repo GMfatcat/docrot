@@ -450,6 +450,9 @@ type Index interface {
 	// examples tree (so claims about it are weaker).
 	IsExample(kind Kind, namespace string) bool
 	HasSymbol(kind Kind, qualified string) bool
+	// Opaque reports whether an unknown member of qualified is not worth
+	// a finding because the language index cannot list its members.
+	Opaque(kind Kind, qualified string) bool
 	SimilarSymbols(kind Kind, qualified string, n int) []string
 
 	// --- Markdown anchors ---
@@ -500,6 +503,8 @@ type Project struct {
 	PyName      string              `json:"pyName,omitempty"`     // [project] name
 	PyRequires  string              `json:"pyRequires,omitempty"` // ">=3.10", "^3.9"
 	NPMName     string              `json:"npmName,omitempty"`
+	NPMExports  []string            `json:"npmExports,omitempty"`  // keys of package.json "exports": ".", "./server", "./v4/*"
+	NodeVersion string              `json:"nodeVersion,omitempty"` // package.json engines.node: ">=18"
 	CargoName   string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
 	RustVersion string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
 	Targets     map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names

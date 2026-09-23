@@ -73,6 +73,7 @@ func TestImplementations(t *testing.T) {
 			if c.ix.IsExample(c.namespace) {
 				t.Errorf("IsExample(%q) = true", c.namespace)
 			}
+			_ = c.ix.Opaque(c.symbol)
 			if c.ix.Literals() == nil || c.ix.Defaults() == nil {
 				t.Error("Literals() or Defaults() is nil")
 			}

@@ -61,12 +61,26 @@ func Build(root string) model.Project {
 		var pkg struct {
 			Name    string            `json:"name"`
 			Scripts map[string]string `json:"scripts"`
+			Engines map[string]string `json:"engines"`
+			Exports json.RawMessage   `json:"exports"`
 		}
 		if json.Unmarshal(b, &pkg) == nil {
 			p.NPMName = pkg.Name
+			p.NodeVersion = pkg.Engines["node"]
 			if len(pkg.Scripts) > 0 {
 				p.Targets["npm"] = sortedKeys(pkg.Scripts)
 				p.TargetFiles["npm"] = "package.json"
+			}
+			var exports map[string]json.RawMessage
+			if json.Unmarshal(pkg.Exports, &exports) == nil {
+				for k := range exports {
+					if strings.HasPrefix(k, ".") {
+						p.NPMExports = append(p.NPMExports, k)
+					}
+				}
+				sort.Strings(p.NPMExports)
+			} else if len(pkg.Exports) > 0 {
+				p.NPMExports = []string{"."} // "exports": "./index.js"
 			}
 		}
 	}

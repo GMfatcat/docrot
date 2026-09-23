@@ -97,6 +97,15 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleMissingRoute, "README.md", "DELETE /rs/items/{id}", model.SevError, ""},
 		{model.RuleToolchain, "README.md", "Rust 1.70+", model.SevWarning, "1.75"},
 		{model.RuleInstallMismatch, "README.md", "fixture-rss", model.SevError, "fixture-rs"},
+		{model.RuleUnknownFlag, "README.md", "--retrie", model.SevWarning, "--retries"},
+		{model.RuleDefaultMismatch, "README.md", "retries default 5", model.SevWarning, "3"},
+		{model.RuleMissingRoute, "README.md", "PUT /js/items", model.SevError, ""},
+		{model.RuleMissingSymbol, "README.md", "Client.fetchAl()", model.SevWarning, "client.Client.fetchAll"},
+		{model.RuleMissingSymbol, "README.md", "useItem", model.SevError, "client.useItems"},
+		{model.RuleMissingImport, "README.md", "fixture-web/nope", model.SevError, "fixture-web/server"},
+		{model.RuleInstallMismatch, "README.md", "fixture-webb", model.SevError, "fixture-web"},
+		{model.RuleMissingTarget, "README.md", "npm deploy", model.SevError, ""},
+		{model.RuleToolchain, "README.md", "Node 16 or later", model.SevWarning, "18"},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))

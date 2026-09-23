@@ -1,0 +1,14 @@
+{
+  "name": "fixture-web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "exports": {
+    ".": "./web/src/client.ts",
+    "./server": "./web/src/server.ts"
+  },
+  "scripts": {
+    "build": "tsc -p web",
+    "lint": "eslint web"
+  }
+}

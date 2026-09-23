@@ -456,6 +456,10 @@ func (ix *Index) IsNamespace(qualified string) bool { return ix.IsModule(qualifi
 // IsExample is IsExampleModule under the lang.Index name.
 func (ix *Index) IsExample(module string) bool { return ix.IsExampleModule(module) }
 
+// Opaque is true for every declaration: attributes set in __init__,
+// proxies and descriptors are invisible to a declaration index.
+func (ix *Index) Opaque(string) bool { return true }
+
 // Symbols lists every declaration as "module.qualified", sorted.
 func (ix *Index) Symbols() []string {
 	out := make([]string, 0, len(ix.all))

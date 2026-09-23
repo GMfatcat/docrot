@@ -460,22 +460,24 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 	if anyHas(ref.Norm) {
 		return Result{OK: true}
 	}
-	// Type.field where Type is a known declaration: members are not indexed
 	first, _, dotted := strings.Cut(ref.Norm, lg.Sep)
-	if dotted && isCapitalized(first) && anyHas(first) {
-		return Result{OK: true}
-	}
 	if lg.Sep == "::" && dotted && !isCapitalized(first) && !r.ix.IsNamespace(ref.Kind, first) {
 		return Result{Skipped: true} // hyper::Body, tower::ServiceExt: a path into another crate
 	}
-	// owner.attr where the owner is a known class, function or module-level
-	// object (not a namespace): an attribute the declaration index cannot
-	// see (set in __init__, a proxy, a descriptor). A missing name *in a
-	// namespace* stays a finding.
+	// owner.attr where the owner is a known class, type, function or
+	// module-level object (not a namespace) whose members the index cannot
+	// list in full (a Python attribute set in __init__, a Rust trait
+	// method, an inherited JavaScript method, an Odin struct field). A
+	// missing name *in a namespace*, or in a JavaScript class that lists
+	// all its members, stays a finding.
 	if i := strings.LastIndex(ref.Norm, lg.Sep); i > 0 {
 		owner := strings.TrimSuffix(ref.Norm[:i], "()")
 		if anyHas(owner) && !anyNamespace(owner) {
-			return Result{OK: true}
+			for _, k := range r.ix.Languages() {
+				if r.ix.HasSymbol(k, owner) && r.ix.Opaque(k, owner) {
+					return Result{OK: true}
+				}
+			}
 		}
 	}
 	if lg.Sep == "::" && dotted && len(first) == 1 && isCapitalized(first) {
@@ -486,8 +488,8 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 	}
 	sev := model.SeverityFor(ref.Confidence)
 	switch {
-	case !dotted && !lg.Flat:
-		sev = model.SevInfo // a bare call is usually a method or a local helper
+	case !dotted && !lg.Flat && ref.Confidence < model.High:
+		sev = model.SevInfo // a bare call is usually a method or a local helper (a named import is not a call)
 	case dotted && lg.Stdlib[first]:
 		return Result{Skipped: true} // typing.Annotated, std::io::Read
 	case dotted && lg.Methods != 0 && isReceiverish(first):
@@ -771,6 +773,9 @@ func (r *Resolver) resolveAnchor(ref model.Reference) Result {
 // --- imports ---------------------------------------------------------------
 
 func (r *Resolver) resolveImport(ref model.Reference) Result {
+	if strings.HasPrefix(ref.Norm, "js:") {
+		return r.resolveJSImport(ref)
+	}
 	mp := r.ix.ModulePath()
 	if mp == "" {
 		return Result{Skipped: true}
@@ -794,6 +799,99 @@ func (r *Resolver) resolveImport(ref model.Reference) Result {
 	}
 	msg := "import path `" + ip + "` does not match any package directory"
 	return Result{Finding: r.finding(model.RuleMissingImport, model.SeverityFor(ref.Confidence), ref, msg, cands)}
+}
+
+// jsSourceExts are the extensions a JavaScript import may omit, and the
+// index files a directory import means.
+var jsSourceExts = []string{"", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".jsx", ".mts", ".cts", ".d.ts", ".vue", ".svelte", ".json", ".css", "/index.ts", "/index.tsx", "/index.js", "/index.mjs", "/index.jsx", "/index.d.ts"}
+
+// jsPathExists reports whether a module specifier names a file or a
+// directory once the usual extensions are tried.
+func (r *Resolver) jsPathExists(p string) bool {
+	p = strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/")
+	if p == "" || p == "." {
+		return true
+	}
+	for _, ext := range jsSourceExts {
+		if r.ix.FileExists(p+ext) || ext == "" && r.ix.DirExists(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveJSImport checks a JavaScript import specifier: a relative path
+// against the document's directory, the root and the usual source roots
+// (info, since examples often describe the reader's tree), or a sub-path
+// of this package ("zod/v4") against package.json "exports" and the tree
+// (error).
+func (r *Resolver) resolveJSImport(ref model.Reference) Result {
+	spec := strings.TrimPrefix(ref.Norm, "js:")
+	if strings.HasPrefix(spec, ".") {
+		docDir := ""
+		if i := strings.LastIndex(ref.Loc.File, "/"); i >= 0 {
+			docDir = ref.Loc.File[:i]
+		}
+		for _, base := range []string{docDir, "", "src", "lib", "app", "packages"} {
+			p := spec
+			if base != "" {
+				p = base + "/" + strings.TrimPrefix(spec, "./")
+			}
+			if r.jsPathExists(normRel(p)) {
+				return Result{OK: true}
+			}
+		}
+		msg := "relative import `" + spec + "` matches no file next to the document, the root, `src/` or `lib/`"
+		return Result{Finding: r.finding(model.RuleMissingImport, model.SevInfo, ref, msg, nil)}
+	}
+	proj := r.ix.Project()
+	if proj.NPMName == "" || !strings.HasPrefix(spec, proj.NPMName+"/") {
+		return Result{Skipped: true}
+	}
+	sub := strings.TrimPrefix(spec, proj.NPMName+"/")
+	for _, e := range proj.NPMExports {
+		e = strings.TrimPrefix(e, "./")
+		if e == sub || strings.HasSuffix(e, "/*") && strings.HasPrefix(sub, strings.TrimSuffix(e, "*")) || strings.HasSuffix(e, "*") && strings.HasPrefix(sub, strings.TrimSuffix(e, "*")) {
+			return Result{OK: true}
+		}
+	}
+	for _, base := range []string{"", "src", "lib", "packages"} {
+		p := sub
+		if base != "" {
+			p = base + "/" + sub
+		}
+		if r.jsPathExists(p) {
+			return Result{OK: true}
+		}
+	}
+	msg := "`" + spec + "`: package.json declares no `exports` entry `./" + sub + "` and no such file or directory exists"
+	var cands []string
+	for _, e := range proj.NPMExports {
+		if e != "." {
+			cands = append(cands, proj.NPMName+"/"+strings.TrimPrefix(e, "./"))
+		}
+	}
+	if len(cands) > 3 {
+		cands = cands[:3]
+	}
+	return Result{Finding: r.finding(model.RuleMissingImport, model.SeverityFor(ref.Confidence), ref, msg, cands)}
+}
+
+// normRel normalises "a/./b/../c" to "a/c".
+func normRel(p string) string {
+	var out []string
+	for _, seg := range strings.Split(p, "/") {
+		switch seg {
+		case "", ".":
+		case "..":
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		default:
+			out = append(out, seg)
+		}
+	}
+	return strings.Join(out, "/")
 }
 
 // --- HTTP routes -----------------------------------------------------------

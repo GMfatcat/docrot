@@ -158,6 +158,7 @@ func (f *fakeIndex) IsNamespace(k model.Kind, q string) bool {
 }
 func (f *fakeIndex) IsExample(model.Kind, string) bool     { return false }
 func (f *fakeIndex) HasSymbol(k model.Kind, q string) bool { return f.langs()[k][q] }
+func (f *fakeIndex) Opaque(model.Kind, string) bool        { return true }
 func (f *fakeIndex) SimilarSymbols(k model.Kind, q string, n int) []string {
 	if f.similar != nil {
 		return f.similar[k]

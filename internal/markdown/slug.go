@@ -43,6 +43,7 @@ func Slug(heading string) string {
 	s := customIDRe.ReplaceAllString(heading, "")
 	s = inlineLinkRe.ReplaceAllString(s, "$1")
 	s = refLinkRe.ReplaceAllString(s, "$1")
+	s = strings.NewReplacer(`\<`, "", `\>`, "").Replace(s) // escaped brackets render as text, not tags
 	s = htmlTagRe.ReplaceAllString(s, "")
 	s = strings.ReplaceAll(s, "`", "")
 

@@ -9,6 +9,14 @@ takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
 started; each item names the stage it would live in.
 
+## Done in 0.6.0: JavaScript and TypeScript
+
+The second plugin language; see `CHANGELOG.md` and
+`docs/field-report-js.md`. Lessons: documents name the instance after the
+module (`reply.send`), the document's own imports say which names belong
+to other packages, and a class that `extends` another must not be held to
+the members it declares.
+
 ## Done in 0.5.0: language plugins and Rust
 
 Every non-Go language is now one index package behind `internal/index/lang`

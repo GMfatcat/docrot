@@ -24,6 +24,7 @@ func TestSlug(t *testing.T) {
 		{"punctuation dropped", "What's new?", "whats-new"},
 		{"underscore kept (GitHub)", "foo_bar", "foo_bar"},
 		{"hyphens not collapsed", "A -- B", "a----b"},
+		{"escaped angle brackets with a reference link", `fastify.RawRequestDefaultExpression\<[RawServer][RawServerGeneric]\>`, "fastifyrawrequestdefaultexpressionrawserver"},
 		{"emoji removed keeps hyphen", "\U0001F431 meowbase", "-meowbase"},
 		{"cjk kept", "\U0001F3AF 核心目標", "-核心目標"},
 		{"cjk plain", "安裝說明", "安裝說明"},

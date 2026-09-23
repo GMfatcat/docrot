@@ -36,18 +36,18 @@
 - [x] 1E 文件：rules.md、how-it-works、llms.txt、README 兩語、CHANGELOG 0.5.0；
       `release = "0.5.0"`；tag。
 
-## Wave 2 — JavaScript／TypeScript（0.6.0）
+## Wave 2 — JavaScript／TypeScript（0.6.0）— 已完成
 
-- [ ] 2A `internal/index/js`：宣告、class 方法、`module.exports`、副檔名與排除、
+- [x] 2A `internal/index/js`：宣告、class 方法、`module.exports`、副檔名與排除、
       字串常值、`process.env`、express／hono／fastify／NestJS 路由、commander／yargs
       預設值。
-- [ ] 2B `internal/extract`＋`resolve`：code fence 裡 `import … from './x'`／
+- [x] 2B `internal/extract`＋`resolve`：code fence 裡 `import … from './x'`／
       `require('./x')` 的相對路徑解析（`.js .ts .tsx .jsx .mjs .cjs`、`index.*`）。
-- [ ] 2C `project`：`package.json` 的 `engines.node` → toolchain。
-- [ ] 2D fixture `testdata/fixture/web/`；golden test。
-- [ ] 2E 實地：meowboard（混合語言主場）、兩個 TS 專案（hono、一個 express 專案）；
+- [x] 2C `project`：`package.json` 的 `engines.node` → toolchain。
+- [x] 2D fixture `testdata/fixture/web/` 與根目錄 `package.json`；golden test。
+- [x] 2E 實地：fastify、hono、zod（meowboard 的 TS 全在 `third_party/`，預設排除）；
       `docs/field-report-js.md`。
-- [ ] 2F 文件與 0.6.0。
+- [x] 2F 文件與 0.6.0。
 
 ## Wave 3 — C#（0.7.0）
 

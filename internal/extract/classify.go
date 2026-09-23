@@ -113,6 +113,10 @@ func IsPlaceholderPath(p string) bool {
 		if i == 0 && len(low) > 2 && strings.HasPrefix(low, "my") && low != "mypy" {
 			return true
 		}
+		// "issues/NNNN/results.md": a run of one repeated capital letter
+		if len(stem) >= 2 && stem == strings.Repeat(stem[:1], len(stem)) && stem[0] >= 'A' && stem[0] <= 'Z' {
+			return true
+		}
 	}
 	return false
 }
@@ -218,6 +222,15 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 			conf = model.High
 		}
 		return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: m[2] + "." + m[3], Confidence: conf}
+	}
+	if member := strings.TrimSuffix(s[1:], "()"); strings.HasPrefix(s, ".") && isIdent(member) && !knownExt[strings.ToLower(member)] && !dotfiles[strings.ToLower(member)] {
+		// `.addSchema`, `.parse()`: a member spelled with its dot, the JavaScript way
+		if kind, ok := x.langBy(".", model.NamingCamel, true); ok {
+			return &model.Reference{Kind: kind, Text: s, Norm: member, Confidence: model.Medium}
+		}
+	}
+	if m := reDotted.FindStringSubmatch(s); m != nil && x.runtimeGlobal(m[1]) {
+		return nil // console.log, Math.max, process.exit: the language's runtime, not a path or a claim
 	}
 	if r := x.pathRef(s, false); r != nil {
 		return r
@@ -406,18 +419,33 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		ref := func(kind model.Kind, c model.Confidence) *model.Reference {
 			return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: c}
 		}
+		if self, ext := x.jsNames(); self[first] || ext[first] {
+			if ext[first] {
+				return nil // express.json() after `import express from "express"`: another package
+			}
+			// z.string() after `import * as z from "zod"` in zod's own docs
+			return &model.Reference{Kind: model.KindJSSym, Text: s, Norm: strings.Join(parts[1:], "."), Confidence: model.High}
+		}
 		switch {
 		case x.hints.IsGoPackage(first):
 			return ref(model.KindGoSymbol, model.High)
 		case len(parts) == 2 && x.hints.IsGoType(first):
 			return ref(model.KindGoSymbol, model.High)
 		}
-		for _, kind := range x.hints.Languages() {
-			if lg, _ := model.LangOf(kind); lg.Sep == "." && x.isNamespace(kind, first) {
-				return ref(kind, model.High)
-			}
-		}
 		last := parts[len(parts)-1]
+		for _, kind := range x.hints.Languages() {
+			lg, _ := model.LangOf(kind)
+			if lg.Sep != "." || !x.isNamespace(kind, first) {
+				continue
+			}
+			// a JavaScript module named server does not own `server.port`:
+			// its members are camelCase, and a lower-case tail is a config
+			// key or an instance the resolver knows how to skip
+			if lg.Naming&model.NamingSnake == 0 && !isCamel(last) && !isCapitalized(last) {
+				continue
+			}
+			return ref(kind, model.High)
+		}
 		allLower := strings.ToLower(norm) == norm
 		switch {
 		case allLower:
@@ -501,6 +529,30 @@ func (x *extractor) colonRef(s, norm string) *model.Reference {
 		return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: conf}
 	}
 	return nil
+}
+
+// dotfiles are names that follow a dot as a file, not as a member.
+var dotfiles = map[string]bool{
+	"git": true, "github": true, "gitignore": true, "gitattributes": true, "gitmodules": true, "gitlab": true,
+	"npmrc": true, "nvmrc": true, "npmignore": true, "yarnrc": true, "pnpmfile": true, "prettierrc": true,
+	"prettierignore": true, "eslintrc": true, "eslintignore": true, "editorconfig": true, "dockerignore": true,
+	"babelrc": true, "vscode": true, "idea": true, "husky": true, "cache": true, "next": true, "nuxt": true,
+	"envrc": true, "env": true, "local": true, "example": true, "htaccess": true, "DS_Store": true, "ds_store": true,
+	"tool-versions": true, "python-version": true, "node-version": true, "ruby-version": true, "mise": true,
+	"venv": true, "tox": true, "pytest_cache": true, "mypy_cache": true, "ruff_cache": true, "docrot": true,
+	"claude": true, "cursor": true, "codex": true, "triage": true, "svn": true, "hg": true, "jj": true, "vs": true,
+	"terraform": true, "config": true, "ssh": true, "aws": true, "docker": true, "kube": true, "gradle": true, "m2": true,
+}
+
+// runtimeGlobal reports whether name is a global of a present language's
+// runtime (console, Math, process…), whose members are never claims.
+func (x *extractor) runtimeGlobal(name string) bool {
+	for _, kind := range x.hints.Languages() {
+		if lg, _ := model.LangOf(kind); lg.Sep == "." && lg.Stdlib[name] {
+			return true
+		}
+	}
+	return false
 }
 
 // externalNames returns the names the document's code examples import

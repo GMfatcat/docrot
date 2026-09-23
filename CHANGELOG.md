@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.6.0 — 2026-09-24
+
+JavaScript and TypeScript, the second language through the plugin table.
+
+- `.js .mjs .cjs .jsx .ts .tsx` outside `node_modules/`, `dist/` and
+  `build/` are indexed: functions, classes and their members (`#private`
+  and `private` ones excluded from the exported surface), `const`/`let`/
+  `var`, interfaces, types, enums and namespaces, object-literal keys —
+  also of an object built inside a factory function, as fastify's instance
+  is — `X.prototype.m`, `X.m = …`, `Object.defineProperty`/`defineProperties`,
+  `export { a as b }`, `export * from`, `module.exports = { … }` and
+  `exports.name`. A module is its file stem; `module.member` also matches
+  a member of any class or object of that module (`reply.send`).
+- Documents may write `client.fetchAll`, `Client.fetchAll()`, `fetchAll()`,
+  `.parse()` and `Mode.Fast`. The document's own code blocks decide what a
+  prefix means: after `import * as z from "zod"` in zod's repository
+  `z.string()` is a claim; after `import express from "express"`
+  `express.json()` is not. `import { Client } from "this-package"` claims
+  that each name is exported; `import x from "this-package/sub"` claims
+  the sub-path exists (`package.json` `exports` or the tree); relative
+  imports are info.
+- Also from JavaScript: commander and yargs flags with their defaults,
+  `process.env.X` reads with `|| 'default'` fallbacks, express/koa/fastify/
+  hono/NestJS routes, `npm install`-style claims from imports, "requires
+  Node 18" against `engines.node`, JSDoc in `docrot comments`.
+- General: an unknown member of a class that lists all its members is a
+  finding, of one that `extends` another (or a Python class, a Rust type,
+  an Odin struct) it is not; runtime globals (`console.log`, `Math.max`)
+  are never paths; `\<` in a heading is text, not a tag; `NNNN` path
+  segments are placeholders.
+- Field report on fastify, hono and zod: `docs/field-report-js.md`.
+
 ## 0.5.0 — 2026-09-23
 
 Language plugins, and Rust as the first language added through them.

@@ -12,7 +12,7 @@ import (
 
 var (
 	// "requires Go 1.21+", "Go 1.22 or later", "Python >= 3.9", "需要 Go 1.21 以上"
-	reToolchain = regexp.MustCompile(`(?i)\b(go|golang|python|rust|rustc)\s*(?:>=|≥|version\s+)?\s*v?(\d+\.\d+)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
+	reToolchain = regexp.MustCompile(`(?i)\b(go|golang|python|rust|rustc|node\.js|nodejs|node)\s*(?:>=|≥|version\s+)?\s*v?(\d+(?:\.\d+)?)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
 	// a negated sentence ("not supported on Python 3.14", "dropped Python 3.8")
 	// is not a requirement of this project
 	reNegated = regexp.MustCompile(`(?i)\b(not|no longer|n't|dropp?e?d?|removed?|unsupported|without|deprecated)\b|不支援|不再|移除|已停止`)
@@ -190,6 +190,8 @@ func (x *extractor) toolchainRefs() {
 					tool = "go"
 				case "rustc":
 					tool = "rust"
+				case "node.js", "nodejs":
+					tool = "node"
 				}
 				r := model.Reference{Kind: model.KindToolchain, Text: strings.TrimSpace(m[0]), Norm: tool + ":" + m[2], Confidence: model.Medium}
 				x.emit(r, ln, 0, x.doc.SectionAt(ln), "")

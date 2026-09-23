@@ -21,6 +21,7 @@ type fakeHints struct {
 	hasPy    bool
 	langs    []model.Kind            // further present languages
 	ns       map[model.Kind][]string // their namespaces
+	proj     model.Project
 	noModule bool
 	routes   bool
 	jsonKeys map[string]bool
@@ -59,6 +60,7 @@ func (f fakeHints) Namespaces(k model.Kind) []string {
 	return f.ns[k]
 }
 func (f fakeHints) HasRoutes() bool            { return f.routes }
+func (f fakeHints) Project() model.Project     { return f.proj }
 func (f fakeHints) HasJSONKey(d string) bool   { return f.jsonKeys[d] }
 func (f fakeHints) HasConfigKey(d string) bool { return f.cfgKeys[d] }
 
