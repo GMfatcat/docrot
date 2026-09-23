@@ -12,7 +12,7 @@ import (
 
 var (
 	// "requires Go 1.21+", "Go 1.22 or later", "Python >= 3.9", "需要 Go 1.21 以上"
-	reToolchain = regexp.MustCompile(`(?i)\b(go|golang|python|rust|rustc|node\.js|nodejs|node)\s*(?:>=|≥|version\s+)?\s*v?(\d+(?:\.\d+)?)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
+	reToolchain = regexp.MustCompile(`(?i)(\bgo|\bgolang|\bpython|\brust|\brustc|\bnode\.js|\bnodejs|\bnode|\.net|\bdotnet)\s*(?:>=|≥|version\s+)?\s*v?(\d+(?:\.\d+)?)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
 	// a negated sentence ("not supported on Python 3.14", "dropped Python 3.8")
 	// is not a requirement of this project
 	reNegated = regexp.MustCompile(`(?i)\b(not|no longer|n't|dropp?e?d?|removed?|unsupported|without|deprecated)\b|不支援|不再|移除|已停止`)
@@ -33,7 +33,8 @@ var installers = map[string]installer{
 	"pip": {"pip", "install"}, "pip3": {"pip", "install"}, "pipx": {"pip", "install"},
 	"uv": {"pip", ""}, "poetry": {"pip", "add"}, "conda": {"pip", "install"},
 	"npm": {"npm", "install"}, "yarn": {"npm", "add"}, "pnpm": {"npm", "add"},
-	"cargo": {"cargo", ""},
+	"cargo":  {"cargo", ""},
+	"dotnet": {"dotnet", ""},
 }
 
 // runners maps a task runner to the sub-command that precedes the target.
@@ -117,6 +118,18 @@ func projectRefs(toks []string, conf model.Confidence) []model.Reference {
 			return out
 		}
 		args = args[1:]
+	} else if cmd == "dotnet" {
+		// dotnet add package X / dotnet add <project> package X / dotnet tool install X
+		k := -1
+		for i, a := range args {
+			if a == "package" && i > 0 && args[0] == "add" || a == "install" && i > 0 && args[0] == "tool" {
+				k = i
+			}
+		}
+		if k < 0 || k+1 >= len(args) {
+			return out
+		}
+		args = args[k+1:]
 	} else if ins.sub != "" {
 		if len(args) < 2 || args[0] != ins.sub {
 			return out
@@ -138,6 +151,10 @@ func projectRefs(toks []string, conf model.Confidence) []model.Reference {
 			continue
 		}
 		name := strings.Trim(t, `"'`)
+		if ins.kind == "dotnet" {
+			add(model.KindInstall, t, "dotnet:"+name)
+			break
+		}
 		if ins.kind == "cargo" {
 			// cargo add serde@1: the name is the first token; the rest are dependencies
 			if i := strings.IndexAny(name, "@="); i > 0 {
@@ -192,6 +209,8 @@ func (x *extractor) toolchainRefs() {
 					tool = "rust"
 				case "node.js", "nodejs":
 					tool = "node"
+				case ".net":
+					tool = "dotnet"
 				}
 				r := model.Reference{Kind: model.KindToolchain, Text: strings.TrimSpace(m[0]), Norm: tool + ":" + m[2], Confidence: model.Medium}
 				x.emit(r, ln, 0, x.doc.SectionAt(ln), "")

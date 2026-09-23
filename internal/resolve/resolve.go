@@ -464,6 +464,16 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 	if lg.Sep == "::" && dotted && !isCapitalized(first) && !r.ix.IsNamespace(ref.Kind, first) {
 		return Result{Skipped: true} // hyper::Body, tower::ServiceExt: a path into another crate
 	}
+	if lg.Kind == model.KindCSharpSym {
+		for _, p := range r.ix.Project().DotnetPackages {
+			if strings.EqualFold(p, strings.TrimSuffix(ref.Norm, "()")) {
+				return Result{OK: true} // Humanizer.Core: a package id, spelled like a namespace
+			}
+		}
+		if dotted && isCapitalized(first) && !anyHas(first) && !anyNamespace(first) {
+			return Result{Skipped: true} // TimeSpan.Zero, BenchmarkDotNet.Artifacts: a type of another assembly
+		}
+	}
 	// owner.attr where the owner is a known class, type, function or
 	// module-level object (not a namespace) whose members the index cannot
 	// list in full (a Python attribute set in __init__, a Rust trait

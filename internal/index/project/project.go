@@ -1,5 +1,5 @@
 // Package project reads a repository's identity files — go.mod,
-// pyproject.toml, setup.cfg, package.json, Cargo.toml — and its task runners'
+// pyproject.toml, setup.cfg, package.json, Cargo.toml, *.csproj — and its task runners'
 // definitions (Makefile, justfile, Taskfile.yml, package.json scripts), so
 // that a document's install line, toolchain requirement and `make target`
 // can be checked against what the repository actually declares.
@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"docrot/internal/model"
@@ -84,6 +85,7 @@ func Build(root string) model.Project {
 			}
 		}
 	}
+	p.DotnetPackages, p.DotnetVersion = csprojs(root)
 	for _, name := range []string{"Makefile", "GNUmakefile", "makefile"} {
 		if lines, ok := read(root, name); ok {
 			p.Targets["make"] = makeTargets(lines)
@@ -228,6 +230,86 @@ func pyproject(lines []string) (name, requires string) {
 		}
 	}
 	return name, requires
+}
+
+var (
+	reCsprojTag = regexp.MustCompile(`<(PackageId|AssemblyName|TargetFrameworks?)>\s*([^<]+?)\s*</`)
+	reNetTFM    = regexp.MustCompile(`^net(\d+)\.(\d+)`)
+	reNetFxTFM  = regexp.MustCompile(`^net(\d)(\d)\d?$`) // net462, net48: .NET Framework 4.6, 4.8
+)
+
+// csprojs finds every *.csproj up to three directories below root (a .NET
+// solution keeps its projects in sub-directories) and returns their
+// package ids (PackageId, else AssemblyName, else the file stem) and the
+// lowest net<major>.<minor> target framework among them.
+func csprojs(root string) (packages []string, version string) {
+	var files []string
+	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, rerr := filepath.Rel(root, p)
+		if rerr != nil || rel == "." {
+			return nil
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if name == ".git" || name == "bin" || name == "obj" || name == "node_modules" || strings.Count(filepath.ToSlash(rel), "/") >= 3 {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(d.Name(), ".csproj") {
+			files = append(files, p)
+		}
+		return nil
+	})
+	sort.Strings(files)
+	seen := map[string]bool{}
+	lowMaj, lowMin := 0, 0
+	for _, file := range files {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		id := strings.TrimSuffix(filepath.Base(file), ".csproj")
+		pkgID, asm := "", ""
+		for _, m := range reCsprojTag.FindAllStringSubmatch(string(b), -1) {
+			switch m[1] {
+			case "PackageId":
+				pkgID = m[2]
+			case "AssemblyName":
+				asm = m[2]
+			default:
+				for _, tfm := range strings.Split(m[2], ";") {
+					v := reNetTFM.FindStringSubmatch(strings.TrimSpace(tfm))
+					if v == nil {
+						v = reNetFxTFM.FindStringSubmatch(strings.TrimSpace(tfm))
+					}
+					if v != nil {
+						maj, _ := strconv.Atoi(v[1])
+						min, _ := strconv.Atoi(v[2])
+						if lowMaj == 0 || maj < lowMaj || maj == lowMaj && min < lowMin {
+							lowMaj, lowMin = maj, min
+						}
+					}
+				}
+			}
+		}
+		if pkgID != "" {
+			id = pkgID
+		} else if asm != "" {
+			id = asm
+		}
+		if !seen[id] {
+			seen[id] = true
+			packages = append(packages, id)
+		}
+	}
+	if lowMaj > 0 {
+		version = strconv.Itoa(lowMaj) + "." + strconv.Itoa(lowMin)
+	}
+	return packages, version
 }
 
 // cargo returns [package] name and rust-version from Cargo.toml; a

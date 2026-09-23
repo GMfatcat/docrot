@@ -49,17 +49,17 @@
       `docs/field-report-js.md`。
 - [x] 2F 文件與 0.6.0。
 
-## Wave 3 — C#（0.7.0）
+## Wave 3 — C#（0.7.0）— 已完成
 
-- [ ] 3A `internal/index/csharp`：namespace、型別、方法、屬性、泛型去角括號、巢狀
+- [x] 3A `internal/index/csharp`：namespace、型別、方法、屬性、泛型去角括號、巢狀
       類別、`Exported`；ASP.NET 路由含 `[controller]`；`GetEnvironmentVariable`；
       `Configuration["A:B"]` → config key；System.CommandLine 選項與預設值。
-- [ ] 3B `config`：預設 `configSamples` 加 `appsettings*.json`；`project`：`.csproj`
+- [x] 3B `config`：預設 `configSamples` 加 `appsettings*.json`；`project`：`.csproj`
       的名字與 `TargetFramework`；`dotnet add package`。
-- [ ] 3C fixture `testdata/fixture/dotnet/`；golden test。
-- [ ] 3D 實地：兩個 C# repo（一個 ASP.NET minimal API、一個 library）；
+- [x] 3C fixture `testdata/fixture/dotnet/`；golden test。
+- [x] 3D 實地：Polly、Humanizer（含一千多頁產生的 API 文件）、TodoApi（minimal API）；
       `docs/field-report-csharp.md`。
-- [ ] 3E 文件與 0.7.0。
+- [x] 3E 文件與 0.7.0。
 
 ## Wave 4 — C／C++（0.8.0）
 

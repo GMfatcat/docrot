@@ -100,6 +100,24 @@ func (r *Resolver) resolveInstall(ref model.Reference) Result {
 		}
 		msg := "`" + ref.Text + "` installs `" + name + "` but Cargo.toml names the package `" + want + "`"
 		return Result{Finding: r.finding(model.RuleInstallMismatch, sev, ref, msg, []string{want})}
+	case "dotnet":
+		if len(proj.DotnetPackages) == 0 {
+			return Result{Skipped: true}
+		}
+		best, bestDist := "", 99
+		for _, want := range proj.DotnetPackages {
+			if strings.EqualFold(name, want) {
+				return Result{OK: true}
+			}
+			if d := fuzzy.Distance(strings.ToLower(name), strings.ToLower(want)); d < bestDist {
+				best, bestDist = want, d
+			}
+		}
+		if len(name) < 4 || bestDist > 2 {
+			return Result{Skipped: true} // a dependency
+		}
+		msg := "`" + ref.Text + "` installs `" + name + "` but the project files name the package `" + best + "`"
+		return Result{Finding: r.finding(model.RuleInstallMismatch, sev, ref, msg, []string{best})}
 	case "npm":
 		want := proj.NPMName
 		if want == "" {
@@ -163,6 +181,8 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 		declared, source = proj.RustVersion, "Cargo.toml"
 	case "node":
 		declared, source = proj.NodeVersion, "package.json"
+	case "dotnet":
+		declared, source = proj.DotnetVersion, "the project files' TargetFramework"
 	}
 	if declared == "" {
 		return Result{Skipped: true}
@@ -175,10 +195,10 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 	if dMaj == cMaj && dMin == cMin {
 		return Result{OK: true} // go.mod churns with every dependency bump; not a staleness signal
 	}
-	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust", "node": "Node"}[tool]
+	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust", "node": "Node", "dotnet": ".NET"}[tool]
 	need := strconv.Itoa(dMaj) + "." + strconv.Itoa(dMin)
-	if !strings.Contains(declared, ".") {
-		need = strconv.Itoa(dMaj) // engines.node ">=18"
+	if !strings.Contains(declared, ".") || tool == "dotnet" && dMin == 0 {
+		need = strconv.Itoa(dMaj) // engines.node ">=18", net8.0
 	}
 	var msg string
 	sev := model.SevWarning

@@ -107,7 +107,13 @@ var Langs = []Lang{
 		module globalThis Number String Boolean Date RegExp Map Set Symbol Error Reflect Proxy navigator
 		localStorage sessionStorage location history performance crypto URL URLSearchParams`)},
 	{Kind: KindCSharpSym, ID: "csharp", Name: "C#", Sep: ".", Exts: []string{".cs"}, Naming: NamingPascal, Methods: NamingPascal,
-		Stdlib: set("System Microsoft Newtonsoft Console Task String Int32 Int64 Math Convert Enum Guid DateTime")},
+		Stdlib: set(`System Microsoft Newtonsoft Console Task ValueTask String Int32 Int64 Math Convert Enum Guid DateTime
+		DateTimeOffset TimeSpan Timeout TimeZoneInfo HttpClient HttpMethod HttpStatusCode HttpRequestMessage HttpResponseMessage
+		CancellationToken CancellationTokenSource Environment Path File Directory Stream MemoryStream Encoding Uri Exception
+		List Dictionary HashSet Queue Stack IEnumerable Enumerable Array Object Type Assembly Thread Random Regex Nullable
+		Tuple Action Func EventArgs StringBuilder JsonSerializer ILogger Activity Interlocked GC Buffer BitConverter
+		Boolean Char Byte Double Decimal Single Version Process Stopwatch Lazy Span Memory ReadOnlySpan ReadOnlyMemory
+		Parallel Volatile Marshal IntPtr BenchmarkDotNet Xunit NUnit Moq FluentAssertions Serilog`)},
 	{Kind: KindCSym, ID: "c", Name: "C/C++", Sep: "::", Exts: []string{".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"}, Naming: NamingSnake, Flat: true,
 		Stdlib: set("std boost")},
 }
@@ -498,17 +504,22 @@ type Index interface {
 // Project is the repository's declared identity (see Index.Project).
 // Every field may be empty; Targets and TargetFiles may be nil.
 type Project struct {
-	GoModule    string              `json:"goModule,omitempty"`
-	GoVersion   string              `json:"goVersion,omitempty"`  // "1.22", from the go directive
-	PyName      string              `json:"pyName,omitempty"`     // [project] name
-	PyRequires  string              `json:"pyRequires,omitempty"` // ">=3.10", "^3.9"
-	NPMName     string              `json:"npmName,omitempty"`
-	NPMExports  []string            `json:"npmExports,omitempty"`  // keys of package.json "exports": ".", "./server", "./v4/*"
-	NodeVersion string              `json:"nodeVersion,omitempty"` // package.json engines.node: ">=18"
-	CargoName   string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
-	RustVersion string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
-	Targets     map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
-	TargetFiles map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
+	GoModule    string   `json:"goModule,omitempty"`
+	GoVersion   string   `json:"goVersion,omitempty"`  // "1.22", from the go directive
+	PyName      string   `json:"pyName,omitempty"`     // [project] name
+	PyRequires  string   `json:"pyRequires,omitempty"` // ">=3.10", "^3.9"
+	NPMName     string   `json:"npmName,omitempty"`
+	NPMExports  []string `json:"npmExports,omitempty"`  // keys of package.json "exports": ".", "./server", "./v4/*"
+	NodeVersion string   `json:"nodeVersion,omitempty"` // package.json engines.node: ">=18"
+	// DotnetPackages are the package ids (or project names) of the *.csproj
+	// files found up to three directories deep; DotnetVersion is the lowest
+	// TargetFramework among them ("8.0" for net8.0).
+	DotnetPackages []string            `json:"dotnetPackages,omitempty"`
+	DotnetVersion  string              `json:"dotnetVersion,omitempty"`
+	CargoName      string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
+	RustVersion    string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
+	Targets        map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
+	TargetFiles    map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
 	// Intersphinx is set when a Sphinx conf.py maps other projects'
 	// inventories: a :ref: label that no local document defines may be
 	// theirs.

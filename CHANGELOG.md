@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.0 — 2026-09-24
+
+C#, the third language through the plugin table.
+
+- `.cs` files (outside `bin/`, `obj/` and generated `*.Designer.cs`/`*.g.cs`)
+  are indexed: file-scoped and block namespaces, classes, structs,
+  interfaces, enums, records, delegates and their methods, properties,
+  fields, events and enum members, under `Namespace.Type.Member`. Documents
+  may write that in full, `Type.Member`, `Type`, `Member()`, `Namespace.Type`
+  or a type by an outer namespace. XML doc comments (`/// <summary>`) feed
+  `docrot comments`.
+- Never a claim: `Type.Member` where the type is declared nowhere in the
+  repository (`TimeSpan.Zero`, a type of another assembly), members of the
+  base class library, and an unknown member of a type that inherits. A
+  dotted name equal to a `.csproj` package id is accepted.
+- Also from C#: System.CommandLine options and their defaults,
+  `Environment.GetEnvironmentVariable` and `Configuration["X"]` reads with
+  `?? "default"`, minimal-API routes (`MapGet`, `MapGroup` prefixes followed
+  through the group variable) and attribute-routed controllers,
+  `dotnet add package` against the `.csproj` package ids, "requires .NET 6"
+  against the lowest `TargetFramework`, and `appsettings*.json` among the
+  default configuration samples.
+- Field report on Polly, Humanizer and TodoApi: `docs/field-report-csharp.md`.
+
 ## 0.6.0 — 2026-09-24
 
 JavaScript and TypeScript, the second language through the plugin table.

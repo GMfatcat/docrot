@@ -106,6 +106,13 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleInstallMismatch, "README.md", "fixture-webb", model.SevError, "fixture-web"},
 		{model.RuleMissingTarget, "README.md", "npm deploy", model.SevError, ""},
 		{model.RuleToolchain, "README.md", "Node 16 or later", model.SevWarning, "18"},
+		{model.RuleUnknownFlag, "README.md", "--shard", model.SevWarning, "--shards"},
+		{model.RuleDefaultMismatch, "README.md", "shards default 4", model.SevWarning, "2"},
+		{model.RuleMissingRoute, "README.md", "DELETE /cs/items", model.SevError, ""},
+		{model.RuleMissingSymbol, "README.md", "Catalog.ListAl()", model.SevWarning, "Fixture.Api.Services.Catalog.ListAll"},
+		{model.RuleMissingSymbol, "README.md", "Fixture.Api.Services.Catalogue", model.SevError, "Fixture.Api.Services.Catalog"},
+		{model.RuleInstallMismatch, "README.md", "Fixture.Apii", model.SevError, "Fixture.Api"},
+		{model.RuleToolchain, "README.md", ".NET 6 or later", model.SevWarning, "8"},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))

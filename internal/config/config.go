@@ -129,7 +129,7 @@ func Default() Config {
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md",
 		},
 		ConfigSamples: []string{
-			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json",
+			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json", "appsettings*.json", "**/appsettings.json",
 		},
 		Stale: Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{
 			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**",

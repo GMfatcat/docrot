@@ -9,6 +9,13 @@ takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
 started; each item names the stage it would live in.
 
+## Done in 0.7.0: C#
+
+The third plugin language; see `CHANGELOG.md` and
+`docs/field-report-csharp.md`. Lessons: a C# document names base-class-library
+types on every page, so a `Type.Member` whose type the repository does not
+declare is never a claim; NuGet package ids look like namespaces.
+
 ## Done in 0.6.0: JavaScript and TypeScript
 
 The second plugin language; see `CHANGELOG.md` and

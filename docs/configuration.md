@@ -16,7 +16,7 @@ rather than ignored.
   "siblings": [],
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
-  "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
+  "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json", "appsettings*.json", "**/appsettings.json"],
   "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
@@ -41,7 +41,8 @@ rather than ignored.
   `pairPatterns` derives translations from a source name (`{stem}` is the
   file name without its extension). `docs/en/…` ↔ `docs/<lang>/…` trees <!-- docrot:ignore missing-path -->
   are detected without configuration.
-- `configSamples` are the JSON files mined for configuration keys.
+- `configSamples` are the JSON files mined for configuration keys
+  (`appsettings*.json` of a .NET project among the defaults).
 - `stale.minChurn` and `stale.minDays` are the staleness thresholds;
   `stale.exclude` keeps dated documents (changelogs, release notes, design
   specs) out of the staleness analysis and out of the toolchain-version
@@ -56,7 +57,7 @@ rather than ignored.
   `minConfidence` drops references below a confidence.
 - `outDir` is the directory every run rewrites; see below.
 - `maxFileMB` caps the size of any file whose *contents* docrot reads
-  (documents, Go/Odin/Python/Rust/JavaScript sources, JSON samples). Binaries are never
+  (documents, Go/Odin/Python/Rust/JavaScript/C# sources, JSON samples). Binaries are never
   opened at all — only their names enter the path index, so a 4 GB model
   file costs one directory entry, gitignored or not. A text file above the
   cap is skipped with a warning; paths to it still resolve.

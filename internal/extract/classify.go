@@ -19,7 +19,7 @@ func init() {
 		html css js ts sql csv jsonl log mod sum proto env gif png jpg jpeg svg pdf lock bat cmd
 		rs c h cpp hpp cc mtrace gguf safetensors wasm tmpl tpl gotmpl xml ico webp mp4 gz tar bz2 xz
 		7z conf service plist rst adoc ipynb pyi mjs cjs tsx jsx vue scss less map
-		pem crt key cff whl egg pyc pth cfg jsonc toml ini`) {
+		pem crt key cff whl egg pyc pth cfg jsonc toml ini cs csproj sln fs vb props targets nuspec razor cshtml`) {
 		knownExt[e] = true
 	}
 }

@@ -15,7 +15,7 @@
   "siblings": [],
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
-  "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
+  "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json", "appsettings*.json", "**/appsettings.json"],
   "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
@@ -36,7 +36,7 @@
   服務文件裡引用它所依賴的函式庫時很有用。
 - `pairs` 明確指定原文與翻譯的配對；`pairPatterns` 由原文檔名推導翻譯（`{stem}` 是去掉副檔名的
   檔名）。`docs/en/…` ↔ `docs/<lang>/…` 這種目錄結構不用設定就會被偵測到。 <!-- docrot:ignore missing-path -->
-- `configSamples` 是用來挖設定鍵的 JSON 檔。
+- `configSamples` 是用來挖設定鍵的 JSON 檔（預設含 .NET 專案的 `appsettings*.json`）。
 - `stale.minChurn` 與 `stale.minDays` 是過期判定的門檻；`stale.exclude` 把有日期的文件（changelog、
   release notes、設計規格）排除在過期分析與工具鏈版本檢查之外，它們本質上是歷史紀錄。
   `stale.enabled: false` 整個關掉依賴 git 的過期規則。
@@ -46,7 +46,7 @@
 - `net` 開啟外部 URL 檢查（也可以用 `--net`）。
 - `failOn` 是讓 `docrot check` 回傳 exit 1 的最低嚴重度；`minConfidence` 丟掉低於某個信心值的引用。
 - `outDir` 是每次執行都會重寫的輸出目錄；見下。
-- `maxFileMB` 限制 docrot 會「讀內容」的檔案大小（文件、Go／Odin／Python／Rust／JavaScript 原始碼、JSON 樣本）。
+- `maxFileMB` 限制 docrot 會「讀內容」的檔案大小（文件、Go／Odin／Python／Rust／JavaScript／C# 原始碼、JSON 樣本）。
   二進位檔完全不會被打開——只有檔名進入路徑索引，所以一個 4 GB 的模型檔不論有沒有被
   gitignore 都只花一筆目錄項目。超過上限的文字檔會跳過並警告；指向它的路徑仍然能解析。
 - `comments` 調整程式碼註解檢查，它會對文件指到的每個符號執行：註解之後有 `minChurn` 個新 commit

@@ -34,7 +34,7 @@ func TestDefaultIsValid(t *testing.T) {
 		{"pairPatterns", d.PairPatterns, []string{
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"}},
 		{"configSamples", d.ConfigSamples, []string{
-			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"}},
+			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json", "appsettings*.json", "**/appsettings.json"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
