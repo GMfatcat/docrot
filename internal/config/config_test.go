@@ -29,7 +29,7 @@ func TestDefaultIsValid(t *testing.T) {
 		{"failOn", d.FailOn, "error"},
 		{"minConfidence", d.MinConfidence, "low"},
 		{"severity", d.Severity, map[string]string{
-			"stale-section": "warning", "pair-lag": "warning", "pair-number": "info",
+			"stale-section": "warning", "pair-lag": "warning", "pair-number": "info", "pair-missing": "info", "pair-orphan": "warning",
 			"stale-symbol": "warning", "stale-comment": "info", "comment-mentions-missing": "warning"}},
 		{"pairPatterns", d.PairPatterns, []string{
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"}},
@@ -139,6 +139,8 @@ func TestParseOverlay(t *testing.T) {
 					"stale-section":            "warning",
 					"pair-lag":                 "error",
 					"pair-number":              "info",
+					"pair-missing":             "info",
+					"pair-orphan":              "warning",
 					"missing-path":             "info",
 					"stale-symbol":             "warning",
 					"stale-comment":            "info",

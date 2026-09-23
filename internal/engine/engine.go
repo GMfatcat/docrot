@@ -331,6 +331,7 @@ func Check(opts Options) (*Run, error) {
 	// check's job), and step 6 compares the two sides
 	prs := pairs.Detect(docs, toPairs(cfg.Pairs), cfg.PairPatterns)
 	mates := pairMates(prs)
+	gapFindings := pairs.Gaps(docs, prs, pairs.Options{Severity: sevOverrides})
 
 	// 5. stale sections
 	if run.Git != nil && cfg.Stale.Enabled {
@@ -406,6 +407,20 @@ func Check(opts Options) (*Run, error) {
 		}
 		prs = kept
 	}
+	if opts.Changed {
+		changedSet := make(map[string]bool, len(checked))
+		for _, d := range checked {
+			changedSet[d] = true
+		}
+		kept := gapFindings[:0]
+		for _, f := range gapFindings {
+			if changedSet[f.Loc.File] {
+				kept = append(kept, f)
+			}
+		}
+		gapFindings = kept
+	}
+	findings = append(findings, gapFindings...)
 	pairOpts := pairs.Options{Severity: sevOverrides, Repo: run.Git}
 	for _, p := range prs {
 		src, tr := parsed[p.Source], parsed[p.Translation]

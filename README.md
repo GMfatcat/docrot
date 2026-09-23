@@ -73,8 +73,9 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 - ⏳ **Staleness (git)** — a section whose referenced files or declarations
   kept changing after the section was last edited.
 - 🌏 **Bilingual pairs** — `README.md` ↔ `README-zh.md` keep the same
-  headings, code blocks, links, tables and numbers, and the translation is
-  not behind the source.
+  headings, code blocks, links, tables and numbers, the translation is
+  not behind the source, and a `docs/en/` ↔ `docs/zh/` tree has no
+  untranslated or orphaned page.
 - 💬 **Code comments** — the doc comment of a documented symbol names
   things that still exist, and its body has not moved on since the comment
   was written.

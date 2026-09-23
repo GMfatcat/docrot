@@ -24,7 +24,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `internal/resolve` — per-kind resolvers producing `model.Finding` with did-you-mean suggestions (`internal/fuzzy`, git rename history, sibling repos).
 - `internal/gitx` — git CLI wrapper: blame line times, commits since, renames, check-ignore, changed files; memoised per run and persisted in `<outDir>/git-cache.json` (blame by blob hash, log by HEAD); bounded concurrency, graceful when git is absent.
 - `internal/stale` — section edit time (blame) vs churn of referenced files (log) and of referenced declarations' bodies (stale-symbol, which supersedes the section finding).
-- `internal/pairs` — pair detection (`{stem}-zh.md` patterns, en/zh directory conventions, explicit config) and fingerprint diff; `pair-lag` via git.
+- `internal/pairs` — pair detection (`{stem}-zh.md` patterns, en/zh directory conventions, explicit config), fingerprint diff, `pair-lag` via git, and `pair-missing`/`pair-orphan` for directory trees.
 - `internal/comments` — comment checks for documented declarations: body churn after the comment's last edit (git) and comment mentions that resolve nowhere.
 - `internal/coverage` — documented vs exported.
 - `internal/baseline` — fingerprints exclude line numbers.

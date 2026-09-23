@@ -31,7 +31,9 @@
    translation excepted: that is the pair check's job), and the blame of each
    referenced declaration says whether *its* body moved on. Blame and log
    answers are cached in the output directory between runs.
-6. **Pairs**: structural fingerprints of both documents are diffed.
+6. **Pairs**: structural fingerprints of both documents are diffed, and a
+   `docs/en/` ↔ `docs/<lang>/` tree is checked for pages missing on either
+   side.
 7. **Comments**: for every symbol a document referred to, the attached
    doc comment or docstring is checked the same way — names it cites must
    exist, and a body that churned after the comment was edited is flagged.

@@ -27,14 +27,16 @@ var defaultSeverity = map[string]model.Severity{
 	model.RulePairTable:   model.SevWarning,
 	model.RulePairNumber:  model.SevInfo,
 	model.RulePairLag:     model.SevWarning,
+	model.RulePairMissing: model.SevInfo,
+	model.RulePairOrphan:  model.SevWarning,
 }
 
 // Options tunes [Compare].
 type Options struct {
 	// Severity overrides the default severity of a pair rule, by rule name.
 	// Missing or empty entries fall back to the defaults: warning for
-	// pair-heading, pair-code, pair-link, pair-table and pair-lag, info for
-	// pair-number.
+	// pair-heading, pair-code, pair-link, pair-table, pair-lag and
+	// pair-orphan, info for pair-number and pair-missing.
 	Severity map[string]model.Severity
 	// Repo enables the git-backed pair-lag rule. When nil the rule is
 	// skipped, and git errors never fail a comparison.

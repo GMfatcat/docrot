@@ -200,6 +200,8 @@ Findings are reported on the translation file.
 | `pair-table` | A table has a different row/column shape. |
 | `pair-number` | A number or version string appears in only one of the two files (info). |
 | `pair-lag` | Requires git. The source has commits newer than the translation's last change. The message lists them. |
+| `pair-missing` | In a directory translation tree (`docs/en/` ↔ `docs/zh/`, any depth, any language of the convention) a source page has no counterpart in a language the tree does translate into. Info, on the source page; the message names the missing file. Suffix pairs (`README-zh.md`) form no tree, so one untranslated README is never a gap. |
+| `pair-orphan` | The reverse: a page under `docs/zh/` whose source under `docs/en/` no longer exists. Warning, on the translation. Both need at least one detected pair in the tree, so a lone `docs/zh/` directory produces nothing. |
 
 ## Code comments
 

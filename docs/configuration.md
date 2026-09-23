@@ -19,7 +19,7 @@ rather than ignored.
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json", "appsettings*.json", "**/appsettings.json"],
   "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "ChangeLog*.md", "Changelog*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
-  "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
+  "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "pair-missing": "info", "pair-orphan": "warning", "stale-comment": "info", "comment-mentions-missing": "warning" },
   "net": false,
   "failOn": "error",
   "minConfidence": "low",

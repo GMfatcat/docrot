@@ -21,14 +21,14 @@
 
 ## Wave B — `pair-missing` 與 `pair-orphan`
 
-- [ ] B1 `internal/pairs/gaps.go`：`Gaps(docs, prs, opts) []model.Finding`；由目錄式配對
+- [x] B1 `internal/pairs/gaps.go`：`Gaps(docs, prs, opts) []model.Finding`；由目錄式配對
       推出翻譯集合，來源樹缺翻譯 → missing，翻譯樹缺來源 → orphan。
-- [ ] B2 `model`：兩個 rule 常數、`AllRules`、`RuleDescriptions`；`pairs.defaultSeverity`；
+- [x] B2 `model`：兩個 rule 常數、`AllRules`、`RuleDescriptions`；`pairs.defaultSeverity`；
       `config.Default().Severity` 加 `pair-missing: info`。
-- [ ] B3 engine 第 6 步呼叫 `Gaps`；`--changed` 時只保留有一側被改到的 finding。
-- [ ] B4 fixture：`docs/en/intro.md` + `docs/zh/intro.md`（一對）、`docs/en/extra.md`（漏翻）、
+- [x] B3 engine 第 6 步呼叫 `Gaps`；`--changed` 時只保留有一側被改到的 finding。
+- [x] B4 fixture：`docs/en/intro.md` + `docs/zh/intro.md`（一對）、`docs/en/extra.md`（漏翻）、
       `docs/zh/old.md`（孤兒）；golden wants 與 `Docs` 計數更新。
-- [ ] B5 文件：rules.md 配對表兩列、how-it-works 兩語第 6 步、README 兩語配對那一點。
+- [x] B5 文件：rules.md 配對表兩列、how-it-works 兩語第 6 步、README 兩語配對那一點。
 
 ## Wave C — `example-syntax`
 

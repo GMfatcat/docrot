@@ -331,6 +331,8 @@ const (
 	RuleMissingTarget    = "missing-target"
 	RuleStaleSymbol      = "stale-symbol"
 	RuleDefaultMismatch  = "default-mismatch"
+	RulePairMissing      = "pair-missing"
+	RulePairOrphan       = "pair-orphan"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -341,6 +343,7 @@ var AllRules = []string{
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
 	RuleStaleComment, RuleCommentMentions, RuleMissingRoute,
 	RuleInstallMismatch, RuleToolchain, RuleMissingTarget, RuleStaleSymbol, RuleDefaultMismatch,
+	RulePairMissing, RulePairOrphan,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -370,6 +373,8 @@ var RuleDescriptions = map[string]string{
 	RuleMissingTarget:    "A make/npm/just/task target mentioned in the document is not defined.",
 	RuleStaleSymbol:      "The body of a function or type this section names changed in several commits after the section was last edited.",
 	RuleDefaultMismatch:  "The default value the document gives for a flag, config key or environment variable differs from the one the code declares.",
+	RulePairMissing:      "A page of a translated documentation tree (docs/en ↔ docs/<lang>) has no counterpart in that language.",
+	RulePairOrphan:       "A translated page's source no longer exists in the documentation tree.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.
