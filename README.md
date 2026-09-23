@@ -97,7 +97,10 @@ silence it.
 5. **Stale**: `git blame` gives each section an edit time; `git log` counts
    commits to every referenced file after that time.
 6. **Pairs**: structural fingerprints of both documents are diffed.
-7. **Baseline**: fingerprints exclude line numbers, so a baseline survives
+7. **Comments**: for every symbol a document referred to, the attached
+   doc comment or docstring is checked the same way — names it cites must
+   exist, and a body that churned after the comment was edited is flagged.
+8. **Baseline**: fingerprints exclude line numbers, so a baseline survives
    ordinary editing.
 
 Severity follows confidence: high → error, medium → warning, low → info.
@@ -139,7 +142,8 @@ scanned.
   "failOn": "error",
   "minConfidence": "low",
   "outDir": ".docrot",
-  "maxFileMB": 8
+  "maxFileMB": 8,
+  "comments": { "enabled": true, "minChurn": 2, "minFrac": 0.5 }
 }
 ```
 
@@ -151,6 +155,10 @@ scanned.
   the staleness analysis; they are historical records by nature.
 - `severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
 - `outDir` is the directory every run rewrites; see below.
+- `comments` tunes the code-comment checks that run for every symbol a
+  document refers to: `minChurn` newer commits (or one commit rewriting
+  `minFrac` of the body) make a comment "stale"; `docrot comments` runs
+  the same checks over every exported declaration.
 - `maxFileMB` caps the size of any file whose *contents* docrot reads
   (documents, Go/Odin/Python sources, JSON samples). Binaries are never
   opened at all — only their names enter the path index, so a 4 GB model
@@ -238,6 +246,7 @@ Design: [docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/sp
 Plan: [docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md).
 Rules: [docs/rules.md](docs/rules.md). Field reports: [docs/field-report.md](docs/field-report.md), [docs/field-report-python.md](docs/field-report-python.md).
 Agent entry point: [llms.txt](llms.txt). Changes: [CHANGELOG.md](CHANGELOG.md).
+What it does not check yet: [docs/roadmap.md](docs/roadmap.md).
 
 ## Non-goals
 

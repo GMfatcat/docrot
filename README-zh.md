@@ -82,7 +82,9 @@ docrot baseline                 # freeze today's findings; fail only on new ones
    Damerau-Levenshtein，路徑另外參考 git 改名歷史）。
 5. **過期判定**：`git blame` 給每個章節一個編輯時間；`git log` 數出那之後每個被引用檔案的 commit 數。
 6. **雙語配對**：對兩份文件的結構指紋做 diff。
-7. **Baseline**：指紋不含行號，所以一般編輯不會讓 baseline 失效。
+7. **註解**：文件指到的每個符號，其 doc comment／docstring 用同一套方法檢查——引用的名字必須存在，
+   註解修改之後本體大幅變動也會標出來。
+8. **Baseline**：指紋不含行號，所以一般編輯不會讓 baseline 失效。
 
 嚴重度跟著信心值走：high → error、medium → warning、low → info。flag 與環境變數再軟一級，
 因為它們太常是在講*別的*程式；glob 沒命中、設定鍵與光禿禿的檔名一律 info。文字報告預設隱藏
@@ -117,7 +119,8 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "failOn": "error",
   "minConfidence": "low",
   "outDir": ".docrot",
-  "maxFileMB": 8
+  "maxFileMB": 8,
+  "comments": { "enabled": true, "minChurn": 2, "minFrac": 0.5 }
 }
 ```
 
@@ -127,6 +130,8 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 - `stale.exclude` 把有日期的文件（changelog、設計規格）排除在過期分析之外；它們本質上是歷史紀錄。
 - `severity` 覆蓋某條規則的等級，例如 `{"stale-section": "info"}`。
 - `outDir` 是每次執行都會重寫的輸出目錄；見下。
+- `comments` 調整程式碼註解檢查，它會對文件指到的每個符號執行：註解之後有 `minChurn` 個新 commit
+  （或一個 commit 改寫了本體 `minFrac` 的比例）就算「過期」；`docrot comments` 對所有 exported 宣告跑同一套檢查。
 - `maxFileMB` 限制 docrot 會「讀內容」的檔案大小（文件、Go／Odin／Python 原始碼、JSON 樣本）。
   二進位檔完全不會被打開——只有檔名進入路徑索引，所以一個 4 GB 的模型檔不論有沒有被
   gitignore 都只花一筆目錄項目。超過上限的文字檔會跳過並警告；指向它的路徑仍然能解析。
@@ -205,6 +210,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 計畫：[docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md)。
 規則：[docs/rules.md](docs/rules.md)。實地報告：[docs/field-report.md](docs/field-report.md)、[docs/field-report-python.md](docs/field-report-python.md)。
 給 agent 的入口：[llms.txt](llms.txt)。變更：[CHANGELOG.md](CHANGELOG.md)。
+還沒檢查的東西：[docs/roadmap.md](docs/roadmap.md)。
 
 ## 非目標
 

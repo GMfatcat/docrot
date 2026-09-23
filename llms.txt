@@ -45,4 +45,5 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - [Field report](docs/field-report.md) — results on eight real Go/Odin repositories
 - [Python field report](docs/field-report-python.md) — results on httpx, Starlette, Typer, Pydantic and FastAPI
 - [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md)
+- [Roadmap](docs/roadmap.md) — claims docrot does not check yet, ranked by value/cost
 - Verify everything: `python scripts/verify.py`

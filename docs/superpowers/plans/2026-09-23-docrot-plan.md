@@ -47,6 +47,10 @@
 - [x] `docrot check` 對自身 repo：0 error（`docs/superpowers/**` 因示意路徑而排除）。
 - [x] 對 meowbase：1.4 秒跑完、報告可讀；抽樣 error 級 finding 大多為真實過期（見實地報告）。
 
+## 0.2.0 之後
+
+後續候選功能與取捨整理在 `docs/roadmap.md`（路由檢查、字串常值索引、JSON 範例對照、RST 輸入、`--changed`、`fix --dry-run` 等）。
+
 ## 事後補充（與原計畫的差異）
 
 - 新增 `siblings` 設定：多 repo 生態（服務文件引用函式庫路徑）沒有它會有整批假警報。
