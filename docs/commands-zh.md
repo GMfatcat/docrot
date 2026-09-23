@@ -63,9 +63,9 @@ finding 失敗，`--all` 可以把已 baseline 的再顯示出來。指紋不含
 
 ## 修正
 
-`docrot fix` 只套用建議裡機械性的那一半：git 歷史記錄過改名的路徑（`old/name.go` →
-`pkg/httpx/server.go`，原文的 `./` 前綴與結尾 `/` 照留）、以及和真實檔名只差大小寫的路徑
-（`docs/Guide.md` 被寫成 `docs/guide.md`，照文件原本用的框架改：repo 根或文件所在目錄）。
+`docrot fix` 只套用建議裡機械性的那一半：git 歷史記錄過改名的路徑（`old/name.go` → <!-- docrot:ignore missing-path -->
+`pkg/httpx/server.go`，原文的 `./` 前綴與結尾 `/` 照留）、以及和真實檔名只差大小寫的路徑 <!-- docrot:ignore missing-path -->
+（`docs/Guide.md` 被寫成 `docs/guide.md`，照文件原本用的框架改：repo 根或文件所在目錄）。 <!-- docrot:ignore missing-path -->
 不加 `--apply` 只印出每一處修改與前後兩行，不寫檔；加 `--apply` 才改寫文件，保留原檔的換行
 風格與 BOM。符號改名、錨點、模糊的「你是不是想找」建議一律不套用；baselined 的 finding 不動。
 `--format json` 列出所有修改。改名表需要 git。

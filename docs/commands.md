@@ -75,10 +75,10 @@ headings, so editing around a finding does not resurrect it.
 ## Fixing
 
 `docrot fix` applies the mechanical half of the suggestions: a path that
-git history records as renamed (`old/name.go` → `pkg/httpx/server.go`,
+git history records as renamed (`old/name.go` → `pkg/httpx/server.go`, <!-- docrot:ignore missing-path -->
 with a `./` prefix or trailing `/` kept as written) and a path that
-differs from the real file only by letter case (`docs/guide.md` for
-`docs/Guide.md`, rewritten in the frame the document used, root or its
+differs from the real file only by letter case (`docs/guide.md` for <!-- docrot:ignore missing-path -->
+`docs/Guide.md`, rewritten in the frame the document used, root or its <!-- docrot:ignore missing-path -->
 own directory). Without `--apply` it prints each change with the line
 before and after and writes nothing; with `--apply` it rewrites the
 documents, keeping their line endings and byte-order mark. Symbol
