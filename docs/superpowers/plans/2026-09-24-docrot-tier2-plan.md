@@ -43,13 +43,13 @@
 
 ## Wave D — 路由與設定鍵覆蓋率
 
-- [ ] D1 `coverage.Result` 加 `Routes`、`Configs`；`coverage.Routes(listed, documented)`、
+- [x] D1 `coverage.Result` 加 `Routes`、`Configs`；`coverage.Routes(listed, documented)`、
       `coverage.Configs(keys, mentioned)`（只算葉節點）；`Findings` 多兩類；測試。
-- [ ] D2 engine 第 7 步：由 `mentioned` 的 `route|`／`configkey|`／`default` 鍵算出
+- [x] D2 engine 第 7 步：由 `mentioned` 的 `route|`／`configkey|`／`default` 鍵算出
       documented 集合（`routes.Normalize`）；`toReportCoverage` 帶過去。
-- [ ] D3 report：`Coverage` 結構加 `Routes`、`Configs`；text、md、html、json 各多兩列；
+- [x] D3 report：`Coverage` 結構加 `Routes`、`Configs`；text、md、html、json 各多兩列；
       `docrot coverage` 表多兩行；report 測試。
-- [ ] D4 文件：rules.md `undocumented` 那列、commands 的 coverage 說明、README 兩語的
+- [x] D4 文件：rules.md `undocumented` 那列、commands 的 coverage 說明、README 兩語的
       覆蓋率那一點、llms.txt。
 
 ## Wave E — `docrot fix`

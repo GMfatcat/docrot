@@ -554,6 +554,14 @@ func (ix *Index) ConfigKeys() []string {
 	return ix.cfg.Keys()
 }
 
+// ConfigFiles lists the sample files the config keys came from.
+func (ix *Index) ConfigFiles() []string {
+	if ix.cfg == nil {
+		return nil
+	}
+	return ix.cfg.Files()
+}
+
 // --- project identity ---
 
 func (ix *Index) Project() model.Project { return ix.proj }

@@ -138,6 +138,12 @@ func writeCoverageText(w io.Writer, cov *Coverage) {
 	}
 	fmt.Fprintf(w, "  flags: %s\n", coverageCell(cov.Flags.Documented, cov.Flags.Total, cov.Flags.Missing))
 	fmt.Fprintf(w, "  envs: %s\n", coverageCell(cov.Envs.Documented, cov.Envs.Total, cov.Envs.Missing))
+	if cov.Routes.Total > 0 {
+		fmt.Fprintf(w, "  routes: %s\n", coverageCell(cov.Routes.Documented, cov.Routes.Total, cov.Routes.Missing))
+	}
+	if cov.Configs.Total > 0 {
+		fmt.Fprintf(w, "  config keys: %s\n", coverageCell(cov.Configs.Documented, cov.Configs.Total, cov.Configs.Missing))
+	}
 }
 
 // coverageCell renders "documented/total (pct%)" plus up to

@@ -227,7 +227,7 @@ supported.
 
 | Rule | Meaning |
 |---|---|
-| `undocumented` | Only when `coverage.report` is true (or with `docrot coverage`): an exported Go symbol, flag, or environment variable is not mentioned by any document. Only references docrot extracted count, so a flag that appears solely inside a ```` ```text ```` block is "undocumented" until it is mentioned in prose or a code span. |
+| `undocumented` | Only when `coverage.report` is true (or with `docrot coverage`): an exported Go symbol, flag, environment variable, registered HTTP route or configuration key (a leaf key of a sample file; a route or key mentioned in a documented default counts) is not mentioned by any document. Only references docrot extracted count, so a flag that appears solely inside a ```` ```text ```` block is "undocumented" until it is mentioned in prose or a code span. |
 
 ## Checking only what changed
 

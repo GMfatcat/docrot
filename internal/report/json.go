@@ -38,6 +38,8 @@ type jsonCoverage struct {
 	Packages []jsonPackageCoverage `json:"packages"`
 	Flags    jsonCoverageGroup     `json:"flags"`
 	Envs     jsonCoverageGroup     `json:"envs"`
+	Routes   jsonCoverageGroup     `json:"routes"`
+	Configs  jsonCoverageGroup     `json:"config"`
 }
 
 type jsonPackageCoverage struct {
@@ -95,6 +97,8 @@ func jsonCoverageOf(c *Coverage) *jsonCoverage {
 		Packages: make([]jsonPackageCoverage, 0, len(c.Packages)),
 		Flags:    jsonCoverageGroup{Total: c.Flags.Total, Documented: c.Flags.Documented, Missing: nonNil(c.Flags.Missing)},
 		Envs:     jsonCoverageGroup{Total: c.Envs.Total, Documented: c.Envs.Documented, Missing: nonNil(c.Envs.Missing)},
+		Routes:   jsonCoverageGroup{Total: c.Routes.Total, Documented: c.Routes.Documented, Missing: nonNil(c.Routes.Missing)},
+		Configs:  jsonCoverageGroup{Total: c.Configs.Total, Documented: c.Configs.Documented, Missing: nonNil(c.Configs.Missing)},
 	}
 	for _, p := range c.Packages {
 		out.Packages = append(out.Packages, jsonPackageCoverage{

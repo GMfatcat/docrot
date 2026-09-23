@@ -82,8 +82,8 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 - 💬 **Code comments** — the doc comment of a documented symbol names
   things that still exist, and its body has not moved on since the comment
   was written.
-- 📊 **Coverage** — exported symbols, flags and environment variables that
-  no document mentions.
+- 📊 **Coverage** — exported symbols, flags, environment variables, routes
+  and config keys that no document mentions.
 
 Every rule, how it decides and how to silence it: [docs/rules.md](docs/rules.md).
 

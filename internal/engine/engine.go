@@ -448,6 +448,9 @@ func Check(opts Options) (*Run, error) {
 		}
 		exported = kept
 		res := coverage.Compute(exported, mentioned)
+		res.Routes = coverage.Routes(ix.Routes(), documentedRoutes(mentioned))
+		res.Configs = coverage.Configs(ix.ConfigKeys(), documentedConfigs(mentioned))
+		res.Locations = coverageLocations(ix, res)
 		cov = toReportCoverage(res)
 		if cfg.Coverage.Report {
 			sev := model.SevInfo
@@ -1001,5 +1004,7 @@ func toReportCoverage(r coverage.Result) *report.Coverage {
 	}
 	c.Flags = report.CoverageGroup{Total: r.Flags.Total, Documented: r.Flags.Documented, Missing: r.Flags.Missing}
 	c.Envs = report.CoverageGroup{Total: r.Envs.Total, Documented: r.Envs.Documented, Missing: r.Envs.Missing}
+	c.Routes = report.CoverageGroup{Total: r.Routes.Total, Documented: r.Routes.Documented, Missing: r.Routes.Missing}
+	c.Configs = report.CoverageGroup{Total: r.Configs.Total, Documented: r.Configs.Documented, Missing: r.Configs.Missing}
 	return c
 }

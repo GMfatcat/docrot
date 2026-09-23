@@ -56,6 +56,8 @@ type htmlCoverage struct {
 	Packages []htmlCoverageRow
 	Flags    htmlCoverageRow
 	Envs     htmlCoverageRow
+	Routes   *htmlCoverageRow // nil when the repository registers no routes
+	Configs  *htmlCoverageRow // nil when it has no configuration samples
 }
 
 // htmlCoverageRow is one documented/total bar.
@@ -181,6 +183,14 @@ func htmlCoverageOf(c *Coverage) *htmlCoverage {
 	}
 	for _, p := range c.Packages {
 		out.Packages = append(out.Packages, htmlCoverageRowOf(p.Package, p.Documented, p.Total, p.Missing))
+	}
+	if c.Routes.Total > 0 {
+		r := htmlCoverageRowOf("routes", c.Routes.Documented, c.Routes.Total, c.Routes.Missing)
+		out.Routes = &r
+	}
+	if c.Configs.Total > 0 {
+		r := htmlCoverageRowOf("config keys", c.Configs.Documented, c.Configs.Total, c.Configs.Missing)
+		out.Configs = &r
 	}
 	return out
 }

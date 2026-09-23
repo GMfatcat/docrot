@@ -255,6 +255,13 @@ func TestCoverage(t *testing.T) {
 	if contains(httpx.Missing, "httpx.NewServer") || contains(httpx.Missing, "httpx.WriteData") {
 		t.Errorf("documented symbols reported missing: %v", httpx.Missing)
 	}
+	cov := run.Report.Coverage
+	if cov.Routes.Total == 0 || !contains(cov.Routes.Missing, "POST /js/items") || contains(cov.Routes.Missing, "GET /v1/items") || contains(cov.Routes.Missing, "GET /v1/items/{}") || contains(cov.Routes.Missing, "/healthz") {
+		t.Errorf("route coverage = %+v", cov.Routes)
+	}
+	if cov.Configs.Total == 0 || !contains(cov.Configs.Missing, "retention.days") || contains(cov.Configs.Missing, "server.addr") || contains(cov.Configs.Missing, "server") {
+		t.Errorf("config coverage = %+v", cov.Configs)
+	}
 }
 
 func contains(list []string, s string) bool {

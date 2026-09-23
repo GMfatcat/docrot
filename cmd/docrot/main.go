@@ -4,7 +4,7 @@
 //	                               and rewrite the output directory (.docrot by default);
 //	                               --changed [--since REF] checks only modified docs
 //	docrot baseline [dir]          freeze current findings into .docrot-baseline.json
-//	docrot coverage [dir]          which exported symbols/flags/env are undocumented
+//	docrot coverage [dir]          which exported symbols/flags/env/routes/config keys are undocumented
 //	docrot pairs [dir]             only the bilingual source/translation checks
 //	docrot explain <doc>           every reference extracted from one document
 //	docrot index [dir] --kind K    dump an index (symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c)
@@ -99,7 +99,7 @@ Usage:
   docrot check [dir] [flags]      scan docs and report findings (exit 1 when --fail-on is met)
                                   --changed [--since REF]: only documents modified since HEAD / REF
   docrot baseline [dir]           write .docrot-baseline.json with the current findings
-  docrot coverage [dir]           list exported symbols / flags / env vars no document mentions
+  docrot coverage [dir]           list exported symbols / flags / env / routes / config keys no document mentions
   docrot pairs [dir]              only the source/translation pair checks
   docrot comments [dir]           comment checks over every exported symbol (not only documented ones)
   docrot explain <doc>            show every reference extracted from one document
@@ -414,6 +414,12 @@ func cmdCoverage(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(tw, "flags\t%d\t%d\t%d%%\t%s\n", cov.Flags.Documented, cov.Flags.Total, pct(cov.Flags.Documented, cov.Flags.Total), joinMax(cov.Flags.Missing, 8))
 	fmt.Fprintf(tw, "env\t%d\t%d\t%d%%\t%s\n", cov.Envs.Documented, cov.Envs.Total, pct(cov.Envs.Documented, cov.Envs.Total), joinMax(cov.Envs.Missing, 8))
+	if cov.Routes.Total > 0 {
+		fmt.Fprintf(tw, "routes\t%d\t%d\t%d%%\t%s\n", cov.Routes.Documented, cov.Routes.Total, pct(cov.Routes.Documented, cov.Routes.Total), joinMax(cov.Routes.Missing, 8))
+	}
+	if cov.Configs.Total > 0 {
+		fmt.Fprintf(tw, "config keys\t%d\t%d\t%d%%\t%s\n", cov.Configs.Documented, cov.Configs.Total, pct(cov.Configs.Documented, cov.Configs.Total), joinMax(cov.Configs.Missing, 8))
+	}
 	tw.Flush()
 	fmt.Fprintf(stdout, "\nsymbols: %d/%d documented (%d%%) across %d docs\n", documented, total, pct(documented, total), run.Report.Summary.Docs)
 	return exitOK

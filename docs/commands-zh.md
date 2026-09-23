@@ -11,7 +11,7 @@ docrot check [dir] [--format text|md|json|sarif|html|github|junit] [--output FIL
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
              [--changed] [--since REF]
 docrot baseline [dir]            write .docrot-baseline.json
-docrot coverage [dir]            documentation coverage table
+docrot coverage [dir]            documentation coverage table (symbols, flags, env, routes, config keys)
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict

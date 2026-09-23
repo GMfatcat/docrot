@@ -214,13 +214,19 @@ func mdCoverage(w io.Writer, cov *Coverage) {
 	}
 	fmt.Fprintln(w, "## Coverage")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Exported symbols, flags and environment variables no document mentions.")
+	fmt.Fprintln(w, "Exported symbols, flags, environment variables, routes and config keys no document mentions.")
 	fmt.Fprintln(w)
 	for _, p := range cov.Packages {
 		fmt.Fprintf(w, "- %s: %s\n", mdText(p.Package), mdText(coverageCell(p.Documented, p.Total, p.Missing)))
 	}
 	fmt.Fprintf(w, "- flags: %s\n", mdText(coverageCell(cov.Flags.Documented, cov.Flags.Total, cov.Flags.Missing)))
 	fmt.Fprintf(w, "- envs: %s\n", mdText(coverageCell(cov.Envs.Documented, cov.Envs.Total, cov.Envs.Missing)))
+	if cov.Routes.Total > 0 {
+		fmt.Fprintf(w, "- routes: %s\n", mdText(coverageCell(cov.Routes.Documented, cov.Routes.Total, cov.Routes.Missing)))
+	}
+	if cov.Configs.Total > 0 {
+		fmt.Fprintf(w, "- config keys: %s\n", mdText(coverageCell(cov.Configs.Documented, cov.Configs.Total, cov.Configs.Missing)))
+	}
 	fmt.Fprintln(w)
 }
 

@@ -68,10 +68,14 @@ type PackageCoverage struct {
 }
 
 // Coverage is the optional "what does no document mention?" section.
+// Routes and Configs are empty (Total 0) in a repository without routes
+// or configuration samples, and the writers then leave them out.
 type Coverage struct {
 	Packages []PackageCoverage
 	Flags    CoverageGroup
 	Envs     CoverageGroup
+	Routes   CoverageGroup
+	Configs  CoverageGroup
 }
 
 // Report is everything the writers need.
