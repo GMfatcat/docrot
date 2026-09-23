@@ -217,6 +217,12 @@ supported.
 | `stale-comment` | Requires git. The comment attached to a function/type was last edited at time *T*; the body has `comments.minChurn` (default 2) or more distinct commits after *T*, or one commit that rewrote `comments.minFrac` (default 50%) of it. Whitespace-only changes never count. Info by default: it means "re-read this comment", not "this comment is wrong". |
 | `comment-mentions-missing` | The comment names something code-like — a backticked token, `snake_case`, `camelCase`, `pkg.Name`, `--flag`, a path — that appears neither in the declaration, nor elsewhere in the file, nor anywhere in the index. Plain English words are never candidates. Typical hit: a parameter that was renamed while the comment kept the old name. |
 
+## Code examples
+
+| Rule | Meaning |
+|---|---|
+| `example-syntax` | A ```` ```go ```` block parses under none of the shapes a snippet takes: a whole file, a file without its `package` clause, a statement list, statements followed by declarations, switch cases, composite-literal elements, struct fields or interface methods (imports written inside the block are hoisted above the wrapper). Warning for a syntax error inside the block; info when the block merely ends before its braces close, which is an excerpt as often as a mistake. Blocks containing `...`, `…` or `{{`, go.mod content, and blocks marked ```` ```go ignore ```` (also `skip`, `no-check`, `pseudo`, `output`, `diff`) are never parsed; changelogs and the other `stale.exclude` documents are not checked, because they quote diffs and old syntax on purpose. Only Go: it has a parser in the standard library. |
+
 ## Coverage
 
 | Rule | Meaning |

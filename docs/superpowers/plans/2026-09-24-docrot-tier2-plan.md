@@ -32,13 +32,13 @@
 
 ## Wave C — `example-syntax`
 
-- [ ] C1 `internal/examples/go.go`：四種包法、略過規則、錯誤行換算、fingerprint；測試涵蓋
+- [x] C1 `internal/examples/go.go`：四種包法、略過規則、錯誤行換算、fingerprint；測試涵蓋
       完整檔、片段、struct 片段、省略號、資訊字串。
-- [ ] C2 `model`：rule 常數、描述；engine 在 extract 之後對每份 checked 文件呼叫；
+- [x] C2 `model`：rule 常數、描述；engine 在 extract 之後對每份 checked 文件呼叫；
       `dropRuleIgnored` 自然生效。
-- [ ] C3 實地：`docs/field-report-examples.md`（短）——meowbase、meowbase-rpc、
+- [x] C3 實地：`docs/field-report-examples.md`（短）——meowbase、meowbase-rpc、
       meowbase-sqlite、meowbase-web、meowshare 的首輪數字、噪音類型、調整後的數字。
-- [ ] C4 fixture README 加一個少了右大括號的 Go 區塊；golden want；rules.md「Code examples」
+- [x] C4 fixture README 加一個少了右大括號的 Go 區塊；golden want；rules.md「Code examples」
       一節；how-it-works 兩語；README 兩語。
 
 ## Wave D — 路由與設定鍵覆蓋率

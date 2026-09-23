@@ -45,6 +45,20 @@ import (
 s := httpx.NewServer(":8080")
 ```
 
+A shorter form:
+
+```go
+srv := httpx.NewServer(":8080"
+srv.Start()
+```
+
+An excerpt of the server loop:
+
+```go
+func (s *Server) loop() {
+	for msg := range s.in {
+```
+
 ## Configuration
 
 Flags: `--addr`, `--config`, `--confg`, `--port`. Rust flags: `--level`, `--workers`, `--worker`. Node flags: `--retries`, `--retrie`. .NET flags: `--shards`, `--shard`. C++ flags: `--threads`, `--thread`.

@@ -70,6 +70,9 @@ docrot baseline                 # freeze today's findings; fail only on new ones
   `cargo add` / `npm install` / `dotnet add package` name this project
   correctly, `import { x } from 'pkg/sub'` names a real sub-path,
   "requires Go 1.21" agrees with `go.mod`, `make lint` is a target. <!-- docrot:ignore toolchain-mismatch -->
+- 🧪 **Go examples** — every ```` ```go ```` block parses, as a file, a
+  snippet, a struct or interface body; an excerpt cut before its closing
+  brace is only info.
 - ⏳ **Staleness (git)** — a section whose referenced files or declarations
   kept changing after the section was last edited.
 - 🌏 **Bilingual pairs** — `README.md` ↔ `README-zh.md` keep the same

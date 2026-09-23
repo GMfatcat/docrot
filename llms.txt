@@ -27,6 +27,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `internal/pairs` — pair detection (`{stem}-zh.md` patterns, en/zh directory conventions, explicit config), fingerprint diff, `pair-lag` via git, and `pair-missing`/`pair-orphan` for directory trees.
 - `internal/comments` — comment checks for documented declarations: body churn after the comment's last edit (git) and comment mentions that resolve nowhere.
 - `internal/coverage` — documented vs exported.
+- `internal/examples` — ```go blocks parsed with `go/parser` under the shapes a snippet takes (`example-syntax`).
 - `internal/baseline` — fingerprints exclude line numbers.
 - `internal/report` — text, agent-facing markdown, json, sarif 2.1.0, self-contained html, GitHub workflow commands, JUnit XML.
 - `internal/engine` — orchestration; `cmd/docrot` — CLI and exit codes.
@@ -49,6 +50,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - [JavaScript/TypeScript field report](docs/field-report-js.md) — results on fastify, hono and zod
 - [C# field report](docs/field-report-csharp.md) — results on Polly, Humanizer and TodoApi
 - [C/C++ field report](docs/field-report-c.md) — results on curl, nlohmann/json and CLI11
+- [Go example check field report](docs/field-report-examples.md) — 1,570 ```go blocks of the meowbase repositories
 - [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md)
 - [Roadmap](docs/roadmap.md) — claims docrot does not check yet, ranked by value/cost
 - Verify everything: `python scripts/verify.py`

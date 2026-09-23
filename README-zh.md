@@ -60,6 +60,8 @@ docrot baseline                 # freeze today's findings; fail only on new ones
   `dotnet add package` 寫對本專案的名字、
   `import { x } from 'pkg/sub'` 指到真的子路徑、
   「requires Go 1.21」與 `go.mod` 一致、`make lint` 是真的目標。 <!-- docrot:ignore toolchain-mismatch -->
+- 🧪 **Go 範例** —— 每個 ```` ```go ```` 區塊都能 parse（整檔、片段、struct／interface 內文都算）；
+  截到右大括號前的節錄只算 info。
 - ⏳ **過期判定（git）** —— 章節最後編輯之後，它引用的檔案或宣告仍持續變動。
 - 🌏 **雙語配對** —— `README.md` ↔ `README-zh.md` 標題、程式碼區塊、連結、表格、數字
   一致，翻譯沒有落後原文；`docs/en/` ↔ `docs/zh/` 這種樹沒有漏翻或孤兒頁。 <!-- docrot:ignore missing-path -->

@@ -26,6 +26,7 @@ import (
 	"docrot/internal/comments"
 	"docrot/internal/config"
 	"docrot/internal/coverage"
+	"docrot/internal/examples"
 	"docrot/internal/extract"
 	"docrot/internal/gitx"
 	"docrot/internal/globx"
@@ -279,6 +280,10 @@ func Check(opts Options) (*Run, error) {
 		historical := globx.MatchAny(cfg.Stale.Exclude, d) // changelogs: no toolchain claims
 		refs := extract.Extract(p, ix, extract.Options{Ignore: ignoreRes, NoToolchain: historical})
 		r := docResult{doc: d, refs: refs}
+		if !historical {
+			// changelogs quote diffs and old syntax on purpose
+			r.findings = append(r.findings, examples.Go(p, examples.Options{Severity: sevOverrides[model.RuleExampleSyntax]})...)
+		}
 		for _, ref := range refs {
 			res := rs.Resolve(ref)
 			switch {

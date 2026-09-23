@@ -39,6 +39,9 @@
    exist, and a body that churned after the comment was edited is flagged.
 8. **Baseline**: fingerprints exclude line numbers, so a baseline survives
    ordinary editing.
+9. **Examples**: alongside extraction, every ```` ```go ```` block is parsed
+   with `go/parser` under the shapes a snippet takes (file, statements,
+   struct fields…); a block that fits none is reported.
 
 ## Confidence and severity
 
@@ -79,14 +82,16 @@ scanned.
 
 ## Where the heuristics came from
 
-The six field reports record every round of tuning: what the first run
+The seven field reports record every round of tuning: what the first run
 reported on eight Go and Odin repositories, seven Python projects, three
-Rust crates, three JavaScript/TypeScript projects, three C# projects and
-three C/C++ projects, which findings were real, which were noise, and the
+Rust crates, three JavaScript/TypeScript projects, three C# projects,
+three C/C++ projects and, for the Go example check, five Go repositories
+with 1,570 example blocks; which findings were real, which were noise, and the
 rule that removed each class of noise. See [field-report.md](field-report.md),
 [field-report-python.md](field-report-python.md),
 [field-report-rust.md](field-report-rust.md),
 [field-report-js.md](field-report-js.md),
-[field-report-csharp.md](field-report-csharp.md) and
-[field-report-c.md](field-report-c.md); every rule's exact behaviour is
+[field-report-csharp.md](field-report-csharp.md),
+[field-report-c.md](field-report-c.md) and
+[field-report-examples.md](field-report-examples.md); every rule's exact behaviour is
 in [rules.md](rules.md).

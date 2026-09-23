@@ -122,6 +122,7 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleMissingTarget, "README.md", "cmake --target fixclii", model.SevError, "cmake fixcli"},
 		{model.RuleToolchain, "README.md", "CMake 3.16 or newer", model.SevWarning, "3.20"},
 		{model.RulePairOrphan, "docs/zh/old.md", "docs/en/old.md", model.SevWarning, ""},
+		{model.RuleExampleSyntax, "README.md", "missing ',' before newline in argument list", model.SevWarning, ""},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))
@@ -171,7 +172,7 @@ func TestFixtureGolden(t *testing.T) {
 		t.Errorf("unexpected error/warning findings:\n  %s", strings.Join(unexpected, "\n  "))
 	}
 	// info findings we do expect
-	infoWant := map[string]bool{"unknown-config-key|server.port": false, "pair-number|1.2.3": false, "pair-number|1.2.4": false, "missing-route|/readyz": false, "pair-missing|docs/zh/extra.md": false}
+	infoWant := map[string]bool{"unknown-config-key|server.port": false, "pair-number|1.2.3": false, "pair-number|1.2.4": false, "missing-route|/readyz": false, "pair-missing|docs/zh/extra.md": false, "example-syntax|ends before its braces close": false}
 	for _, f := range got {
 		if f.Severity != model.SevInfo {
 			continue
