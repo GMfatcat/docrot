@@ -61,6 +61,14 @@ type Options struct {
 	OutDir string
 	// NoOut suppresses writing OutDir without forgetting about it.
 	NoOut bool
+	// Changed restricts the checks to documents that differ from HEAD in
+	// the work tree or index, untracked documents, and (with ChangedBase,
+	// e.g. "origin/main") documents changed on this branch since the merge
+	// base. Every document is still parsed so cross-document anchors
+	// resolve; only the changed ones are extracted, resolved and analysed.
+	// Coverage is skipped, since it needs every document. Requires git.
+	Changed     bool
+	ChangedBase string
 }
 
 // Run is the outcome of Check.
@@ -80,6 +88,9 @@ type Run struct {
 	Written []string
 	// CommentSpans counts the declarations whose comments were checked.
 	CommentSpans int
+	// AllDocs is every discovered document when Changed restricted Docs to
+	// a subset; nil otherwise.
+	AllDocs []string
 }
 
 // Check runs the full pipeline.
@@ -186,6 +197,34 @@ func Check(opts Options) (*Run, error) {
 		}
 	}
 
+	// 3b. --changed: keep only the documents git says differ
+	checked := docs
+	if opts.Changed {
+		if run.Git == nil {
+			return nil, errors.New("--changed needs git: the directory is not in a work tree, or --no-git was given")
+		}
+		changed, err := run.Git.Changed(opts.ChangedBase)
+		if err != nil {
+			return nil, err
+		}
+		set := make(map[string]bool, len(changed))
+		for _, p := range changed {
+			set[p] = true
+		}
+		checked = checked[:0:0]
+		for _, d := range docs {
+			if set[d] {
+				checked = append(checked, d)
+			}
+		}
+		run.AllDocs = docs
+		run.Docs = checked
+		if opts.Coverage || cfg.Coverage.Report {
+			warn("coverage is skipped with --changed: it needs every document")
+			opts.Coverage, cfg.Coverage.Report = false, false
+		}
+	}
+
 	// 4. extract + resolve
 	ignoreRes, err := cfg.IgnoreRegexps()
 	if err != nil {
@@ -215,12 +254,12 @@ func Check(opts Options) (*Run, error) {
 		findings []model.Finding
 		resolved []stale.ResolvedRef
 	}
-	results := make([]docResult, len(docs))
+	results := make([]docResult, len(checked))
 	mentioned := map[string]bool{}
 	symbolRefs := map[string]model.Reference{} // kind|norm → one reference that resolved
 	var mu sync.Mutex
-	parallel(len(docs), func(i int) {
-		d := docs[i]
+	parallel(len(checked), func(i int) {
+		d := checked[i]
 		p := parsed[d]
 		if p == nil {
 			return
@@ -268,8 +307,8 @@ func Check(opts Options) (*Run, error) {
 		if s, ok := sevOverrides[model.RuleStaleSection]; ok {
 			staleOpts.Severity = s
 		}
-		staleOut := make([][]model.Finding, len(docs))
-		parallel(len(docs), func(i int) {
+		staleOut := make([][]model.Finding, len(checked))
+		parallel(len(checked), func(i int) {
 			r := results[i]
 			if len(r.resolved) == 0 || parsed[r.doc] == nil || globx.MatchAny(cfg.Stale.Exclude, r.doc) {
 				return
@@ -315,8 +354,21 @@ func Check(opts Options) (*Run, error) {
 		}
 	}
 
-	// 6. bilingual pairs
+	// 6. bilingual pairs (with --changed: only pairs with a changed side)
 	prs := pairs.Detect(docs, toPairs(cfg.Pairs), cfg.PairPatterns)
+	if opts.Changed {
+		set := make(map[string]bool, len(checked))
+		for _, d := range checked {
+			set[d] = true
+		}
+		kept := prs[:0]
+		for _, p := range prs {
+			if set[p.Source] || set[p.Translation] {
+				kept = append(kept, p)
+			}
+		}
+		prs = kept
+	}
 	pairOpts := pairs.Options{Severity: sevOverrides, Repo: run.Git}
 	for _, p := range prs {
 		src, tr := parsed[p.Source], parsed[p.Translation]
@@ -371,7 +423,7 @@ func Check(opts Options) (*Run, error) {
 	report.Sort(findings)
 	sum := report.Summary{
 		Root:       root,
-		Docs:       len(docs),
+		Docs:       len(checked),
 		References: totalRefs,
 		Baselined:  baselined,
 		Fixed:      fixedN,
@@ -405,6 +457,9 @@ func Check(opts Options) (*Run, error) {
 	}
 	if st.Routes > 0 {
 		sum.Extra["routes"] = strconv.Itoa(st.Routes)
+	}
+	if opts.Changed {
+		sum.Extra["changed"] = strconv.Itoa(len(checked)) + " of " + strconv.Itoa(len(docs)) + " docs"
 	}
 	if len(prs) > 0 {
 		sum.Extra["pairs"] = strconv.Itoa(len(prs))

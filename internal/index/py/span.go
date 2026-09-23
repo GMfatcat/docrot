@@ -1,6 +1,7 @@
 package py
 
 import (
+	"bytes"
 	"sort"
 	"strings"
 
@@ -85,6 +86,11 @@ func signatureEnd(lines []string, start int) (int, string) {
 	return end, ""
 }
 
+var (
+	tripleDouble = []byte(`"""`)
+	tripleSingle = []byte("'''")
+)
+
 // maskBlock masks string literals across several lines, including
 // triple-quoted strings that span lines (FastAPI writes parameter docs as
 // Annotated[..., Doc("""...""")] inside the signature). Newlines are kept
@@ -109,7 +115,7 @@ func maskBlock(text string) string {
 				i++
 				continue
 			}
-			if strings.HasPrefix(string(out[i:]), quote) {
+			if bytes.HasPrefix(out[i:], []byte(quote)) {
 				for k := 0; k < len(quote); k++ {
 					out[i+k] = ' '
 				}
@@ -126,7 +132,7 @@ func maskBlock(text string) string {
 				out[i] = ' '
 				i++
 			}
-		case strings.HasPrefix(string(out[i:]), `"""`) || strings.HasPrefix(string(out[i:]), `'''`):
+		case bytes.HasPrefix(out[i:], tripleDouble) || bytes.HasPrefix(out[i:], tripleSingle):
 			quote = string(out[i : i+3])
 			out[i], out[i+1], out[i+2] = ' ', ' ', ' '
 			i += 2

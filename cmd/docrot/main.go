@@ -1,7 +1,8 @@
 // Command docrot finds where documentation lies about the code.
 //
 //	docrot check [dir] [flags]     scan docs, report findings, exit 1 on failures,
-//	                               and rewrite the output directory (.docrot by default)
+//	                               and rewrite the output directory (.docrot by default);
+//	                               --changed [--since REF] checks only modified docs
 //	docrot baseline [dir]          freeze current findings into .docrot-baseline.json
 //	docrot coverage [dir]          which exported symbols/flags/env are undocumented
 //	docrot pairs [dir]             only the bilingual source/translation checks
@@ -19,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"runtime/pprof"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -95,6 +97,7 @@ func usage(w io.Writer) {
 
 Usage:
   docrot check [dir] [flags]      scan docs and report findings (exit 1 when --fail-on is met)
+                                  --changed [--since REF]: only documents modified since HEAD / REF
   docrot baseline [dir]           write .docrot-baseline.json with the current findings
   docrot coverage [dir]           list exported symbols / flags / env vars no document mentions
   docrot pairs [dir]              only the source/translation pair checks
@@ -209,9 +212,20 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	c.fs.BoolVar(&all, "all", false, "also show baselined findings (implies --info)")
 	c.fs.BoolVar(&quiet, "quiet", false, "print only the summary line (text format)")
 	c.fs.BoolVar(&cov, "coverage", false, "append the documentation coverage section")
+	var changed bool
+	var since string
+	c.fs.BoolVar(&changed, "changed", false, "check only documents modified in the work tree or index, plus untracked ones (pre-commit speed)")
+	c.fs.StringVar(&since, "since", "", "with --changed: also documents changed on this branch since the merge base with REF (e.g. origin/main)")
 	root, cfg, ok := c.parse(args, stderr)
 	if !ok {
 		return c.exitCode()
+	}
+	if since != "" {
+		changed = true
+	}
+	if changed && c.noGit {
+		fmt.Fprintln(stderr, "docrot: --changed needs git; drop --no-git")
+		return exitUsage
 	}
 	if !contains(report.Formats, format) {
 		fmt.Fprintf(stderr, "docrot: --format must be one of %s\n", strings.Join(report.Formats, ", "))
@@ -238,10 +252,20 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	opts := c.engineOptions(root, cfg, stderr)
 	opts.ShowAll = all
 	opts.Coverage = cov
+	opts.Changed = changed
+	opts.ChangedBase = since
 	if outDir != "" {
 		opts.OutDir = outDir
 	}
 	opts.NoOut = noOut
+	if prof := os.Getenv("DOCROT_CPUPROFILE"); prof != "" {
+		// developer aid: DOCROT_CPUPROFILE=cpu.prof docrot check … ; go tool pprof
+		if f, err := os.Create(prof); err == nil {
+			if err := pprof.StartCPUProfile(f); err == nil {
+				defer pprof.StopCPUProfile()
+			}
+		}
+	}
 	run, err := engine.Check(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "docrot: %v\n", err)
