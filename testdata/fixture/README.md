@@ -15,7 +15,11 @@ details, plus the [install section](docs/guide.md#instal).
 ./scripts/verify.ps1
 ./scripts/build.ps1
 go run ./cmd/server
+go get example.com/Fixture
+pip install fixture_tools
 ```
+
+Requires Go 1.22 or later and Python 3.10+. Run `make build`; `make lint` was removed.
 
 ## API
 

@@ -135,7 +135,7 @@ scanned.
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
@@ -151,8 +151,9 @@ scanned.
 - `siblings` lists other repositories (relative to the root) where a path
   missing here may legitimately live — useful when a service documents the
   library it is built on.
-- `stale.exclude` keeps dated documents (changelogs, design specs) out of
-  the staleness analysis; they are historical records by nature.
+- `stale.exclude` keeps dated documents (changelogs, release notes, design
+  specs) out of the staleness analysis and out of the toolchain-version
+  check; they are historical records by nature.
 - `severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
 - `outDir` is the directory every run rewrites; see below.
 - `comments` tunes the code-comment checks that run for every symbol a

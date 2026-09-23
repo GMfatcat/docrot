@@ -22,6 +22,7 @@ type fakeIndex struct {
 	odin, py    map[string]bool
 	routes      []string // "GET /x" or "/x"
 	literals    map[string]bool
+	project     model.Project
 }
 
 func (f *fakeIndex) FileExists(rel string) bool { return f.files[rel] }
@@ -133,6 +134,7 @@ func (f *fakeIndex) HasPySymbol(q string) bool               { return f.py[q] }
 func (f *fakeIndex) PyModuleIsExample(string) bool           { return false }
 func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
 func (f *fakeIndex) HasLiteral(s string) bool                { return f.literals[s] }
+func (f *fakeIndex) Project() model.Project                  { return f.project }
 func (f *fakeIndex) HasRoutes() bool                         { return len(f.routes) > 0 }
 func (f *fakeIndex) MatchRoute(method, p string) model.RouteMatch {
 	var methods []string
@@ -198,6 +200,13 @@ func newFake() *fakeIndex {
 		anchors:  map[string][]string{"docs/guide.md": {"setup", "install"}, "README.md": {"usage"}},
 		routes:   []string{"GET /v1/items", "POST /v1/items", "/healthz"},
 		literals: map[string]bool{"/openapi.json": true, "http.requests": true, "emit_event": true, "dry-run": true, "FIXTURE_HOME": true, "server.tls": true},
+		project: model.Project{
+			GoModule: "example.com/fixture", GoVersion: "1.22",
+			PyName: "my-tool", PyRequires: ">=3.10",
+			NPMName:     "@acme/tool",
+			Targets:     map[string][]string{"make": {"build", "test"}},
+			TargetFiles: map[string]string{"make": "Makefile"},
+		},
 	}
 }
 
@@ -282,6 +291,25 @@ func TestResolvePolicy(t *testing.T) {
 		{"json example key medium is info", jsonRef("server.timeout", model.Medium), false, false, model.RuleUnknownConfigKey, model.SevInfo, "", ""},
 		{"json example unknown top-level key still reported", jsonRef("retention", model.High), false, false, model.RuleUnknownConfigKey, model.SevWarning, "", ""},
 		{"json example key present", jsonRef("server.addr", model.High), true, false, "", "", "", ""},
+		{"target ok", ref(model.KindTarget, "make:build", model.High, "README.md"), true, false, "", "", "", "Makefile"},
+		{"target typo", ref(model.KindTarget, "make:buidl", model.High, "README.md"), false, false, model.RuleMissingTarget, model.SevError, "make build", ""},
+		{"target inline is warning", ref(model.KindTarget, "make:lint", model.Medium, "README.md"), false, false, model.RuleMissingTarget, model.SevWarning, "", ""},
+		{"target unknown tool skipped", ref(model.KindTarget, "just:x", model.High, "README.md"), false, true, "", "", "", ""},
+		{"install go ok", ref(model.KindInstall, "go:example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
+		{"install go module root ok", ref(model.KindInstall, "go:example.com/fixture", model.High, "README.md"), true, false, "", "", "", ""},
+		{"install go missing dir", ref(model.KindInstall, "go:example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleInstallMismatch, model.SevError, "", ""},
+		{"install go wrong module", ref(model.KindInstall, "go:github.com/acme/fixture", model.High, "README.md"), false, false, model.RuleInstallMismatch, model.SevError, "example.com/fixture", ""},
+		{"install go dependency skipped", ref(model.KindInstall, "go:github.com/other/lib", model.High, "README.md"), false, true, "", "", "", ""},
+		{"install pip ok normalised", ref(model.KindInstall, "pip:My_Tool", model.High, "README.md"), true, false, "", "", "", ""},
+		{"install pip close", ref(model.KindInstall, "pip:my-tools", model.Medium, "README.md"), false, false, model.RuleInstallMismatch, model.SevWarning, "my-tool", ""},
+		{"install pip other skipped", ref(model.KindInstall, "pip:requests", model.High, "README.md"), false, true, "", "", "", ""},
+		{"install npm ok", ref(model.KindInstall, "npm:@acme/tool", model.High, "README.md"), true, false, "", "", "", ""},
+		{"install npm unscoped same name", ref(model.KindInstall, "npm:tool", model.High, "README.md"), false, false, model.RuleInstallMismatch, model.SevError, "@acme/tool", ""},
+		{"toolchain go equal", ref(model.KindToolchain, "go:1.22", model.Medium, "README.md"), true, false, "", "", "", "go.mod"},
+		{"toolchain go too low", ref(model.KindToolchain, "go:1.21", model.Medium, "README.md"), false, false, model.RuleToolchain, model.SevWarning, "1.22", ""},
+		{"toolchain go higher is info", ref(model.KindToolchain, "go:1.23", model.Medium, "README.md"), false, false, model.RuleToolchain, model.SevInfo, "1.22", ""},
+		{"toolchain python too low", ref(model.KindToolchain, "python:3.9", model.Medium, "README.md"), false, false, model.RuleToolchain, model.SevWarning, "3.10", ""},
+		{"toolchain unknown skipped", ref(model.KindToolchain, "rust:1.0", model.Medium, "README.md"), false, true, "", "", "", ""},
 		{"import ok", ref(model.KindImport, "example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"import missing", ref(model.KindImport, "example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleMissingImport, model.SevError, "", ""},
 		{"import foreign skipped", ref(model.KindImport, "github.com/x/y", model.High, "README.md"), false, true, "", "", "", ""},

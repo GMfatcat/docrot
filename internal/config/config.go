@@ -36,7 +36,9 @@ type Stale struct {
 	MinChurn int  `json:"minChurn"`
 	MinDays  int  `json:"minDays"`
 	// Exclude are doc globs never analysed for staleness (changelogs,
-	// dated specs and plans are historical records by nature).
+	// release notes, dated specs and plans are historical records by
+	// nature). The same documents are not checked for toolchain claims:
+	// "drop Python 3.8" in a changelog is history, not a requirement.
 	Exclude []string `json:"exclude"`
 }
 
@@ -130,7 +132,7 @@ func Default() Config {
 			"config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json",
 		},
 		Stale: Stale{Enabled: true, MinChurn: 3, MinDays: 90, Exclude: []string{
-			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**",
+			"CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**",
 		}},
 		Coverage: Coverage{Report: false, IncludeInternal: false},
 		Severity: map[string]string{

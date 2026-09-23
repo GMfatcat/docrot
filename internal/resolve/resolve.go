@@ -93,6 +93,12 @@ func (r *Resolver) Resolve(ref model.Reference) Result {
 		return r.resolveImport(ref)
 	case model.KindRoute:
 		return r.resolveRoute(ref)
+	case model.KindTarget:
+		return r.resolveTarget(ref)
+	case model.KindInstall:
+		return r.resolveInstall(ref)
+	case model.KindToolchain:
+		return r.resolveToolchain(ref)
 	}
 	return Result{Skipped: true}
 }

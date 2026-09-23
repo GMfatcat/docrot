@@ -264,7 +264,8 @@ func Check(opts Options) (*Run, error) {
 		if p == nil {
 			return
 		}
-		refs := extract.Extract(p, ix, extract.Options{Ignore: ignoreRes})
+		historical := globx.MatchAny(cfg.Stale.Exclude, d) // changelogs: no toolchain claims
+		refs := extract.Extract(p, ix, extract.Options{Ignore: ignoreRes, NoToolchain: historical})
 		r := docResult{doc: d, refs: refs}
 		for _, ref := range refs {
 			res := rs.Resolve(ref)

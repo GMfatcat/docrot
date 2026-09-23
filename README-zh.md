@@ -112,7 +112,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
   "pairs": [],
   "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
   "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
+  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/*-report.md", "**/adr/**"] },
   "coverage": { "report": false, "includeInternal": false },
   "severity": { "stale-section": "warning", "pair-lag": "warning", "pair-number": "info" },
   "net": false,
@@ -127,7 +127,7 @@ docrot 是在真實 repo 上調校的，不是合成範例。它刻意忽略的�
 - `ignore` 是套用在引用文字上的正規表示式。
 - `siblings` 列出其他 repo（相對於根目錄），這裡找不到的路徑可能合理地住在那邊——
   服務文件裡引用它所依賴的函式庫時很有用。
-- `stale.exclude` 把有日期的文件（changelog、設計規格）排除在過期分析之外；它們本質上是歷史紀錄。
+- `stale.exclude` 把有日期的文件（changelog、release notes、設計規格）排除在過期分析與工具鏈版本檢查之外；它們本質上是歷史紀錄。
 - `severity` 覆蓋某條規則的等級，例如 `{"stale-section": "info"}`。
 - `outDir` 是每次執行都會重寫的輸出目錄；見下。
 - `comments` 調整程式碼註解檢查，它會對文件指到的每個符號執行：註解之後有 `minChurn` 個新 commit

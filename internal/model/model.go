@@ -28,12 +28,16 @@ const (
 	KindCommand   Kind = "command"   // executable path in a shell block
 	KindImport    Kind = "import"    // Go import path in a go block
 	KindRoute     Kind = "route"     // HTTP route: "GET /v1/items" or "/healthz"
+	KindInstall   Kind = "install"   // install line: "go:example.com/x", "pip:httpx", "npm:@acme/x"
+	KindToolchain Kind = "toolchain" // version requirement in prose: "go:1.21", "python:3.9"
+	KindTarget    Kind = "target"    // task-runner target: "make:build", "npm:lint", "just:x", "task:x"
 )
 
 // AllKinds lists every Kind in a stable order.
 var AllKinds = []Kind{
 	KindPath, KindGoSymbol, KindOdinSym, KindPySym, KindFlag, KindEnv,
 	KindConfigKey, KindAnchor, KindURL, KindCommand, KindImport, KindRoute,
+	KindInstall, KindToolchain, KindTarget,
 }
 
 // Confidence expresses how sure the extractor is that a piece of text
@@ -201,6 +205,9 @@ const (
 	RuleStaleComment     = "stale-comment"
 	RuleCommentMentions  = "comment-mentions-missing"
 	RuleMissingRoute     = "missing-route"
+	RuleInstallMismatch  = "install-mismatch"
+	RuleToolchain        = "toolchain-mismatch"
+	RuleMissingTarget    = "missing-target"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -210,6 +217,7 @@ var AllRules = []string{
 	RuleMissingImport, RuleStaleSection, RulePairHeading, RulePairCode,
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
 	RuleStaleComment, RuleCommentMentions, RuleMissingRoute,
+	RuleInstallMismatch, RuleToolchain, RuleMissingTarget,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -234,6 +242,9 @@ var RuleDescriptions = map[string]string{
 	RuleStaleComment:     "The body of a documented function changed in several commits after its comment was last edited.",
 	RuleCommentMentions:  "A code comment names a parameter, symbol, flag or path that no longer exists.",
 	RuleMissingRoute:     "An HTTP route mentioned in the document is not registered by any handler in the code.",
+	RuleInstallMismatch:  "An install line (go get, pip install, npm install) names this project by a different path or name than its manifest.",
+	RuleToolchain:        "The Go or Python version the document requires differs from go.mod / pyproject.toml.",
+	RuleMissingTarget:    "A make/npm/just/task target mentioned in the document is not defined.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.
@@ -345,6 +356,34 @@ type Index interface {
 	// (or struct tag value), spelled exactly so: the last resort before a
 	// documented name is reported missing.
 	HasLiteral(s string) bool
+
+	// --- project identity ---
+	// Project returns what the manifests declare: module path and Go
+	// version, Python distribution name and requirement, npm name, and the
+	// targets of Makefile / justfile / Taskfile / package.json scripts.
+	Project() Project
+}
+
+// Project is the repository's declared identity (see Index.Project).
+// Every field may be empty; Targets and TargetFiles may be nil.
+type Project struct {
+	GoModule    string              `json:"goModule,omitempty"`
+	GoVersion   string              `json:"goVersion,omitempty"`  // "1.22", from the go directive
+	PyName      string              `json:"pyName,omitempty"`     // [project] name
+	PyRequires  string              `json:"pyRequires,omitempty"` // ">=3.10", "^3.9"
+	NPMName     string              `json:"npmName,omitempty"`
+	Targets     map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
+	TargetFiles map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
+}
+
+// HasTarget reports whether tool defines name.
+func (p Project) HasTarget(tool, name string) bool {
+	for _, t := range p.Targets[tool] {
+		if t == name {
+			return true
+		}
+	}
+	return false
 }
 
 // RouteMatch is the outcome of Index.MatchRoute.

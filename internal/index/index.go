@@ -17,6 +17,7 @@ import (
 	"docrot/internal/index/files"
 	"docrot/internal/index/gosym"
 	"docrot/internal/index/odin"
+	"docrot/internal/index/project"
 	"docrot/internal/index/py"
 	"docrot/internal/index/routes"
 	"docrot/internal/markdown"
@@ -70,6 +71,7 @@ type Index struct {
 	cfg     *config.Index
 	anch    *anchors.Index
 	rts     *routes.Set
+	proj    model.Project
 	flagSet map[string]bool
 	pkgSet  map[string]bool
 	stats   Stats
@@ -110,12 +112,16 @@ func Build(root string, opts Options) (*Index, []error, error) {
 		}
 	}
 
-	wg.Add(5)
+	wg.Add(6)
 	go func() {
 		defer wg.Done()
 		f, err := files.Build(root, opts.Exclude)
 		setFatal(err)
 		ix.files = f
+	}()
+	go func() {
+		defer wg.Done()
+		ix.proj = project.Build(root)
 	}()
 	go func() {
 		defer wg.Done()
@@ -465,6 +471,10 @@ func (ix *Index) ConfigKeys() []string {
 	return ix.cfg.Keys()
 }
 
+// --- project identity ---
+
+func (ix *Index) Project() model.Project { return ix.proj }
+
 // --- string literals ---
 
 func (ix *Index) HasLiteral(s string) bool {
@@ -552,6 +562,15 @@ func (ix *Index) Symbols(kind string) []string {
 		return ix.PyModules()
 	case "routes":
 		return ix.Routes()
+	case "targets":
+		var out []string
+		for tool, list := range ix.proj.Targets {
+			for _, t := range list {
+				out = append(out, tool+" "+t)
+			}
+		}
+		sort.Strings(out)
+		return out
 	}
 	return nil
 }

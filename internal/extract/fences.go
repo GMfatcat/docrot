@@ -66,6 +66,7 @@ func (x *extractor) shellRefs(line string, promptOnly bool) []model.Reference {
 			continue
 		}
 		cmd := toks[0]
+		out = append(out, projectRefs(toks, model.High)...) // go get, pip install, make target
 		switch {
 		case isExplicitPath(cmd):
 			if r := x.pathRef(cmd, false); r != nil {

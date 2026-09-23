@@ -41,6 +41,9 @@ type Hints interface {
 type Options struct {
 	// Ignore patterns are matched against Reference.Text; a match drops the reference.
 	Ignore []*regexp.Regexp
+	// NoToolchain skips version-requirement claims ("requires Go 1.21"):
+	// set for changelogs and other historical documents.
+	NoToolchain bool
 }
 
 type extractor struct {
@@ -67,6 +70,9 @@ func Extract(doc *markdown.Doc, h Hints, opts Options) []model.Reference {
 	x.fences()
 	x.bare()
 	x.routes()
+	if !opts.NoToolchain {
+		x.toolchainRefs()
+	}
 	sortRefs(x.out)
 	return x.out
 }
@@ -125,6 +131,10 @@ func (x *extractor) spans() {
 			continue
 		}
 		for _, r := range x.classifyTokens(sp.Text) {
+			x.emit(r, sp.Line, sp.Col, sp.Section, "")
+		}
+		// `make build`, `pip install httpx`: an inline command line
+		for _, r := range projectRefs(strings.Fields(sp.Text), model.Medium) {
 			x.emit(r, sp.Line, sp.Col, sp.Section, "")
 		}
 	}
