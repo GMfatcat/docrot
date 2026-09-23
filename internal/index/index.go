@@ -13,6 +13,7 @@ import (
 	"docrot/internal/fuzzy"
 	"docrot/internal/globx"
 	"docrot/internal/index/anchors"
+	"docrot/internal/index/c"
 	"docrot/internal/index/config"
 	"docrot/internal/index/csharp"
 	"docrot/internal/index/files"
@@ -123,6 +124,13 @@ var builders = map[model.Kind]builder{
 	},
 	model.KindCSharpSym: func(root string, ex []string) (lang.Index, error) {
 		ix, err := csharp.Build(root, ex)
+		if ix == nil {
+			return nil, err
+		}
+		return ix, err
+	},
+	model.KindCSym: func(root string, ex []string) (lang.Index, error) {
+		ix, err := c.Build(root, ex)
 		if ix == nil {
 			return nil, err
 		}

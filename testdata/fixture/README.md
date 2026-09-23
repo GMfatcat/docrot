@@ -23,9 +23,11 @@ npm install fixture-webb
 npm run lint
 npm run deploy
 dotnet add package Fixture.Apii
+cmake --build build --target fixcli
+cmake --build build --target fixclii
 ```
 
-Requires Go 1.22 or later and Python 3.10+. The crate requires Rust 1.70+. The web client requires Node 16 or later. The API needs .NET 6 or later. Run `make build`; `make lint` was removed.
+Requires Go 1.22 or later and Python 3.10+. The crate requires Rust 1.70+. The web client requires Node 16 or later. The API needs .NET 6 or later. Building needs CMake 3.16 or newer. Run `make build`; `make lint` was removed.
 
 ## API
 
@@ -45,8 +47,8 @@ s := httpx.NewServer(":8080")
 
 ## Configuration
 
-Flags: `--addr`, `--config`, `--confg`, `--port`. Rust flags: `--level`, `--workers`, `--worker`. Node flags: `--retries`, `--retrie`. .NET flags: `--shards`, `--shard`.
-Environment variables: `FIXTURE_DEBUG`, `FIXTURE_TRACE`, `FIXTURE_LEVEL`, `FIXTURE_HOME`, `FIXTURE_TOKEN`, `FIXTURE_REGION`.
+Flags: `--addr`, `--config`, `--confg`, `--port`. Rust flags: `--level`, `--workers`, `--worker`. Node flags: `--retries`, `--retrie`. .NET flags: `--shards`, `--shard`. C++ flags: `--threads`, `--thread`.
+Environment variables: `FIXTURE_DEBUG`, `FIXTURE_TRACE`, `FIXTURE_LEVEL`, `FIXTURE_HOME`, `FIXTURE_TOKEN`, `FIXTURE_REGION`, `FIX_HOME`.
 Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
 The `--addr` flag defaults to `:9090`.
 Also `--verbose` (default: `false`).
@@ -54,6 +56,7 @@ And `server.timeout_ms` (default: `3000`).
 The `--level` flag defaults to `debug`.
 The `--retries` flag defaults to `5`.
 The `--shards` flag defaults to `4`.
+The `--threads` flag defaults to `4`.
 
 ```json
 {
@@ -81,7 +84,14 @@ Odin: `fixture_odin.render_frame` and `render_frames()`. Python: `helper.summari
 `Runner.run_async`, `helper.summarise`. Rust: `fixture_rs::io::read_all`, `Config::new()`,
 `fixture_rs::io::write_al`, `crate::render()` and `std::env::var`. JavaScript: `Client.fetchAll()`,
 `useItems()`, `Client.fetchAl()`, `.fetchAll` and `fw.useItems()`. C#: `Fixture.Api.Services.Catalog`,
-`Catalog.ListAll()`, `Catalog.ListAl()` and `Fixture.Api.Services.Catalogue`.
+`Catalog.ListAll()`, `Catalog.ListAl()` and `Fixture.Api.Services.Catalogue`. C/C++: `fix_easy_init()`,
+`fix_easy_perfrom()`, `FIXOPT_URL(3)`, `FIXOPT_PROT(3)`, `fix::Engine::start()` and `fix::Engine::stat()`.
+
+```c
+#include "fix/fix.h"
+#include "fix/nope.h"
+#include <stdio.h>
+```
 
 ```ts
 import { Client, VERSION, useItem } from 'fixture-web';

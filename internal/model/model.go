@@ -53,6 +53,7 @@ const (
 	NamingSnake  Naming = 1 << iota // render_frame()
 	NamingCamel                     // renderFrame()
 	NamingPascal                    // RenderFrame()
+	NamingUpper                     // CURLOPT_URL(3): a macro or enum value
 )
 
 // Lang describes one language whose symbols a lightweight declaration
@@ -114,7 +115,7 @@ var Langs = []Lang{
 		Tuple Action Func EventArgs StringBuilder JsonSerializer ILogger Activity Interlocked GC Buffer BitConverter
 		Boolean Char Byte Double Decimal Single Version Process Stopwatch Lazy Span Memory ReadOnlySpan ReadOnlyMemory
 		Parallel Volatile Marshal IntPtr BenchmarkDotNet Xunit NUnit Moq FluentAssertions Serilog`)},
-	{Kind: KindCSym, ID: "c", Name: "C/C++", Sep: "::", Exts: []string{".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"}, Naming: NamingSnake, Flat: true,
+	{Kind: KindCSym, ID: "c", Name: "C/C++", Sep: "::", Exts: []string{".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx", ".inl", ".ipp"}, Naming: NamingSnake | NamingUpper, Flat: true,
 		Stdlib: set("std boost")},
 }
 
@@ -514,12 +515,18 @@ type Project struct {
 	// DotnetPackages are the package ids (or project names) of the *.csproj
 	// files found up to three directories deep; DotnetVersion is the lowest
 	// TargetFramework among them ("8.0" for net8.0).
-	DotnetPackages []string            `json:"dotnetPackages,omitempty"`
-	DotnetVersion  string              `json:"dotnetVersion,omitempty"`
-	CargoName      string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
-	RustVersion    string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
-	Targets        map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
-	TargetFiles    map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
+	DotnetPackages []string `json:"dotnetPackages,omitempty"`
+	DotnetVersion  string   `json:"dotnetVersion,omitempty"`
+	// CMakeName is project(NAME …) of the root CMakeLists.txt; CMakeVersion
+	// its cmake_minimum_required(VERSION x.y).
+	CMakeName    string `json:"cmakeName,omitempty"`
+	CMakeVersion string `json:"cmakeVersion,omitempty"`
+	// CMakeOptions are the option(NAME …) names of the root CMakeLists.txt.
+	CMakeOptions []string            `json:"cmakeOptions,omitempty"`
+	CargoName    string              `json:"cargoName,omitempty"`   // [package] name of Cargo.toml
+	RustVersion  string              `json:"rustVersion,omitempty"` // rust-version = "1.70"
+	Targets      map[string][]string `json:"targets,omitempty"`     // tool ("make", "npm", "just", "task") → sorted names
+	TargetFiles  map[string]string   `json:"targetFiles,omitempty"` // tool → defining file (relative)
 	// Intersphinx is set when a Sphinx conf.py maps other projects'
 	// inventories: a :ref: label that no local document defines may be
 	// theirs.

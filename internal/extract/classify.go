@@ -19,7 +19,8 @@ func init() {
 		html css js ts sql csv jsonl log mod sum proto env gif png jpg jpeg svg pdf lock bat cmd
 		rs c h cpp hpp cc mtrace gguf safetensors wasm tmpl tpl gotmpl xml ico webp mp4 gz tar bz2 xz
 		7z conf service plist rst adoc ipynb pyi mjs cjs tsx jsx vue scss less map
-		pem crt key cff whl egg pyc pth cfg jsonc toml ini cs csproj sln fs vb props targets nuspec razor cshtml`) {
+		pem crt key cff whl egg pyc pth cfg jsonc toml ini cs csproj sln fs vb props targets nuspec razor cshtml
+		cmake bazel bzl swift mk am in ac m4 pc def rc nix hcl tf`) {
 		knownExt[e] = true
 	}
 }
@@ -113,9 +114,15 @@ func IsPlaceholderPath(p string) bool {
 		if i == 0 && len(low) > 2 && strings.HasPrefix(low, "my") && low != "mypy" {
 			return true
 		}
-		// "issues/NNNN/results.md": a run of one repeated capital letter
+		// "issues/NNNN/results.md", "tests/data/testNUM": a run of one repeated
+		// capital letter, or a NUM/NNN/XXX tail
 		if len(stem) >= 2 && stem == strings.Repeat(stem[:1], len(stem)) && stem[0] >= 'A' && stem[0] <= 'Z' {
 			return true
+		}
+		for _, tail := range []string{"NUM", "NNN", "XXX", "NNNN", "XXXX"} {
+			if len(stem) > len(tail) && strings.HasSuffix(stem, tail) {
+				return true
+			}
 		}
 	}
 	return false
@@ -144,6 +151,9 @@ var externalCommands = map[string]bool{
 	"sqlite3": true, "psql": true, "openssl": true, "systemctl": true, "journalctl": true,
 	"dotnet": true, "java": true, "mvn": true, "gradle": true, "brew": true, "apt": true,
 	"choco": true, "winget": true, "scoop": true, "ffmpeg": true, "jq": true, "sc": true,
+	"configure": true, "./configure": true, "meson": true, "ninja": true, "conan": true, "vcpkg": true,
+	"pkg-config": true, "autoreconf": true, "libtool": true, "ctest": true, "cpack": true, "g++": true,
+	"cl": true, "msbuild": true, "xcodebuild": true, "cargo-make": true,
 }
 
 // rejectChars are characters that mark a span as a template, expression or
@@ -191,7 +201,7 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 		return x.anchorRef(s[:i], s[i+1:], model.High)
 	}
 	if m := reFlag.FindStringSubmatch(s); m != nil {
-		if placeholderIdents[m[2]] {
+		if placeholderIdents[m[2]] || buildSystemFlag(m[2]) {
 			return nil
 		}
 		conf := model.High
@@ -491,6 +501,11 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 			if kind, ok := x.langBy("", model.NamingCamel, false); ok {
 				return ref(kind)
 			}
+		case isUpperSnake(name):
+			// CURLOPT_URL(3): a macro, an enum value, a man page section
+			if kind, ok := x.langBy("", model.NamingUpper, false); ok {
+				return ref(kind)
+			}
 		}
 		if x.hints.ModulePath() != "" {
 			return ref(model.KindGoSymbol)
@@ -511,6 +526,7 @@ func (x *extractor) colonRef(s, norm string) *model.Reference {
 	if len(parts) > 5 || isPlaceholderSymbol(strings.Join(parts, ".")) {
 		return nil
 	}
+	var first model.Kind
 	for _, kind := range x.hints.Languages() {
 		lg, _ := model.LangOf(kind)
 		if lg.Sep != "::" {
@@ -522,11 +538,17 @@ func (x *extractor) colonRef(s, norm string) *model.Reference {
 		if isCapitalized(parts[0]) && x.externalNames(kind)[parts[0]] {
 			return nil // ServiceBuilder::new after "use tower::ServiceBuilder": another crate's type
 		}
-		conf := model.Medium
 		if x.isNamespace(kind, parts[0]) {
-			conf = model.High
+			// the language that owns the namespace wins (a Rust crate and a
+			// C++ namespace may share a repository)
+			return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: model.High}
 		}
-		return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: conf}
+		if first == "" {
+			first = kind
+		}
+	}
+	if first != "" {
+		return &model.Reference{Kind: first, Text: s, Norm: norm, Confidence: model.Medium}
 	}
 	return nil
 }
@@ -609,6 +631,29 @@ func useLeafNames(spec string) []string {
 }
 
 func isCapitalized(s string) bool { return s != "" && s[0] >= 'A' && s[0] <= 'Z' }
+
+// isUpperSnake reports an ALL_CAPS identifier of the shape a macro or an
+// enum value has: an underscore, or at least four letters (so that O(n)
+// and N are never claims).
+func isUpperSnake(s string) bool {
+	if s == "" || strings.ToUpper(s) != s || !strings.ContainsAny(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		return false
+	}
+	return strings.Contains(s, "_") || len(s) >= 4
+}
+
+// buildSystemFlag reports a flag that belongs to configure, a compiler or
+// a package manager rather than to this program: --enable-x, --with-x,
+// --prefix, --std=c++17 and friends.
+func buildSystemFlag(name string) bool {
+	low := strings.ToLower(name)
+	for _, p := range []string{"enable-", "disable-", "with-", "without-", "std=", "prefix", "sysconfdir", "libdir", "bindir", "datadir", "host=", "build=", "target="} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return low == "head" || low == "std" || strings.Contains(low, ".") // --sub.field: a syntax illustration
+}
 
 func isSnake(s string) bool {
 	return strings.ToLower(s) == s && strings.Contains(s, "_")
@@ -716,7 +761,7 @@ func (x *extractor) classifyTokens(s string) []model.Reference {
 			break
 		}
 		tok := m[1]
-		if fm := reFlag.FindStringSubmatch(tok); fm != nil && !placeholderIdents[fm[2]] {
+		if fm := reFlag.FindStringSubmatch(tok); fm != nil && !placeholderIdents[fm[2]] && !buildSystemFlag(fm[2]) {
 			conf := model.Medium
 			if fm[1] == "-" {
 				conf = model.Low

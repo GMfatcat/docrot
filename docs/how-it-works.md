@@ -9,17 +9,18 @@
    (Sphinx roles, directives, toctrees, labels; `.txt` sources too) and
    AsciiDoc are all read into the same shape. No CommonMark dependency.
 2. **Extract** references from code spans, link targets, shell blocks, Go
-   blocks and JavaScript blocks (whose imports also say which names belong
-   to this package and which to others). Each reference gets a *kind* and a *confidence*: a path with a
+   blocks, C/C++ blocks (their `#include` lines) and JavaScript blocks
+   (whose imports also say which names belong to this package and which
+   to others). Each reference gets a *kind* and a *confidence*: a path with a
    directory and an extension is high; a bare file name is medium; a
    dotted name whose first part is an unknown lower-case word (`app.Run`) is
    low and never reported.
 3. **Index** the repository once: file tree, Go packages/symbols/flags/env/
-   tags (`go/parser`), Odin, Python, Rust, JavaScript/TypeScript and C#
-   declarations (line-level patterns), HTTP route registrations, Markdown
+   tags (`go/parser`), Odin, Python, Rust, JavaScript/TypeScript, C# and
+   C/C++ declarations (line-level patterns), HTTP route registrations, Markdown
    anchors, JSON sample keys, every identifier-like string literal, and the
    manifests (`go.mod`, `pyproject.toml`, `package.json`, `Cargo.toml`,
-   `*.csproj`, Makefile, justfile, Taskfile). Every language except Go goes through one interface
+   `*.csproj`, `CMakeLists.txt`, Makefile, justfile, Taskfile). Every language except Go goes through one interface
    (`internal/index/lang`) and one row in `model.Langs`: the extractor's
    naming rules, the resolver and the CLI range over that table.
 4. **Resolve** each reference and produce a finding with a *did-you-mean*
@@ -74,13 +75,14 @@ scanned.
 
 ## Where the heuristics came from
 
-The five field reports record every round of tuning: what the first run
+The six field reports record every round of tuning: what the first run
 reported on eight Go and Odin repositories, seven Python projects, three
-Rust crates, three JavaScript/TypeScript projects and three C# projects,
-which findings were real, which were noise, and the rule that removed each
-class of noise. See [field-report.md](field-report.md),
+Rust crates, three JavaScript/TypeScript projects, three C# projects and
+three C/C++ projects, which findings were real, which were noise, and the
+rule that removed each class of noise. See [field-report.md](field-report.md),
 [field-report-python.md](field-report-python.md),
 [field-report-rust.md](field-report-rust.md),
-[field-report-js.md](field-report-js.md) and
-[field-report-csharp.md](field-report-csharp.md); every rule's exact
-behaviour is in [rules.md](rules.md).
+[field-report-js.md](field-report-js.md),
+[field-report-csharp.md](field-report-csharp.md) and
+[field-report-c.md](field-report-c.md); every rule's exact behaviour is
+in [rules.md](rules.md).

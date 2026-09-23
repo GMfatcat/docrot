@@ -16,13 +16,14 @@ docrot 就是做這件事的：
 - 📌 抽出文件對 repo 的每一個主張（路徑、符號、flag、環境變數、設定鍵、路由、預設值、安裝指令），對照真正的程式碼
 - ⏳ 用 git 歷史找出程式碼早已往前走的章節
 - 🌏 盯著雙語文件是否同步
-- 📦 讀 Markdown、reStructuredText、AsciiDoc，對照 Go、Python、TypeScript／JavaScript、Rust、C#、Odin 程式碼；單一靜態 Go 執行檔，**只用標準庫**；HTML 報告離線就能開
+- 📦 讀 Markdown、reStructuredText、AsciiDoc，對照 Go、Python、TypeScript／JavaScript、Rust、C#、C／C++、Odin 程式碼，混合也行；單一靜態 Go 執行檔，**只用標準庫**；HTML 報告離線就能開
 
 ![docrot 對 fixture repo 執行 check 的輸出](docs/assets/terminal.svg)
 
 兩張圖都來自 `testdata/fixture` 這個故意種了錯誤的測試 repo。真實 repo 的結果——八個
-Go／Odin repo、七個 Python 專案、三個 Rust crate、三個 JavaScript／TypeScript 專案、三個 C# 專案，
-包括 FastAPI 的 1,692 份文件與 Django 的 686 頁 Sphinx 文件——見[實地報告](docs/field-report.md)。
+Go／Odin repo、七個 Python 專案、三個 Rust crate、三個 JavaScript／TypeScript 專案、三個 C# 專案、
+三個 C／C++ 專案，包括 FastAPI 的 1,692 份文件、Django 的 686 頁 Sphinx 文件與 curl 的 928 頁 man page
+——見[實地報告](docs/field-report.md)。
 
 ## 🚀 安裝
 
@@ -48,14 +49,15 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 
 - 📁 **路徑、符號、import** —— `` `internal/gitx/gitx.go` ``、`` `report.WriteSARIF` ``、
   `` `render_frame()` `` 與 `import "docrot/internal/model"` 都存在（Go 走 `go/parser`；
-  Odin、Python、Rust、JavaScript／TypeScript 與 C# 走會跟著再匯出的宣告索引），附「你是不是想找」建議與 git 改名歷史。
+  Odin、Python、Rust、JavaScript／TypeScript、C# 與 C／C++ 走會跟著再匯出的宣告索引），附「你是不是想找」建議與 git 改名歷史。
 - 🎛️ **flag、環境變數、設定鍵、預設值** —— `--format` 有定義、`DOCROT_DEBUG` 有被讀、
   `stale.minChurn` 是 struct tag 或樣本檔裡的鍵、```` ```json ```` 設定範例沒有已刪掉的鍵、
   「`--port` 預設是 `8080`」和程式碼說的一樣。
 - 🌐 **HTTP 路由** —— `GET /v1/items` 真的有 handler 註冊（net/http、chi、gin、echo、
   FastAPI、Flask、Starlette、Django、axum、actix-web、rocket、express、fastify、hono、NestJS、ASP.NET Core）。
 - 🔗 **錨點、指令、安裝行、工具鏈、目標** —— `[x](docs/rules.md#exit-codes)` 指得到、
-  `python scripts/verify.py` 存在、`go get`／`pip install`／`cargo add`／`npm install`／`dotnet add package` 寫對本專案的名字、
+  `python scripts/verify.py` 存在、`#include "x.h"` 在樹裡、`go get`／`pip install`／`cargo add`／`npm install`／
+  `dotnet add package` 寫對本專案的名字、
   `import { x } from 'pkg/sub'` 指到真的子路徑、
   「requires Go 1.21」與 `go.mod` 一致、`make lint` 是真的目標。 <!-- docrot:ignore toolchain-mismatch -->
 - ⏳ **過期判定（git）** —— 章節最後編輯之後，它引用的檔案或宣告仍持續變動。
@@ -70,7 +72,7 @@ docrot baseline                 # freeze today's findings; fail only on new ones
 ## 🧠 怎麼判斷
 
 把每份文件 tokenize，抽出帶*種類*與*信心值*的引用，整個 repo 只建一次索引（檔案、
-Go／Odin／Python／Rust／JS／C# 宣告、路由、字串常值、manifest、錨點），逐一解析，用 blame 與 log 判斷
+Go／Odin／Python／Rust／JS／C#／C++ 宣告、路由、字串常值、manifest、錨點），逐一解析，用 blame 與 log 判斷
 過期，比對配對指紋，檢查註解，套用 baseline。嚴重度跟著信心值走：high → error、
 medium → warning、low → info；文字報告預設隱藏 info，加 `--info` 才列出。啟發式規則是在
 真實 repo 上調校的；它刻意忽略哪些東西，寫在 [docs/how-it-works.md](docs/how-it-works.md)。
@@ -131,7 +133,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 - [運作方式](docs/how-it-works.md)——處理流程、信心值與嚴重度、刻意忽略的東西
 - [設定](docs/configuration.md)——`.docrot.json`、輸出目錄、git 快取
 - [指令](docs/commands.md)——flag、exit code、CI
-- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md) 與 [C#](docs/field-report-csharp.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
+- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md)、[C#](docs/field-report-csharp.md) 與 [C／C++](docs/field-report-c.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
 - [變更紀錄](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [設計規格](docs/superpowers/specs/2026-09-23-docrot-design.md) · [計畫](docs/superpowers/plans/2026-09-23-docrot-plan.md) · 給 agent 的 [llms.txt](llms.txt)
 
 ## 🚫 非目標

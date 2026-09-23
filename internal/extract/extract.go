@@ -238,6 +238,15 @@ func (x *extractor) fences() {
 			for _, r := range x.goFenceRefs(f.Content) {
 				x.emit(r, f.StartLine, 0, section, lang)
 			}
+		case cLangs[lang]:
+			for _, r := range x.cFenceRefs(f.Content, f.StartLine) {
+				line := r.Loc.Line
+				r.Loc = model.Location{}
+				if x.ignored(line) {
+					continue
+				}
+				x.emit(r, line, 0, section, lang)
+			}
 		case jsLangs[lang]:
 			for _, r := range x.jsFenceRefs(f) {
 				line := r.Loc.Line

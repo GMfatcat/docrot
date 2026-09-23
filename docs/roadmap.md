@@ -9,6 +9,16 @@ takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
 started; each item names the stage it would live in.
 
+## Done in 0.8.0: C and C++
+
+The fourth plugin language; see `CHANGELOG.md` and
+`docs/field-report-c.md`. The four languages the user asked for (Rust,
+JavaScript/TypeScript, C#, C/C++) all ship through `internal/index/lang`;
+adding another is one package plus one row in `model.Langs`. Lessons from
+C: a repository's documentation describes its build system and its helper
+scripts as much as its code, so configure flags, CMake options and the
+options of a test runner written in Perl are never this program's flags.
+
 ## Done in 0.7.0: C#
 
 The third plugin language; see `CHANGELOG.md` and

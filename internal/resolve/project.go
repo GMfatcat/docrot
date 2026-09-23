@@ -183,6 +183,8 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 		declared, source = proj.NodeVersion, "package.json"
 	case "dotnet":
 		declared, source = proj.DotnetVersion, "the project files' TargetFramework"
+	case "cmake":
+		declared, source = proj.CMakeVersion, "CMakeLists.txt"
 	}
 	if declared == "" {
 		return Result{Skipped: true}
@@ -195,7 +197,7 @@ func (r *Resolver) resolveToolchain(ref model.Reference) Result {
 	if dMaj == cMaj && dMin == cMin {
 		return Result{OK: true} // go.mod churns with every dependency bump; not a staleness signal
 	}
-	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust", "node": "Node", "dotnet": ".NET"}[tool]
+	label := map[string]string{"go": "Go", "python": "Python", "rust": "Rust", "node": "Node", "dotnet": ".NET", "cmake": "CMake"}[tool]
 	need := strconv.Itoa(dMaj) + "." + strconv.Itoa(dMin)
 	if !strings.Contains(declared, ".") || tool == "dotnet" && dMin == 0 {
 		need = strconv.Itoa(dMaj) // engines.node ">=18", net8.0

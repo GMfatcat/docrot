@@ -461,8 +461,8 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 		return Result{OK: true}
 	}
 	first, _, dotted := strings.Cut(ref.Norm, lg.Sep)
-	if lg.Sep == "::" && dotted && !isCapitalized(first) && !r.ix.IsNamespace(ref.Kind, first) {
-		return Result{Skipped: true} // hyper::Body, tower::ServiceExt: a path into another crate
+	if lg.Sep == "::" && dotted && !isCapitalized(first) && !anyNamespace(first) {
+		return Result{Skipped: true} // hyper::Body, tower::ServiceExt: a path into another crate or library
 	}
 	if lg.Kind == model.KindCSharpSym {
 		for _, p := range r.ix.Project().DotnetPackages {
@@ -470,9 +470,16 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 				return Result{OK: true} // Humanizer.Core: a package id, spelled like a namespace
 			}
 		}
-		if dotted && isCapitalized(first) && !anyHas(first) && !anyNamespace(first) {
-			return Result{Skipped: true} // TimeSpan.Zero, BenchmarkDotNet.Artifacts: a type of another assembly
+	}
+	if lg.Kind == model.KindCSym {
+		for _, t := range r.ix.Project().Targets["cmake"] {
+			if t == strings.TrimSuffix(ref.Norm, "()") {
+				return Result{OK: true} // CLI11::CLI11: an imported CMake target
+			}
 		}
+	}
+	if (lg.Kind == model.KindCSharpSym || lg.Kind == model.KindCSym) && dotted && isCapitalized(first) && !anyHas(first) && !anyNamespace(first) {
+		return Result{Skipped: true} // TimeSpan.Zero, GooFit::Application: a type of another assembly or library
 	}
 	// owner.attr where the owner is a known class, type, function or
 	// module-level object (not a namespace) whose members the index cannot
@@ -522,6 +529,22 @@ func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result 
 	}
 	msg := lg.Name + " symbol `" + ref.Text + "` not found"
 	cands := r.ix.SimilarSymbols(ref.Kind, ref.Norm, 3)
+	if len(cands) == 0 {
+		// the classifier picked the first language that fits the spelling;
+		// another present language may hold the nearest name
+		for _, k := range r.ix.Languages() {
+			if k == ref.Kind {
+				continue
+			}
+			if c := r.ix.SimilarSymbols(k, ref.Norm, 3); len(c) > 0 {
+				cands = c
+				if other, ok := model.LangOf(k); ok {
+					msg = other.Name + " symbol `" + ref.Text + "` not found"
+				}
+				break
+			}
+		}
+	}
 	if dotted {
 		// "pydantic.utils.to_camel": the module exists, the name lives in
 		// another module of the same package (moved, or reachable through a
@@ -583,6 +606,8 @@ var externalEnvPrefixes = []string{
 	"OS", "WINDIR", "CGO_", "ANTHROPIC_", "OPENAI_", "AWS_", "AZURE_", "GOOGLE_", "K8S_",
 	"KUBE", "HELM_", "TF_", "VAULT_", "SSH_", "GPG_", "EDITOR", "VISUAL", "PAGER", "MSYS",
 	"MINGW", "CI", "BUILD_", "RUNNER_", "JOB_", "ACTIONS_", "ODIN_", "RUST", "CARGO_",
+	"LD_", "DYLD_", "PKG_CONFIG", "CC", "CXX", "CFLAGS", "CXXFLAGS", "LDFLAGS", "CPPFLAGS", "MAKEFLAGS",
+	"DESTDIR", "PREFIX", "CMAKE_", "ASAN_", "UBSAN_", "MSAN_", "TSAN_", "VCPKG_", "CONAN_", "MSVC",
 }
 
 // envContext reports whether the line around a reference talks about
@@ -617,6 +642,16 @@ func (r *Resolver) resolveEnv(ref model.Reference) Result {
 	}
 	if r.ix.HasEnv(ref.Norm) || r.ix.HasLiteral(ref.Norm) {
 		return Result{OK: true} // read through a wrapper the index does not recognise
+	}
+	for _, k := range r.ix.Languages() {
+		if r.ix.HasSymbol(k, ref.Norm) {
+			return Result{OK: true} // CURLOPT_URL: a macro or enum value, not a variable
+		}
+	}
+	for _, o := range r.ix.Project().CMakeOptions {
+		if o == ref.Norm {
+			return Result{OK: true} // CLI11_PRECOMPILED: a CMake option, set with -D
+		}
 	}
 	if len(r.ix.Envs()) == 0 || isExternalEnv(ref.Norm) || !envContext(ref.Context) {
 		return Result{Skipped: true}
@@ -786,6 +821,9 @@ func (r *Resolver) resolveImport(ref model.Reference) Result {
 	if strings.HasPrefix(ref.Norm, "js:") {
 		return r.resolveJSImport(ref)
 	}
+	if strings.HasPrefix(ref.Norm, "c:") {
+		return r.resolveCInclude(ref)
+	}
 	mp := r.ix.ModulePath()
 	if mp == "" {
 		return Result{Skipped: true}
@@ -883,6 +921,41 @@ func (r *Resolver) resolveJSImport(ref model.Reference) Result {
 	}
 	if len(cands) > 3 {
 		cands = cands[:3]
+	}
+	return Result{Finding: r.finding(model.RuleMissingImport, model.SeverityFor(ref.Confidence), ref, msg, cands)}
+}
+
+// resolveCInclude checks a #include of a code block: the header is looked
+// for next to the document, at the root and under any include/, src/ or
+// lib/ directory of the tree. A quoted include that matches nothing is an
+// error; an angle-bracket include that matches nothing is a system header.
+func (r *Resolver) resolveCInclude(ref model.Reference) Result {
+	spec := strings.TrimPrefix(ref.Norm, "c:")
+	angle := strings.HasPrefix(spec, "<")
+	spec = strings.TrimLeft(spec, `"<`)
+	docDir := ""
+	if i := strings.LastIndex(ref.Loc.File, "/"); i >= 0 {
+		docDir = ref.Loc.File[:i]
+	}
+	for _, base := range []string{docDir, "", "include", "src", "lib"} {
+		p := spec
+		if base != "" {
+			p = base + "/" + spec
+		}
+		if r.ix.FileExists(normRel(p)) {
+			return Result{OK: true, File: normRel(p)}
+		}
+	}
+	if len(r.ix.Glob("**/"+spec)) > 0 {
+		return Result{OK: true}
+	}
+	if angle {
+		return Result{Skipped: true} // <stdio.h>: a system header
+	}
+	msg := "header `" + spec + "` is not in this repository (looked next to the document, at the root and under include/, src/ and lib/)"
+	var cands []string
+	for _, s := range r.ix.SimilarPaths(spec, 3) {
+		cands = append(cands, s)
 	}
 	return Result{Finding: r.finding(model.RuleMissingImport, model.SeverityFor(ref.Confidence), ref, msg, cands)}
 }

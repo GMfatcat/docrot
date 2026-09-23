@@ -113,6 +113,14 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RuleMissingSymbol, "README.md", "Fixture.Api.Services.Catalogue", model.SevError, "Fixture.Api.Services.Catalog"},
 		{model.RuleInstallMismatch, "README.md", "Fixture.Apii", model.SevError, "Fixture.Api"},
 		{model.RuleToolchain, "README.md", ".NET 6 or later", model.SevWarning, "8"},
+		{model.RuleMissingSymbol, "README.md", "fix_easy_perfrom()", model.SevWarning, "fix_easy_perform"},
+		{model.RuleMissingSymbol, "README.md", "FIXOPT_PROT(3)", model.SevWarning, "fixoption::FIXOPT_PORT"},
+		{model.RuleMissingSymbol, "README.md", "fix::Engine::stat()", model.SevError, "fix::Engine::start"},
+		{model.RuleMissingImport, "README.md", "fix/nope.h", model.SevError, ""},
+		{model.RuleUnknownFlag, "README.md", "--thread", model.SevWarning, "--threads"},
+		{model.RuleDefaultMismatch, "README.md", "threads default 4", model.SevWarning, "2"},
+		{model.RuleMissingTarget, "README.md", "cmake --target fixclii", model.SevError, "cmake fixcli"},
+		{model.RuleToolchain, "README.md", "CMake 3.16 or newer", model.SevWarning, "3.20"},
 	}
 	got := run.Report.Findings
 	matched := make([]bool, len(got))

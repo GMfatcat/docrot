@@ -61,13 +61,13 @@
       `docs/field-report-csharp.md`。
 - [x] 3E 文件與 0.7.0。
 
-## Wave 4 — C／C++（0.8.0）
+## Wave 4 — C／C++（0.8.0）— 已完成
 
-- [ ] 4A `internal/index/c`：標頭原型、巨集、typedef、struct／enum／class、namespace、
+- [x] 4A `internal/index/c`：標頭原型、巨集、typedef、struct／enum／class、namespace、
       `Class::method` 定義、排除目錄；`getenv`；getopt／CLI11／cxxopts flag。
-- [ ] 4B `extract`＋`resolve`：fence 裡 `#include "…"` → path（根、`include/`、`src/`）。
-- [ ] 4C `project`：`CMakeLists.txt` 的 target、`option()`／`set(… CACHE)` →
+- [x] 4B `extract`＋`resolve`：fence 裡 `#include "…"` → path（根、`include/`、`src/`）。
+- [x] 4C `project`：`CMakeLists.txt` 的 target、`option()`／`set(… CACHE)` →
       config key 與 default、`project()` 名字、`cmake_minimum_required` → toolchain。
-- [ ] 4D fixture `testdata/fixture/native/`；golden test。
-- [ ] 4E 實地：meowboard 的 C++、curl 或 sqlite；`docs/field-report-c.md`。
-- [ ] 4F 文件與 0.8.0；roadmap 更新。
+- [x] 4D fixture `testdata/fixture/native/`；golden test。
+- [x] 4E 實地：curl、nlohmann/json、CLI11（meowboard 的 C++ 幾乎全在 `third_party/`）；`docs/field-report-c.md`。
+- [x] 4F 文件與 0.8.0；roadmap 更新。

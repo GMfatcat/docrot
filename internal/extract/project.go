@@ -12,7 +12,7 @@ import (
 
 var (
 	// "requires Go 1.21+", "Go 1.22 or later", "Python >= 3.9", "需要 Go 1.21 以上"
-	reToolchain = regexp.MustCompile(`(?i)(\bgo|\bgolang|\bpython|\brust|\brustc|\bnode\.js|\bnodejs|\bnode|\.net|\bdotnet)\s*(?:>=|≥|version\s+)?\s*v?(\d+(?:\.\d+)?)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
+	reToolchain = regexp.MustCompile(`(?i)(\bgo|\bgolang|\bpython|\brust|\brustc|\bnode\.js|\bnodejs|\bnode|\.net|\bdotnet|\bcmake)\s*(?:>=|≥|version\s+)?\s*v?(\d+(?:\.\d+)?)(?:\.\d+)?\s*(\+|or\s+(?:later|newer|higher|above)|and\s+(?:later|newer|above)|以上|或更新|或以上)?`)
 	// a negated sentence ("not supported on Python 3.14", "dropped Python 3.8")
 	// is not a requirement of this project
 	reNegated = regexp.MustCompile(`(?i)\b(not|no longer|n't|dropp?e?d?|removed?|unsupported|without|deprecated)\b|不支援|不再|移除|已停止`)
@@ -50,6 +50,15 @@ func projectRefs(toks []string, conf model.Confidence) []model.Reference {
 	var out []model.Reference
 	add := func(kind model.Kind, text, norm string) {
 		out = append(out, model.Reference{Kind: kind, Text: text, Norm: norm, Confidence: conf})
+	}
+	// cmake --build <dir> --target X
+	if cmd == "cmake" {
+		for i, t := range toks {
+			if t == "--target" && i+1 < len(toks) && !strings.HasPrefix(toks[i+1], "-") {
+				add(model.KindTarget, "cmake --target "+toks[i+1], "cmake:"+toks[i+1])
+			}
+		}
+		return out
 	}
 	// go get / go install
 	if cmd == "go" && (toks[1] == "get" || toks[1] == "install") {

@@ -582,7 +582,7 @@ func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Ki
 		}
 		return false
 	case strings.ToUpper(tok) == tok && strings.Contains(tok, "_"):
-		return ix.HasEnv(tok)
+		return ix.HasEnv(tok) || hasAnySymbol(ix, tok) // an environment variable, or a macro / enum value
 	}
 	if hasAnySymbol(ix, tok) {
 		return true

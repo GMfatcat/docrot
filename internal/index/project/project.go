@@ -1,5 +1,5 @@
 // Package project reads a repository's identity files — go.mod,
-// pyproject.toml, setup.cfg, package.json, Cargo.toml, *.csproj — and its task runners'
+// pyproject.toml, setup.cfg, package.json, Cargo.toml, *.csproj, CMakeLists.txt — and its task runners'
 // definitions (Makefile, justfile, Taskfile.yml, package.json scripts), so
 // that a document's install line, toolchain requirement and `make target`
 // can be checked against what the repository actually declares.
@@ -86,6 +86,14 @@ func Build(root string) model.Project {
 		}
 	}
 	p.DotnetPackages, p.DotnetVersion = csprojs(root)
+	if lines, ok := read(root, "CMakeLists.txt"); ok {
+		var targets []string
+		p.CMakeName, p.CMakeVersion, targets, p.CMakeOptions = cmakeLists(lines)
+		if len(targets) > 0 {
+			p.Targets["cmake"] = targets
+			p.TargetFiles["cmake"] = "CMakeLists.txt"
+		}
+	}
 	for _, name := range []string{"Makefile", "GNUmakefile", "makefile"} {
 		if lines, ok := read(root, name); ok {
 			p.Targets["make"] = makeTargets(lines)
@@ -106,6 +114,18 @@ func Build(root string) model.Project {
 			p.TargetFiles["task"] = name
 			break
 		}
+	}
+	_, autotools := read(root, "Makefile.am")
+	if !autotools {
+		_, autotools = read(root, "configure.ac")
+	}
+	if len(p.Targets["make"]) == 0 && len(p.Targets["cmake"]) > 0 && !autotools {
+		// a CMake build directory's Makefile carries every target plus the
+		// standard ones, so `make docs` is a claim against CMakeLists.txt
+		p.Targets["make"] = sortedSet(map[string]bool{"all": true, "clean": true, "install": true, "test": true, "package": true, "help": true})
+		p.Targets["make"] = append(p.Targets["make"], p.Targets["cmake"]...)
+		sort.Strings(p.Targets["make"])
+		p.TargetFiles["make"] = "CMakeLists.txt"
 	}
 	for tool, list := range p.Targets {
 		if len(list) == 0 {
@@ -310,6 +330,35 @@ func csprojs(root string) (packages []string, version string) {
 		version = strconv.Itoa(lowMaj) + "." + strconv.Itoa(lowMin)
 	}
 	return packages, version
+}
+
+var (
+	reCMakeProject = regexp.MustCompile(`(?i)^project\s*\(\s*([A-Za-z0-9_.-]+)`)
+	reCMakeMin     = regexp.MustCompile(`(?i)^cmake_minimum_required\s*\(\s*VERSION\s+(\d+\.\d+)`)
+	reCMakeTarget  = regexp.MustCompile(`(?i)^(?:add_executable|add_library|add_custom_target)\s*\(\s*([A-Za-z0-9_.:-]+)`)
+	reCMakeOption  = regexp.MustCompile(`(?i)^(?:option|cmake_dependent_option)\s*\(\s*([A-Za-z0-9_]+)`)
+)
+
+// cmakeLists returns project(NAME), cmake_minimum_required(VERSION), the
+// add_executable/add_library/add_custom_target names (alias targets such
+// as CLI11::CLI11 included) and the option() names of a CMakeLists.txt. A
+// name written as a variable (${X}) is skipped.
+func cmakeLists(lines []string) (name, version string, targets, options []string) {
+	set := map[string]bool{}
+	opts := map[string]bool{}
+	for _, raw := range lines {
+		l := strings.TrimSpace(raw)
+		if m := reCMakeProject.FindStringSubmatch(l); m != nil && name == "" {
+			name = m[1]
+		} else if m := reCMakeMin.FindStringSubmatch(l); m != nil && version == "" {
+			version = m[1]
+		} else if m := reCMakeTarget.FindStringSubmatch(l); m != nil && !strings.Contains(m[1], "$") {
+			set[m[1]] = true
+		} else if m := reCMakeOption.FindStringSubmatch(l); m != nil {
+			opts[m[1]] = true
+		}
+	}
+	return name, version, sortedSet(set), sortedSet(opts)
 }
 
 // cargo returns [package] name and rust-version from Cargo.toml; a

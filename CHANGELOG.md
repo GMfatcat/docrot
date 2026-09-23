@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.0 — 2026-09-24
+
+C and C++, the last of the four languages the plugin table was built for.
+
+- `.c .h .cc .cpp .cxx .hpp .hh .hxx .inl .ipp` (outside `build/`,
+  `third_party/`, `vendor/`, `external/`, `deps/`) are indexed: macros,
+  prototypes and definitions (K&R style included), out-of-line
+  `Type::method` definitions, classes and structs with their methods and
+  fields (access labels honoured), enum values — also curl's
+  `CURLOPT(CURLOPT_URL, …)` macro lists — `typedef` and `using` aliases,
+  and C++ namespaces (`namespace a::b`, `X_NAMESPACE_BEGIN` pairs).
+  Documents may write `curl_easy_perform()`, `curl_easy_perform(3)`,
+  `CURLOPT_URL(3)`, `json::parse`, `basic_json::dump`, `nlohmann::json`.
+  Comments (`/* */`, `//`, Doxygen `///`) feed `docrot comments`.
+- Also from C/C++: getopt-style option tables, CLI11 and cxxopts flags
+  with `default_val`/`default_value` defaults and `envname`, `getenv`
+  reads, `#include "x.h"` in code blocks against the tree (`<x.h>` is a
+  system header when nothing matches), CMake targets for
+  `cmake --build … --target x` and for `make x` when no Makefile exists,
+  `cmake_minimum_required` for "requires CMake 3.16" claims, and CMake
+  `option()` names, which are not environment variables.
+- Never a claim: `std::`/`boost::` paths, a `::` path into another library,
+  an unknown member of an alias, typedef or inheriting type, flags of the
+  build system (`--enable-x`, `--with-x`, `--prefix`, `--std=`) or spelled
+  with a dot, `LD_LIBRARY_PATH`-style environment variables, and an
+  `UPPER_SNAKE` name that is a macro or enum value.
+- When the language the classifier picked has no near-miss for a missing
+  name, the suggestion comes from whichever present language has one.
+- Field report on curl, nlohmann/json and CLI11: `docs/field-report-c.md`.
+
 ## 0.7.0 — 2026-09-24
 
 C#, the third language through the plugin table.
