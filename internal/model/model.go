@@ -197,6 +197,8 @@ const (
 	RulePairNumber       = "pair-number"
 	RulePairLag          = "pair-lag"
 	RuleUndocumented     = "undocumented"
+	RuleStaleComment     = "stale-comment"
+	RuleCommentMentions  = "comment-mentions-missing"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -205,6 +207,7 @@ var AllRules = []string{
 	RuleUnknownConfigKey, RuleBrokenAnchor, RuleBrokenURL, RuleMissingCommand,
 	RuleMissingImport, RuleStaleSection, RulePairHeading, RulePairCode,
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
+	RuleStaleComment, RuleCommentMentions,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -226,6 +229,8 @@ var RuleDescriptions = map[string]string{
 	RulePairNumber:       "A number or version appears in only one of a source/translation pair.",
 	RulePairLag:          "The source document has commits newer than the translation's last change.",
 	RuleUndocumented:     "An exported symbol, flag or environment variable is not mentioned by any document.",
+	RuleStaleComment:     "The body of a documented function changed in several commits after its comment was last edited.",
+	RuleCommentMentions:  "A code comment names a parameter, symbol, flag or path that no longer exists.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.
@@ -329,4 +334,23 @@ type Exported struct {
 	Kind      Kind   `json:"kind"`      // KindGoSymbol | KindFlag | KindEnv
 	File      string `json:"file"`      // defining file, relative
 	Line      int    `json:"line"`
+}
+
+// SymbolSpan locates a declaration together with its attached comment, for
+// the comment checks. Line numbers are 1-based and inclusive; a zero
+// DocStart means the declaration has no comment. Body covers the signature
+// line through the closing line (for Python: through the last indented
+// line; docstring lines are excluded from the churn count).
+type SymbolSpan struct {
+	Qualified string   `json:"qualified"`
+	Kind      Kind     `json:"kind"` // KindGoSymbol | KindPySym | KindOdinSym
+	File      string   `json:"file"`
+	DocStart  int      `json:"docStart"`
+	DocEnd    int      `json:"docEnd"`
+	DeclLine  int      `json:"declLine"`
+	BodyStart int      `json:"bodyStart"`
+	BodyEnd   int      `json:"bodyEnd"`
+	Doc       []string `json:"doc"`    // comment text, markers stripped
+	Params    []string `json:"params"` // receiver, parameter and named result identifiers
+	Exported  bool     `json:"exported"`
 }
