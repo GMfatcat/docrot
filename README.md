@@ -11,40 +11,23 @@ in the guide is dead, and the Chinese README is three commits behind the
 English one. Link checkers only look at URLs. Markdown linters only look at
 formatting. Nothing checks the *claims*.
 
-docrot extracts every claim a document makes about the repository — file
-paths, Go/Odin/Python symbols, CLI flags, environment variables, config
-keys and JSON config examples, default values, heading anchors, shell
-commands, Go import paths, HTTP routes, install lines, `make` targets,
-toolchain requirements — and checks each one against the real code. It
-reads Markdown, reStructuredText and AsciiDoc. Then it uses git history to
-spot sections whose referenced code has churned since the prose was last
-touched, and compares bilingual document pairs for structural drift.
-
-It is a single static binary written in Go with **no dependencies outside
-the standard library**, and the HTML report it writes is a single file that
-opens offline.
+docrot extracts every claim a document makes about the repository and checks
+it against the real code, then uses git history to find the sections the
+code has moved on from, and compares bilingual document pairs. It reads
+Markdown, reStructuredText and AsciiDoc. It is a single static Go binary
+with **no dependencies outside the standard library**, and the HTML report
+it writes is one file that opens offline.
 
 ![docrot check on the fixture repository](docs/assets/terminal.svg)
 
 ![The HTML report: findings with filters by severity, rule and file](docs/assets/report.png)
 
-```text
-CHANGELOG.md:91:5: error missing-symbol `httpx.Retry` not found in package httpx (did you mean httpx.ClientConfig.Retry?)
-docs/llms-reference.md:148:3: warning missing-path `internal/api` not found at the repo root (exists under examples/service/)
-README.md:59: warning stale-section section "🚀 快速上手" last edited 2026-08-04; since then servicex/app.go: 4 commits (latest 2026-08-12)
-README-zh.md:1: warning pair-heading translation has 4 headings, source has 5
+Both pictures come from the seeded test repository under `testdata/fixture`.
+For real runs — eight Go and Odin repositories, seven Python projects,
+FastAPI's 1,692 documents and Django's 686 Sphinx pages among them — see the
+[field reports](docs/field-report.md).
 
-50 errors, 52 warnings, 214 info — 51 docs, 2,306 references, 1.36s [214 info hidden; --info to show]
-```
-
-Those lines are from a real run on an internal Go repository; see the
-[field report](docs/field-report.md) for what docrot found across eight
-repositories in three languages, and the
-[Python field report](docs/field-report-python.md) for httpx, Starlette,
-Typer, Pydantic and FastAPI (1,692 documents, 372 translation pairs), plus
-the Sphinx documentation of requests and Django (686 pages).
-
-## Install
+## 🚀 Install
 
 ```sh
 go install ./cmd/docrot          # from a clone
@@ -54,145 +37,67 @@ go build -o docrot ./cmd/docrot  # or just build the binary
 Requires Go 1.26+. `git` on `PATH` is optional; without it the git-based
 rules are silently disabled.
 
-## Quick start
+## ⚡ Quick start
 
 ```sh
 cd your-repo
-docrot check                    # text report, exit 1 on errors
-docrot check --format html --output docrot.html
+docrot check                    # text report, exit 1 on errors; .docrot/ gets html, md, json and txt
+docrot check --changed          # only the documents you touched (pre-commit speed)
 docrot explain README.md        # what did it extract, and why?
 docrot coverage                 # which exported API is never documented?
 docrot baseline                 # freeze today's findings; fail only on new ones
-docrot check --changed          # only the documents you touched (pre-commit speed)
 ```
 
-## What it checks
+## 🔍 What it checks
 
-| Rule | The document says… | docrot verifies… |
-|---|---|---|
-| `missing-path` | `` `internal/gitx/gitx.go` ``, `[rules](docs/rules.md)` | the file or directory exists (relative to the doc or the repo root; globs allowed) |
-| `missing-symbol` | `` `report.WriteSARIF` ``, `` `Resolver.Resolve()` ``, `` `render_frame()` `` | the Go symbol exists (via `go/parser`), or the Odin / Python declaration exists |
-| `unknown-flag` | `` `--format` `` | some `flag.*` call defines it |
-| `unknown-env` | `` `DOCROT_DEBUG` `` | the code reads it (`os.Getenv`, `os.LookupEnv`, any `*Env*` call) |
-| `unknown-config-key` | `` `stale.minChurn` ``, every key of a ```` ```json ```` config example | a `json:"…"` / `yaml:"…"` / `toml:"…"` tag path or a sample config file has it |
-| `broken-anchor` | `[x](docs/rules.md#exit-codes)` | the heading exists (GitHub slug rules, CJK-aware) |
-| `missing-command` | `python scripts/verify.py` inside a ```` ```sh ```` block | the script / package path exists |
-| `missing-import` | `import "docrot/internal/model"` inside a ```` ```go ```` block | the package directory exists in this module |
-| `missing-route` | `` `GET /v1/items` ``, `` `/healthz` ``, `curl localhost:8080/x`, `METHOD \| /path` table rows | a handler registers it: `mux.HandleFunc` (Go 1.22 patterns included), chi/gin/echo method calls, FastAPI/Flask decorators, Starlette `Route`, Django `path()`; parameters and mounted prefixes are matched |
-| `install-mismatch` | `go get example.com/old/name`, `pip install my-tool`, `npm install @acme/x` | when the name is nearly this project's, it matches `go.mod` / `pyproject.toml` / `package.json` exactly |
-| `toolchain-mismatch` | "requires Go 1.21+", "Python 3.9 or later" | the `go` directive / `requires-python` asks for the same minimum | <!-- docrot:ignore toolchain-mismatch -->
-| `missing-target` | `make lint`, `npm run build`, `just release`, `task deploy` | the Makefile / package.json scripts / justfile / Taskfile define it |
-| `default-mismatch` | `` `--port` `` (default: `` `8080` ``), a table with a Default column | `flag.Int("port", 8080, …)`, a `default:"…"` struct tag, `typer.Option(8080)` or `os.getenv("X", "…")` says the same |
-| `broken-url` | `https://…` (only with `--net`) | the URL answers 2xx/3xx |
-| `stale-section` | a section last edited on 2026-06-01 | the code it references has not churned since (git) |
-| `stale-symbol` | a section that names `` `httpx.NewServer` `` | the body of that declaration has not churned in several commits since the section was edited (git) |
-| `pair-*` | `README.md` ↔ `README-zh.md` | same headings, identical code blocks, same links/tables/numbers, translation not behind source (git) |
-| `undocumented` | — | every exported symbol / flag / env var is mentioned somewhere (`docrot coverage`) |
-| `stale-comment` | a doc comment / docstring on a symbol the docs point at | the function body has not churned in several commits since the comment was edited (git) |
-| `comment-mentions-missing` | `// raw is re-read on retry` above a function | `raw` still exists in the signature, the file, or the index |
+- 📁 **Paths, symbols, imports** — `` `internal/gitx/gitx.go` ``,
+  `` `report.WriteSARIF` ``, `` `render_frame()` `` and
+  `import "docrot/internal/model"` exist (Go through `go/parser`, Odin and
+  Python through a declaration index), with did-you-mean suggestions and
+  git rename history.
+- 🎛️ **Flags, environment variables, config keys, defaults** — `--format`
+  is defined, `DOCROT_DEBUG` is read, `stale.minChurn` is a struct tag or a
+  sample key, a ```` ```json ```` config example has no dropped key, and
+  "`--port` defaults to `8080`" says what the code says.
+- 🌐 **HTTP routes** — `GET /v1/items` is registered by a handler
+  (net/http, chi, gin, echo, FastAPI, Flask, Starlette, Django).
+- 🔗 **Anchors, commands, install lines, toolchain, targets** —
+  `[x](docs/rules.md#exit-codes)` resolves, `python scripts/verify.py`
+  exists, `go get` / `pip install` name this project correctly, "requires
+  Go 1.21" agrees with `go.mod`, `make lint` is a target. <!-- docrot:ignore toolchain-mismatch -->
+- ⏳ **Staleness (git)** — a section whose referenced files or declarations
+  kept changing after the section was last edited.
+- 🌏 **Bilingual pairs** — `README.md` ↔ `README-zh.md` keep the same
+  headings, code blocks, links, tables and numbers, and the translation is
+  not behind the source.
+- 💬 **Code comments** — the doc comment of a documented symbol names
+  things that still exist, and its body has not moved on since the comment
+  was written.
+- 📊 **Coverage** — exported symbols, flags and environment variables that
+  no document mentions.
 
-Every rule is described in [docs/rules.md](docs/rules.md), including how to
-silence it.
+Every rule, how it decides and how to silence it: [docs/rules.md](docs/rules.md).
 
-## How it decides
+## 🧠 How it decides
 
-1. **Tokenize** each document: headings, fenced blocks, inline code
-   spans, links, images, tables, comments. Markdown, reStructuredText
-   (Sphinx roles, directives, toctrees, labels; `.txt` sources too) and
-   AsciiDoc are all read into the same shape. No CommonMark dependency.
-2. **Extract** references from code spans, link targets, shell blocks and
-   Go blocks. Each reference gets a *kind* and a *confidence*: a path with a
-   directory and an extension is high; a bare file name is medium; a
-   dotted name whose first part is an unknown lower-case word (`app.Run`) is
-   low and never reported.
-3. **Index** the repository once: file tree, Go packages/symbols/flags/env/
-   tags (`go/parser`), Odin and Python declarations (regex), HTTP route
-   registrations, Markdown anchors, JSON sample keys, every identifier-like
-   string literal, and the manifests (`go.mod`, `pyproject.toml`,
-   `package.json`, Makefile, justfile, Taskfile).
-4. **Resolve** each reference and produce a finding with a *did-you-mean*
-   suggestion (Damerau-Levenshtein over the right candidate set, plus git
-   rename history for paths).
-5. **Stale**: `git blame` gives each section an edit time; `git log` counts
-   commits to every referenced file after that time, and the blame of each
-   referenced declaration says whether *its* body moved on. Blame and log
-   answers are cached in the output directory between runs.
-6. **Pairs**: structural fingerprints of both documents are diffed.
-7. **Comments**: for every symbol a document referred to, the attached
-   doc comment or docstring is checked the same way — names it cites must
-   exist, and a body that churned after the comment was edited is flagged.
-8. **Baseline**: fingerprints exclude line numbers, so a baseline survives
-   ordinary editing.
+Tokenize each document, extract references with a *kind* and a
+*confidence*, index the repository once (files, Go/Odin/Python
+declarations, routes, string literals, manifests, anchors), resolve each
+reference, blame and log for staleness, diff pair fingerprints, check
+comments, apply the baseline. Severity follows confidence: high → error,
+medium → warning, low → info; the text report hides info unless you pass
+`--info`. The heuristics were tuned on real repositories; what they
+deliberately ignore is written down in
+[docs/how-it-works.md](docs/how-it-works.md).
 
-Severity follows confidence: high → error, medium → warning, low → info.
-Flags and environment variables are one step softer because they are so
-often about *other* programs; glob misses, config keys in prose and bare
-file names are always info. The text report hides info unless you pass
-`--info`.
+## ⚙️ Configuration
 
-docrot was tuned against real repositories, not synthetic examples. Things
-it deliberately ignores: paths matched by `.gitignore` (build artifacts),
-prose like `health/ready` or `net/http`, flags after external programs
-(`go test -race`), `UPPER_SNAKE` words on lines that never mention an
-environment, `cfg.Addr` when `cfg` is both a package and a variable, and
-illustrative names such as `Type.Method`, `--flag` or `path/to/file`. As a
-last resort, anything the code spells as a string literal — `"request_id"`,
-`"X-Request-ID"`, `"/openapi.json"` — counts as existing, which is what
-keeps log fields, header names and routes registered through constants
-from being reported.
-
-Letter case is checked exactly on every platform. A document that says
-`docs/foo.md` when the file is `Docs/Foo.md` gets a finding on Windows
-and macOS as well, worded "differs only by letter case", because that link
-works on the author's laptop and breaks on the Linux CI runner. Document
-discovery itself is case-insensitive, so `README.MD` and `readme.md` are
-scanned.
-
-## Configuration
-
-`docrot init` writes a `.docrot.json` with the defaults:
-
-```json
-{
-  "docs": ["**/*.md", "**/*.rst", "**/*.adoc", "llms.txt"],
-  "exclude": ["vendor/**", "node_modules/**", "third_party/**", "3rdparty/**", "external/**", "**/testdata/**", "dist/**", ".git/**", ".*/**"],
-  "ignore": [],
-  "siblings": [],
-  "pairs": [],
-  "pairPatterns": ["{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"],
-  "configSamples": ["config.json", "config*.json", "*.example.json", "*.sample.json", "configs/**/*.json"],
-  "stale": { "enabled": true, "minChurn": 3, "minDays": 90, "exclude": ["CHANGELOG*.md", "CHANGES*.md", "HISTORY*.md", "NEWS*.md", "RELEASE*.md", "**/release-notes*.md", "**/release_notes*.md", "**/releases/**", "**/superpowers/**", "**/specs/**", "**/plans/**", "**/research/**", "**/deep-research/**", "**/*-report.md", "**/adr/**"] },
-  "coverage": { "report": false, "includeInternal": false },
-  "severity": { "stale-section": "warning", "stale-symbol": "warning", "pair-lag": "warning", "pair-number": "info", "stale-comment": "info", "comment-mentions-missing": "warning" },
-  "net": false,
-  "failOn": "error",
-  "minConfidence": "low",
-  "outDir": ".docrot",
-  "maxFileMB": 8,
-  "comments": { "enabled": true, "minChurn": 2, "minFrac": 0.5 }
-}
-```
-
-- `ignore` holds regular expressions matched against the reference text.
-- `siblings` lists other repositories (relative to the root) where a path
-  missing here may legitimately live — useful when a service documents the
-  library it is built on.
-- `stale.exclude` keeps dated documents (changelogs, release notes, design
-  specs) out of the staleness analysis and out of the toolchain-version
-  check; they are historical records by nature.
-- `severity` overrides a rule's level, e.g. `{"stale-section": "info"}`.
-- `outDir` is the directory every run rewrites; see below.
-- `comments` tunes the code-comment checks that run for every symbol a
-  document refers to: `minChurn` newer commits (or one commit rewriting
-  `minFrac` of the body) make a comment "stale"; `docrot comments` runs
-  the same checks over every exported declaration.
-- `maxFileMB` caps the size of any file whose *contents* docrot reads
-  (documents, Go/Odin/Python sources, JSON samples). Binaries are never
-  opened at all — only their names enter the path index, so a 4 GB model
-  file costs one directory entry, gitignored or not. A text file above the
-  cap is skipped with a warning; paths to it still resolve.
-
-To silence a false positive where it happens:
+`docrot init` writes a `.docrot.json` with the defaults. The keys you will
+actually touch: `docs` and `exclude` (what to scan), `ignore` (regular
+expressions over reference text), `siblings` (other repositories where a
+path may live), `stale.exclude` (changelogs and other historical
+documents), `severity` and `outDir`. To silence one false positive where it
+happens:
 
 ```markdown
 <!-- docrot:ignore -->            the next non-blank line
@@ -202,63 +107,20 @@ inline text <!-- docrot:ignore -->  this line
 <!-- docrot:ignore missing-path unknown-flag -->   only these rules (also with ignore-start)
 ```
 
-### Output directory
+Every key with its default, the output directory and the git cache:
+[docs/configuration.md](docs/configuration.md).
 
-Every `docrot check` run rewrites one directory, named by the `outDir`
-setting, so that a human and an agent always find the current report in the
-same place:
-
-```text
-.docrot/.gitignore   a single "*", so the reports never reach a commit
-.docrot/report.md    for agents: findings by file, how to read them, a checklist
-.docrot/report.html  for humans: the filterable single-file page
-.docrot/report.json  the stable JSON schema
-.docrot/report.txt   the terminal report, with info findings
-.docrot/git-cache.json  blame and log answers of the last run (speed only; safe to delete)
-```
-
-Each file is rendered into a temporary file and renamed into place, so an
-interrupted run never leaves half a report where the next reader expects a
-whole one. The directory is excluded from document discovery, so yesterday's
-report is never checked as though it were documentation. Pass `--out-dir` to
-put it somewhere else, `--no-out` to write nothing this run, or set `outDir`
-to the empty string to turn it off for good. `git-cache.json` holds the
-blame and log answers of the last run, keyed by blob hash and HEAD; it is
-why a second run on a large repository takes a tenth of the time, and
-deleting it costs nothing but that speed.
-
-## Commands
+## 🖥️ Commands
 
 ```text
-docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
-             [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
-             [--out-dir DIR] [--no-out]
-             [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
-             [--changed] [--since REF]
-docrot baseline [dir]            write .docrot-baseline.json
-docrot coverage [dir]            documentation coverage table
-docrot pairs [dir]               only the bilingual checks
-docrot comments [dir]            comment checks over every exported declaration
-docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets|defaults
-docrot init [dir]
-docrot version
+docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] [--fail-on LEVEL]
+docrot explain <doc>             every extracted reference with its verdict
+docrot baseline | coverage | pairs | comments | index | init | version
 ```
 
-Flags shared by the scanning commands: `--config` picks the config file,
-`--no-git` disables the git rules, `--net` checks URLs, `--verbose` prints
-index and git warnings, `--min-confidence` drops weak references. `check`
-adds `--format`, `--output`, `--fail-on`, `--info`, `--all`, `--coverage`,
-`--quiet`, `--out-dir`, `--no-out`, `--changed` (only documents modified
-since HEAD, plus untracked ones) and `--since REF` (also documents changed
-on this branch since the merge base with REF — a PR check). `explain` adds
-`--kind` and `--root`; `index` takes `--kind`.
+Every flag, the exit codes and the CI recipes: [docs/commands.md](docs/commands.md).
 
-Exit codes: `0` clean, `1` a new finding at or above `--fail-on`, `2` usage
-or internal error. The SARIF output uploads directly to GitHub code
-scanning; baselined findings carry `baselineState: unchanged`.
-
-## CI
+## 🤖 CI
 
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
@@ -267,7 +129,7 @@ scanning; baselined findings carry `baselineState: unchanged`.
   with: { sarif_file: docrot.sarif }
 ```
 
-## Development
+## 🛠️ Development
 
 ```sh
 python scripts/verify.py        # gofmt, vet, test, build, self-check, fixture check, formats
@@ -279,19 +141,22 @@ docrot checks its own documentation as part of `scripts/verify.py`; the
 dated design documents under `docs/superpowers/` are excluded there because
 they are full of illustrative paths by design.
 
-Design: [docs/superpowers/specs/2026-09-23-docrot-design.md](docs/superpowers/specs/2026-09-23-docrot-design.md).
-Plan: [docs/superpowers/plans/2026-09-23-docrot-plan.md](docs/superpowers/plans/2026-09-23-docrot-plan.md).
-Rules: [docs/rules.md](docs/rules.md). Field reports: [docs/field-report.md](docs/field-report.md), [docs/field-report-python.md](docs/field-report-python.md).
-Agent entry point: [llms.txt](llms.txt). Changes: [CHANGELOG.md](CHANGELOG.md).
-What it does not check yet: [docs/roadmap.md](docs/roadmap.md).
+## 📚 Documentation
 
-## Non-goals
+- [Rules](docs/rules.md) — every rule, how it decides, how to silence it
+- [How it works](docs/how-it-works.md) — the pipeline, confidence and severity, what is deliberately ignored
+- [Configuration](docs/configuration.md) — `.docrot.json`, the output directory, the git cache
+- [Commands](docs/commands.md) — flags, exit codes, CI
+- [Field report](docs/field-report.md) (Go and Odin) and [Python field report](docs/field-report-python.md) — what it found on real repositories, and what was noise
+- [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md) · [Plan](docs/superpowers/plans/2026-09-23-docrot-plan.md) · [llms.txt](llms.txt) for agents
+
+## 🚫 Non-goals
 
 - Not a Markdown linter. Formatting is none of docrot's business.
 - Not a CommonMark implementation. It recognises exactly what it needs.
 - Does not execute examples, and does not judge translation quality.
 - Does not rewrite documents (yet).
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE).

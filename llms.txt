@@ -36,12 +36,13 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `internal/model` is the only shared package: `Kind`, `Confidence`, `Severity`, `Reference`, `Finding`, rule ids, `Index` interface.
 - Severity policy: paths/anchors/commands/imports/symbols/routes/install/targets follow confidence (high→error, medium→warning, low→info); flags and env are one step softer; config keys in prose and glob misses are info, keys of a JSON config example are warnings; bare file names and bare `/path` spans are info; toolchain-mismatch is a warning when the document promises less than the manifest requires; default-mismatch and stale-symbol are warnings; a Python name missing from an existing module but defined elsewhere in the package is a warning, not an error. Rule-scoped ignores: `<!-- docrot:ignore missing-path -->`.
 - Exit codes: 0 clean, 1 findings at/above `--fail-on`, 2 usage/config/internal error.
-- Config: `.docrot.json` (see README). Notable keys: `exclude`, `ignore` (regexes on reference text), `siblings` (other repos where paths may live), `stale.exclude`, `severity`, `pairs`, `pairPatterns`.
+- Config: `.docrot.json` (see docs/configuration.md). Notable keys: `exclude`, `ignore` (regexes on reference text), `siblings` (other repos where paths may live), `stale.exclude`, `severity`, `pairs`, `pairPatterns`.
 
 ## Docs
 
 - [README](README.md), [繁體中文 README](README-zh.md)
 - [Rules reference](docs/rules.md) — every rule, how it decides, how to silence it
+- [How it works](docs/how-it-works.md), [Configuration](docs/configuration.md), [Commands](docs/commands.md) — pipeline and severity policy, every config key, every flag and exit code
 - [Field report](docs/field-report.md) — results on eight real Go/Odin repositories
 - [Python field report](docs/field-report-python.md) — results on httpx, Starlette, Typer, Pydantic and FastAPI, plus the Sphinx docs of requests and Django
 - [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md)
