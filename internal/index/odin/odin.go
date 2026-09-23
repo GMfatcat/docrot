@@ -25,8 +25,13 @@ import (
 	"strings"
 	"sync"
 
+	"docrot/internal/index/defaults"
+	"docrot/internal/index/lang"
 	"docrot/internal/index/literals"
+	"docrot/internal/index/routes"
 )
+
+var _ lang.Index = (*Index)(nil)
 
 // Stats summarises what Build found.
 type Stats struct {
@@ -349,6 +354,41 @@ func (ix *Index) File(qualified string) (string, int, bool) {
 
 // Stats returns index-wide counters.
 func (ix *Index) Stats() Stats { return ix.stats }
+
+// Counts returns the counters in the shape the composite index reports.
+func (ix *Index) Counts() lang.Stats {
+	return lang.Stats{Files: ix.stats.Files, Namespaces: ix.stats.Packages, Symbols: ix.stats.Symbols}
+}
+
+// Namespaces is Packages under the lang.Index name.
+func (ix *Index) Namespaces() []string { return ix.Packages() }
+
+// IsNamespace reports whether qualified is a package name of the tree.
+func (ix *Index) IsNamespace(qualified string) bool {
+	q := stripParens(qualified)
+	i := sort.SearchStrings(ix.packages, q)
+	return i < len(ix.packages) && ix.packages[i] == q
+}
+
+// IsExample is always false: Odin trees keep no examples/ convention docrot
+// recognises.
+func (ix *Index) IsExample(string) bool { return false }
+
+// Symbols lists every declaration as "pkg.name", sorted.
+func (ix *Index) Symbols() []string {
+	out := make([]string, 0, len(ix.all))
+	for _, s := range ix.all {
+		out = append(out, s.pkg+"."+s.name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Routes returns nil: no Odin HTTP framework is recognised.
+func (ix *Index) Routes() []routes.Route { return nil }
+
+// Defaults returns an empty set: Odin option defaults are not indexed.
+func (ix *Index) Defaults() *defaults.Set { return defaults.New() }
 
 // Literals returns the identifier-like string literals of the tree.
 func (ix *Index) Literals() *literals.Set { return ix.lits }

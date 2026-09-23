@@ -118,8 +118,8 @@ func TestAllSpans(t *testing.T) {
 	}
 	want := []pair{
 		{model.KindGoSymbol, "demo.Greet"},
-		{model.KindPySym, "lib.load"},
 		{model.KindOdinSym, "demo.sum"},
+		{model.KindPySym, "lib.load"},
 	}
 
 	var got []pair

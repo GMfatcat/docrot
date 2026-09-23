@@ -37,8 +37,9 @@ type Lookup interface {
 	IsGoPackage(name string) bool
 	SimilarPaths(rel string, n int) []string
 	HasGoSymbol(qualified string) bool
-	HasPySymbol(qualified string) bool
-	HasOdinSymbol(qualified string) bool
+	// Languages and HasSymbol cover every other language (model.Langs).
+	Languages() []model.Kind
+	HasSymbol(kind model.Kind, qualified string) bool
 	HasFlag(name string) bool
 	HasEnv(name string) bool
 	HasJSONKey(dotted string) bool
@@ -87,20 +88,6 @@ var skipTokens = map[string]bool{
 	"writeOnly": true, "exclusiveMinimum": true, "exclusiveMaximum": true, "minLength": true,
 	"maxLength": true, "minItems": true, "maxItems": true, "uniqueItems": true, "multipleOf": true,
 	"operationId": true, "requestBody": true, "securitySchemes": true,
-}
-
-// pyStdlib are Python standard-library modules a docstring may cite.
-var pyStdlib = map[string]bool{}
-
-func init() {
-	for _, m := range strings.Fields(`typing typing_extensions datetime enum dataclasses collections functools itertools
-		os sys re json pathlib asyncio logging math random time uuid decimal fractions io shutil subprocess threading
-		multiprocessing socket ssl http urllib email csv sqlite3 unittest pytest contextlib abc inspect types copy
-		pickle struct hashlib hmac secrets base64 string textwrap operator warnings argparse configparser tempfile
-		glob fnmatch zipfile tarfile gzip heapq bisect array queue weakref numbers statistics ipaddress mimetypes
-		platform signal select selectors traceback importlib pkgutil builtins concurrent contextvars zoneinfo tomllib`) {
-		pyStdlib[m] = true
-	}
 }
 
 var tldSegments = map[string]bool{"org": true, "com": true, "io": true, "net": true, "dev": true, "app": true, "ai": true, "local": true, "sh": true, "co": true, "edu": true, "gov": true}
@@ -393,12 +380,9 @@ func plausible(tok string, ix Lookup, kind model.Kind) bool {
 			// lower-case prefix: only meaningful when it is a package or module of this repo
 			isPkg := false
 			if ix != nil {
-				switch kind {
-				case model.KindPySym:
-					isPkg = ix.HasPySymbol(first) && !pyStdlib[first]
-				case model.KindOdinSym:
-					isPkg = ix.HasOdinSymbol(first)
-				default:
+				if lg, ok := model.LangOf(kind); ok {
+					isPkg = ix.HasSymbol(kind, first) && !lg.Stdlib[first]
+				} else {
 					isPkg = ix.IsGoPackage(first) && !extract.IsStdlibPackage(first)
 				}
 			}
@@ -408,19 +392,12 @@ func plausible(tok string, ix Lookup, kind model.Kind) bool {
 		} else if ix != nil {
 			// Capitalised owner (Parameter.empty, Client.Push): only when the
 			// owner is something this repository declares
-			switch kind {
-			case model.KindPySym:
-				if !ix.HasPySymbol(first) {
+			if _, ok := model.LangOf(kind); ok {
+				if !ix.HasSymbol(kind, first) {
 					return false
 				}
-			case model.KindOdinSym:
-				if !ix.HasOdinSymbol(first) {
-					return false
-				}
-			default:
-				if !ix.HasGoSymbol(first) {
-					return false
-				}
+			} else if !ix.HasGoSymbol(first) {
+				return false
 			}
 		}
 	}
@@ -596,7 +573,7 @@ func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Ki
 	case strings.ToUpper(tok) == tok && strings.Contains(tok, "_"):
 		return ix.HasEnv(tok)
 	}
-	if ix.HasGoSymbol(tok) || ix.HasPySymbol(tok) || ix.HasOdinSymbol(tok) {
+	if hasAnySymbol(ix, tok) {
 		return true
 	}
 	if ix.HasLiteral(tok) || ix.HasLiteral(strings.TrimSuffix(tok, "()")) {
@@ -617,11 +594,21 @@ func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Ki
 		return ix.HasJSONKey(tok) || ix.HasConfigKey(tok)
 	}
 	// a bare identifier: accept if the index knows any symbol by that name
-	switch kind {
-	case model.KindPySym:
-		return ix.HasPySymbol(tok)
-	case model.KindOdinSym:
-		return ix.HasOdinSymbol(tok)
+	if _, ok := model.LangOf(kind); ok {
+		return ix.HasSymbol(kind, tok)
 	}
 	return ix.HasGoSymbol(tok)
+}
+
+// hasAnySymbol reports whether any language of the repository declares tok.
+func hasAnySymbol(ix Lookup, tok string) bool {
+	if ix.HasGoSymbol(tok) {
+		return true
+	}
+	for _, k := range ix.Languages() {
+		if ix.HasSymbol(k, tok) {
+			return true
+		}
+	}
+	return false
 }

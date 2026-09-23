@@ -27,9 +27,12 @@ import (
 	"sync"
 
 	"docrot/internal/index/defaults"
+	"docrot/internal/index/lang"
 	"docrot/internal/index/literals"
 	"docrot/internal/index/routes"
 )
+
+var _ lang.Index = (*Index)(nil)
 
 // Stats summarises what Build found.
 type Stats struct {
@@ -438,6 +441,30 @@ func (ix *Index) Modules() []string {
 
 // Stats returns index-wide counters.
 func (ix *Index) Stats() Stats { return ix.stats }
+
+// Counts returns the counters in the shape the composite index reports.
+func (ix *Index) Counts() lang.Stats {
+	return lang.Stats{Files: ix.stats.Files, Namespaces: ix.stats.Modules, Symbols: ix.stats.Symbols}
+}
+
+// Namespaces is Modules under the lang.Index name.
+func (ix *Index) Namespaces() []string { return ix.Modules() }
+
+// IsNamespace is IsModule under the lang.Index name.
+func (ix *Index) IsNamespace(qualified string) bool { return ix.IsModule(qualified) }
+
+// IsExample is IsExampleModule under the lang.Index name.
+func (ix *Index) IsExample(module string) bool { return ix.IsExampleModule(module) }
+
+// Symbols lists every declaration as "module.qualified", sorted.
+func (ix *Index) Symbols() []string {
+	out := make([]string, 0, len(ix.all))
+	for _, s := range ix.all {
+		out = append(out, s.module+"."+s.qualified)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Has reports whether qualified exists. Accepted forms: "module.name",
 // "Class.method", "module.Class.method", "name". A trailing "(...)" or "()"

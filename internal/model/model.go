@@ -20,6 +20,10 @@ const (
 	KindGoSymbol  Kind = "gosym"     // pkg.Name / pkg.Type.Method / Type.Method / Name()
 	KindOdinSym   Kind = "odinsym"   // Odin package.proc / proc
 	KindPySym     Kind = "pysym"     // Python module.func / Class.method / name
+	KindRustSym   Kind = "rustsym"   // Rust crate::module::item / Type::method / name
+	KindJSSym     Kind = "jssym"     // JavaScript/TypeScript module.name / Class.method / name
+	KindCSharpSym Kind = "cssym"     // C# Namespace.Class.Method / Class.Method
+	KindCSym      Kind = "csym"      // C/C++ name / ns::name / Class::method
 	KindFlag      Kind = "flag"      // --name / -name
 	KindEnv       Kind = "env"       // UPPER_SNAKE
 	KindConfigKey Kind = "configkey" // dotted lower-case key path
@@ -36,9 +40,114 @@ const (
 
 // AllKinds lists every Kind in a stable order.
 var AllKinds = []Kind{
-	KindPath, KindGoSymbol, KindOdinSym, KindPySym, KindFlag, KindEnv,
+	KindPath, KindGoSymbol, KindOdinSym, KindPySym, KindRustSym, KindJSSym,
+	KindCSharpSym, KindCSym, KindFlag, KindEnv,
 	KindConfigKey, KindAnchor, KindURL, KindCommand, KindImport, KindRoute,
 	KindInstall, KindToolchain, KindTarget, KindDefault,
+}
+
+// Naming is the set of bare-call spellings ("name()") a language owns.
+type Naming int
+
+const (
+	NamingSnake  Naming = 1 << iota // render_frame()
+	NamingCamel                     // renderFrame()
+	NamingPascal                    // RenderFrame()
+)
+
+// Lang describes one language whose symbols a lightweight declaration
+// index resolves (every language except Go, which has go/parser). The
+// table is the only place a language is enumerated: the composite index,
+// the extractor, the resolver, the reports and the CLI all range over it.
+type Lang struct {
+	Kind Kind
+	// ID names the language on the command line (docrot index --kind ID)
+	// and in the report summary.
+	ID string
+	// Name is the language as messages spell it.
+	Name string
+	// Sep is how documents qualify names: "." or "::".
+	Sep string
+	// Exts lists the source file extensions the language's index reads.
+	Exts []string
+	// Naming lists the bare-call spellings that belong to the language.
+	Naming Naming
+	// Methods lists the spellings of a method on a capitalised owner
+	// ("Runner.run_async", "Client.fetchAll", "Client.Fetch") that belong
+	// to the language; zero when documents never write members that way.
+	Methods Naming
+	// Flat marks a language whose declarations are top-level procedures
+	// (Odin, C): a bare call in a document is a claim at full severity,
+	// where in an object language it is usually a method or local helper.
+	Flat bool
+	// Stdlib lists first segments that name the language's standard
+	// library or runtime: a dotted name starting with one is never a claim
+	// about the repository unless the repository defines it itself.
+	Stdlib map[string]bool
+}
+
+// Langs lists every supported language in tie-break order: when a name
+// fits several present languages, the first wins the classification (the
+// resolver still consults every language before reporting a miss).
+var Langs = []Lang{
+	{Kind: KindOdinSym, ID: "odin", Name: "Odin", Sep: ".", Exts: []string{".odin"}, Naming: NamingSnake, Flat: true,
+		Stdlib: set("core base vendor")},
+	{Kind: KindPySym, ID: "python", Name: "Python", Sep: ".", Exts: []string{".py"}, Naming: NamingSnake, Methods: NamingSnake,
+		Stdlib: set(`typing typing_extensions datetime enum dataclasses collections functools itertools
+		os sys re json pathlib asyncio logging math random time uuid decimal fractions io shutil subprocess
+		threading multiprocessing socket ssl http urllib email csv sqlite3 unittest pytest contextlib abc
+		inspect types copy pickle struct hashlib hmac secrets base64 string textwrap operator warnings
+		argparse configparser tempfile glob fnmatch zipfile tarfile gzip heapq bisect array queue weakref
+		numbers statistics ipaddress mimetypes platform signal select selectors traceback importlib pkgutil
+		builtins __future__ concurrent contextvars dis gc html xml zoneinfo tomllib venv pprint reprlib`)},
+	{Kind: KindRustSym, ID: "rust", Name: "Rust", Sep: "::", Exts: []string{".rs"}, Naming: NamingSnake,
+		Stdlib: set("std core alloc proc_macro test")},
+	{Kind: KindJSSym, ID: "js", Name: "JavaScript", Sep: ".", Exts: []string{".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"}, Naming: NamingCamel, Methods: NamingCamel,
+		Stdlib: set(`console document window process Math JSON Object Array Promise Buffer fetch require
+		module globalThis Number String Boolean Date RegExp Map Set Symbol Error Reflect Proxy navigator
+		localStorage sessionStorage location history performance crypto URL URLSearchParams`)},
+	{Kind: KindCSharpSym, ID: "csharp", Name: "C#", Sep: ".", Exts: []string{".cs"}, Naming: NamingPascal, Methods: NamingPascal,
+		Stdlib: set("System Microsoft Newtonsoft Console Task String Int32 Int64 Math Convert Enum Guid DateTime")},
+	{Kind: KindCSym, ID: "c", Name: "C/C++", Sep: "::", Exts: []string{".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"}, Naming: NamingSnake, Flat: true,
+		Stdlib: set("std boost")},
+}
+
+func set(words string) map[string]bool {
+	m := map[string]bool{}
+	for _, w := range strings.Fields(words) {
+		m[w] = true
+	}
+	return m
+}
+
+// LangOf returns the language a symbol Kind belongs to.
+func LangOf(k Kind) (Lang, bool) {
+	for _, l := range Langs {
+		if l.Kind == k {
+			return l, true
+		}
+	}
+	return Lang{}, false
+}
+
+// LangByID returns the language named on the command line.
+func LangByID(id string) (Lang, bool) {
+	for _, l := range Langs {
+		if l.ID == id {
+			return l, true
+		}
+	}
+	return Lang{}, false
+}
+
+// IsSymbol reports whether the Kind names a code declaration in any
+// language, Go included.
+func (k Kind) IsSymbol() bool {
+	if k == KindGoSymbol {
+		return true
+	}
+	_, ok := LangOf(k)
+	return ok
 }
 
 // Confidence expresses how sure the extractor is that a piece of text
@@ -326,21 +435,22 @@ type Index interface {
 	// GoExported lists exported symbols for coverage (see Exported).
 	GoExported() []Exported
 
-	// --- Odin / Python ---
-	HasOdin() bool
-	OdinPackages() []string
-	HasOdinSymbol(qualified string) bool
-	SimilarOdinSymbols(qualified string, n int) []string
-	HasPython() bool
-	PyModules() []string
-	HasPySymbol(qualified string) bool
-	// PyModuleIsExample reports whether a Python module lives under a tests,
-	// docs or examples tree (so claims about it are weaker).
-	PyModuleIsExample(module string) bool
-	// PyIsModule reports whether a dotted name is a module or package (as
-	// opposed to a class, function or module-level object).
-	PyIsModule(qualified string) bool
-	SimilarPySymbols(qualified string, n int) []string
+	// --- other languages (see Langs) ---
+	// Languages lists the kinds of the languages with at least one indexed
+	// source file, in Langs order.
+	Languages() []Kind
+	HasLang(kind Kind) bool
+	// Namespaces lists the packages, modules, crates or namespaces of a
+	// language, sorted.
+	Namespaces(kind Kind) []string
+	// IsNamespace reports whether qualified names a namespace of the
+	// language rather than a declaration.
+	IsNamespace(kind Kind, qualified string) bool
+	// IsExample reports whether a namespace lives under a tests, docs or
+	// examples tree (so claims about it are weaker).
+	IsExample(kind Kind, namespace string) bool
+	HasSymbol(kind Kind, qualified string) bool
+	SimilarSymbols(kind Kind, qualified string, n int) []string
 
 	// --- Markdown anchors ---
 	// HasAnchor reports whether docRel (a markdown file) has a heading
@@ -433,7 +543,7 @@ type Exported struct {
 // line; docstring lines are excluded from the churn count).
 type SymbolSpan struct {
 	Qualified string   `json:"qualified"`
-	Kind      Kind     `json:"kind"` // KindGoSymbol | KindPySym | KindOdinSym
+	Kind      Kind     `json:"kind"` // KindGoSymbol or a Langs kind
 	File      string   `json:"file"`
 	DocStart  int      `json:"docStart"`
 	DocEnd    int      `json:"docEnd"`

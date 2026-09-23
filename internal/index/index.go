@@ -16,6 +16,7 @@ import (
 	"docrot/internal/index/config"
 	"docrot/internal/index/files"
 	"docrot/internal/index/gosym"
+	"docrot/internal/index/lang"
 	"docrot/internal/index/odin"
 	"docrot/internal/index/project"
 	"docrot/internal/index/py"
@@ -38,19 +39,18 @@ type Options struct {
 
 // Stats summarises the built index for the report.
 type Stats struct {
-	Files       int
-	Routes      int
-	Literals    int
-	GoFiles     int
-	GoPackages  int
-	GoSymbols   int
-	Flags       int
-	Envs        int
-	JSONKeys    int
-	OdinFiles   int
-	OdinSymbols int
-	PyFiles     int
-	PySymbols   int
+	Files      int
+	Routes     int
+	Literals   int
+	GoFiles    int
+	GoPackages int
+	GoSymbols  int
+	Flags      int
+	Envs       int
+	JSONKeys   int
+	// Langs holds the counters of every other language that has at least
+	// one source file, keyed by its symbol kind.
+	Langs       map[model.Kind]lang.Stats
 	ConfigFiles int
 	ConfigKeys  int
 	ParseErrors int
@@ -66,8 +66,7 @@ type Index struct {
 	opts    Options
 	files   *files.Index
 	gos     *gosym.Index
-	od      *odin.Index
-	pys     *py.Index
+	langs   map[model.Kind]lang.Index // every other language with at least one file
 	cfg     *config.Index
 	anch    *anchors.Index
 	rts     *routes.Set
@@ -79,11 +78,34 @@ type Index struct {
 
 var _ model.Index = (*Index)(nil)
 
+// builder builds one language's index; a nil index means the language is
+// absent from the tree.
+type builder func(root string, exclude []string) (lang.Index, error)
+
+// builders maps every language of model.Langs to its index package. A
+// language listed in model.Langs without a builder is simply never present.
+var builders = map[model.Kind]builder{
+	model.KindOdinSym: func(root string, ex []string) (lang.Index, error) {
+		ix, err := odin.Build(root, ex)
+		if ix == nil {
+			return nil, err
+		}
+		return ix, err
+	},
+	model.KindPySym: func(root string, ex []string) (lang.Index, error) {
+		ix, err := py.Build(root, ex)
+		if ix == nil {
+			return nil, err
+		}
+		return ix, err
+	},
+}
+
 // Build indexes root. Per-file parse errors are returned as warnings and
 // never abort the build.
 func Build(root string, opts Options) (*Index, []error, error) {
 	start := time.Now()
-	ix := &Index{root: root, opts: opts, anch: anchors.New(), rts: routes.New()}
+	ix := &Index{root: root, opts: opts, anch: anchors.New(), rts: routes.New(), langs: map[model.Kind]lang.Index{}}
 	excl, large := expandExcludes(root, opts.Exclude, opts.MaxFileSize)
 	ix.stats.SkippedLarge = large
 	// content indexers never open oversized files; the path index still lists them
@@ -112,7 +134,7 @@ func Build(root string, opts Options) (*Index, []error, error) {
 		}
 	}
 
-	wg.Add(6)
+	wg.Add(4 + len(builders))
 	go func() {
 		defer wg.Done()
 		f, err := files.Build(root, opts.Exclude)
@@ -129,18 +151,19 @@ func Build(root string, opts Options) (*Index, []error, error) {
 		addWarn(errs...)
 		ix.gos = g
 	}()
-	go func() {
-		defer wg.Done()
-		o, err := odin.Build(root, excl)
-		addWarn(err)
-		ix.od = o
-	}()
-	go func() {
-		defer wg.Done()
-		p, err := py.Build(root, excl)
-		addWarn(err)
-		ix.pys = p
-	}()
+	for kind, build := range builders {
+		go func() {
+			defer wg.Done()
+			li, err := build(root, excl)
+			addWarn(err)
+			if li == nil || li.Empty() {
+				return
+			}
+			mu.Lock()
+			ix.langs[kind] = li
+			mu.Unlock()
+		}()
+	}
 	go func() {
 		defer wg.Done()
 		c, err := config.Build(root, opts.ConfigSamples, excl)
@@ -159,8 +182,8 @@ func Build(root string, opts Options) (*Index, []error, error) {
 			ix.rts.Add(r)
 		}
 	}
-	if ix.pys != nil {
-		for _, r := range ix.pys.Routes() {
+	for _, kind := range ix.Languages() {
+		for _, r := range ix.langs[kind].Routes() {
 			ix.rts.Add(r)
 		}
 	}
@@ -178,13 +201,9 @@ func Build(root string, opts Options) (*Index, []error, error) {
 		ix.stats.Flags, ix.stats.Envs, ix.stats.JSONKeys = gs.Flags, gs.Envs, gs.JSONKeys
 		ix.stats.ParseErrors = gs.ParseErrors
 	}
-	if ix.od != nil {
-		s := ix.od.Stats()
-		ix.stats.OdinFiles, ix.stats.OdinSymbols = s.Files, s.Symbols
-	}
-	if ix.pys != nil {
-		s := ix.pys.Stats()
-		ix.stats.PyFiles, ix.stats.PySymbols = s.Files, s.Symbols
+	ix.stats.Langs = map[model.Kind]lang.Stats{}
+	for kind, li := range ix.langs {
+		ix.stats.Langs[kind] = li.Counts()
 	}
 	if ix.cfg != nil {
 		s := ix.cfg.Stats()
@@ -197,7 +216,15 @@ func Build(root string, opts Options) (*Index, []error, error) {
 
 // parsedExt are the extensions whose contents an indexer would read; only
 // these are subject to the size cap (a 4 GB model file is never opened).
-var parsedExt = map[string]bool{".go": true, ".odin": true, ".py": true, ".json": true, ".jsonc": true}
+var parsedExt = func() map[string]bool {
+	m := map[string]bool{".go": true, ".json": true, ".jsonc": true}
+	for _, l := range model.Langs {
+		for _, e := range l.Exts {
+			m[e] = true
+		}
+	}
+	return m
+}()
 
 // expandExcludes walks root and returns the relative paths (files and
 // directories) matched by the glob patterns, so leaf indexes that only
@@ -375,84 +402,77 @@ func (ix *Index) GoExported() []model.Exported {
 
 // --- Odin / Python ---
 
-func (ix *Index) HasOdin() bool { return ix.od != nil && !ix.od.Empty() }
-
-func (ix *Index) OdinPackages() []string {
-	if ix.od == nil {
-		return nil
+// Languages lists the present languages in model.Langs order.
+func (ix *Index) Languages() []model.Kind {
+	var out []model.Kind
+	for _, l := range model.Langs {
+		if _, ok := ix.langs[l.Kind]; ok {
+			out = append(out, l.Kind)
+		}
 	}
-	return ix.od.Packages()
+	return out
 }
 
-func (ix *Index) HasOdinSymbol(q string) bool { return ix.od != nil && ix.od.Has(q) }
+func (ix *Index) HasLang(kind model.Kind) bool { _, ok := ix.langs[kind]; return ok }
 
-func (ix *Index) SimilarOdinSymbols(q string, n int) []string {
-	if ix.od == nil {
-		return nil
+func (ix *Index) Namespaces(kind model.Kind) []string {
+	if li, ok := ix.langs[kind]; ok {
+		return li.Namespaces()
 	}
-	return ix.od.Similar(q, n)
+	return nil
 }
 
-func (ix *Index) HasPython() bool { return ix.pys != nil && !ix.pys.Empty() }
-
-func (ix *Index) PyModules() []string {
-	if ix.pys == nil {
-		return nil
-	}
-	return ix.pys.Modules()
+func (ix *Index) IsNamespace(kind model.Kind, q string) bool {
+	li, ok := ix.langs[kind]
+	return ok && li.IsNamespace(q)
 }
 
-func (ix *Index) HasPySymbol(q string) bool { return ix.pys != nil && ix.pys.Has(q) }
+func (ix *Index) IsExample(kind model.Kind, ns string) bool {
+	li, ok := ix.langs[kind]
+	return ok && li.IsExample(ns)
+}
 
-func (ix *Index) PyModuleIsExample(m string) bool { return ix.pys != nil && ix.pys.IsExampleModule(m) }
+func (ix *Index) HasSymbol(kind model.Kind, q string) bool {
+	li, ok := ix.langs[kind]
+	return ok && li.Has(q)
+}
 
-func (ix *Index) PyIsModule(q string) bool { return ix.pys != nil && ix.pys.IsModule(q) }
-
-func (ix *Index) SimilarPySymbols(q string, n int) []string {
-	if ix.pys == nil {
-		return nil
+func (ix *Index) SimilarSymbols(kind model.Kind, q string, n int) []string {
+	if li, ok := ix.langs[kind]; ok {
+		return li.Similar(q, n)
 	}
-	return ix.pys.Similar(q, n)
+	return nil
 }
 
 // --- declaration spans ---
 
 // SymbolSpan returns the declaration span of a qualified symbol in the
-// language selected by kind (model.KindGoSymbol, model.KindPySym or
-// model.KindOdinSym). Other kinds never resolve.
+// language selected by kind (model.KindGoSymbol or a model.Langs kind).
+// Other kinds never resolve.
 func (ix *Index) SymbolSpan(kind model.Kind, qualified string) (model.SymbolSpan, bool) {
-	switch kind {
-	case model.KindGoSymbol:
+	if kind == model.KindGoSymbol {
 		if ix.gos != nil {
 			return ix.gos.Span(qualified)
 		}
-	case model.KindPySym:
-		if ix.pys != nil {
-			return ix.pys.Span(qualified)
-		}
-	case model.KindOdinSym:
-		if ix.od != nil {
-			return ix.od.Span(qualified)
-		}
+		return model.SymbolSpan{}, false
+	}
+	if li, ok := ix.langs[kind]; ok {
+		return li.Span(qualified)
 	}
 	return model.SymbolSpan{}, false
 }
 
 // AllSpans returns the documented declaration surface of every language:
 // exported Go funcs, methods and types (internal/ packages only when
-// includeInternal), exported Python defs and classes outside example trees,
-// and every Odin proc and type. Each language's spans are sorted by
-// qualified name.
+// includeInternal) followed by each other language's surface in
+// model.Langs order. Each language's spans are sorted by qualified name.
 func (ix *Index) AllSpans(includeInternal bool) []model.SymbolSpan {
 	var out []model.SymbolSpan
 	if ix.gos != nil {
 		out = append(out, ix.gos.AllSpans(includeInternal)...)
 	}
-	if ix.pys != nil {
-		out = append(out, ix.pys.AllSpans()...)
-	}
-	if ix.od != nil {
-		out = append(out, ix.od.AllSpans()...)
+	for _, kind := range ix.Languages() {
+		out = append(out, ix.langs[kind].AllSpans()...)
 	}
 	return out
 }
@@ -485,8 +505,8 @@ func (ix *Index) Default(kind, name string) (string, bool) {
 			return v, true
 		}
 	}
-	if ix.pys != nil {
-		if v, ok := ix.pys.Defaults().Get(kind, name); ok {
+	for _, k := range ix.Languages() {
+		if v, ok := ix.langs[k].Defaults().Get(kind, name); ok {
 			return v, true
 		}
 	}
@@ -499,10 +519,12 @@ func (ix *Index) HasLiteral(s string) bool {
 	if ix.gos != nil && ix.gos.Literals().Has(s) {
 		return true
 	}
-	if ix.pys != nil && ix.pys.Literals().Has(s) {
-		return true
+	for _, li := range ix.langs {
+		if li.Literals().Has(s) {
+			return true
+		}
 	}
-	return ix.od != nil && ix.od.Literals().Has(s)
+	return false
 }
 
 func (ix *Index) literalCount() int {
@@ -510,11 +532,8 @@ func (ix *Index) literalCount() int {
 	if ix.gos != nil {
 		n += ix.gos.Literals().Len()
 	}
-	if ix.pys != nil {
-		n += ix.pys.Literals().Len()
-	}
-	if ix.od != nil {
-		n += ix.od.Literals().Len()
+	for _, li := range ix.langs {
+		n += li.Literals().Len()
 	}
 	return n
 }
@@ -571,13 +590,6 @@ func (ix *Index) Symbols(kind string) []string {
 		out = append(out, ix.ConfigKeys()...)
 		sort.Strings(out)
 		return out
-	case "odin":
-		if ix.od == nil {
-			return nil
-		}
-		return ix.od.ProcNames()
-	case "python":
-		return ix.PyModules()
 	case "routes":
 		return ix.Routes()
 	case "targets":
@@ -594,11 +606,17 @@ func (ix *Index) Symbols(kind string) []string {
 		if ix.gos != nil {
 			out = append(out, ix.gos.Defaults().List()...)
 		}
-		if ix.pys != nil {
-			out = append(out, ix.pys.Defaults().List()...)
+		for _, k := range ix.Languages() {
+			out = append(out, ix.langs[k].Defaults().List()...)
 		}
 		sort.Strings(out)
 		return out
+	}
+	if l, ok := model.LangByID(kind); ok {
+		if li, present := ix.langs[l.Kind]; present {
+			return li.Symbols()
+		}
+		return []string{}
 	}
 	return nil
 }

@@ -21,8 +21,11 @@ type fakeIndex struct {
 	anchors     map[string][]string
 	odin, py    map[string]bool
 	pyMods      map[string]bool
-	defaults    map[string]string // "flag:addr" → ":8080"
-	routes      []string          // "GET /x" or "/x"
+	more        map[model.Kind]map[string]bool // further languages' symbols
+	nsOf        map[model.Kind]map[string]bool // their namespaces
+	similar     map[model.Kind][]string        // canned SimilarSymbols answers
+	defaults    map[string]string              // "flag:addr" → ":8080"
+	routes      []string                       // "GET /x" or "/x"
 	literals    map[string]bool
 	project     model.Project
 }
@@ -124,20 +127,45 @@ func (f *fakeIndex) HasJSONKey(d string) bool {
 	}
 	return false
 }
-func (f *fakeIndex) JSONKeys() []string                      { return f.jsonKeys }
-func (f *fakeIndex) GoExported() []model.Exported            { return nil }
-func (f *fakeIndex) HasOdin() bool                           { return len(f.odin) > 0 }
-func (f *fakeIndex) OdinPackages() []string                  { return nil }
-func (f *fakeIndex) HasOdinSymbol(q string) bool             { return f.odin[q] }
-func (f *fakeIndex) SimilarOdinSymbols(string, int) []string { return nil }
-func (f *fakeIndex) HasPython() bool                         { return len(f.py) > 0 }
-func (f *fakeIndex) PyModules() []string                     { return nil }
-func (f *fakeIndex) HasPySymbol(q string) bool               { return f.py[q] }
-func (f *fakeIndex) PyModuleIsExample(string) bool           { return false }
-func (f *fakeIndex) PyIsModule(q string) bool                { return f.pyMods[q] }
-func (f *fakeIndex) SimilarPySymbols(string, int) []string   { return nil }
-func (f *fakeIndex) HasLiteral(s string) bool                { return f.literals[s] }
-func (f *fakeIndex) Project() model.Project                  { return f.project }
+func (f *fakeIndex) JSONKeys() []string           { return f.jsonKeys }
+func (f *fakeIndex) GoExported() []model.Exported { return nil }
+func (f *fakeIndex) langs() map[model.Kind]map[string]bool {
+	m := map[model.Kind]map[string]bool{}
+	if len(f.odin) > 0 {
+		m[model.KindOdinSym] = f.odin
+	}
+	if len(f.py) > 0 {
+		m[model.KindPySym] = f.py
+	}
+	for k, v := range f.more {
+		m[k] = v
+	}
+	return m
+}
+func (f *fakeIndex) Languages() []model.Kind {
+	var out []model.Kind
+	for _, l := range model.Langs {
+		if _, ok := f.langs()[l.Kind]; ok {
+			out = append(out, l.Kind)
+		}
+	}
+	return out
+}
+func (f *fakeIndex) HasLang(k model.Kind) bool      { _, ok := f.langs()[k]; return ok }
+func (f *fakeIndex) Namespaces(model.Kind) []string { return nil }
+func (f *fakeIndex) IsNamespace(k model.Kind, q string) bool {
+	return k == model.KindPySym && f.pyMods[q] || f.nsOf[k] != nil && f.nsOf[k][q]
+}
+func (f *fakeIndex) IsExample(model.Kind, string) bool     { return false }
+func (f *fakeIndex) HasSymbol(k model.Kind, q string) bool { return f.langs()[k][q] }
+func (f *fakeIndex) SimilarSymbols(k model.Kind, q string, n int) []string {
+	if f.similar != nil {
+		return f.similar[k]
+	}
+	return nil
+}
+func (f *fakeIndex) HasLiteral(s string) bool { return f.literals[s] }
+func (f *fakeIndex) Project() model.Project   { return f.project }
 func (f *fakeIndex) Default(kind, name string) (string, bool) {
 	v, ok := f.defaults[kind+":"+name]
 	return v, ok

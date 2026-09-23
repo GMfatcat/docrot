@@ -41,11 +41,14 @@ var placeholderFirstSegments = map[string]bool{
 }
 
 var (
-	reURL      = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
-	reFlag     = regexp.MustCompile(`^(--?)([A-Za-z][A-Za-z0-9_.-]*)(=.*)?$`)
-	reEnv      = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
-	reDotted   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_]*)+)(\[[^\]]*\])?(\(.*\))?$`)
-	reCall     = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\((.*)\)$`)
+	reURL    = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
+	reFlag   = regexp.MustCompile(`^(--?)([A-Za-z][A-Za-z0-9_.-]*)(=.*)?$`)
+	reEnv    = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
+	reDotted = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)((?:\.[A-Za-z_][A-Za-z0-9_]*)+)(\[[^\]]*\])?(\(.*\))?$`)
+	reCall   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\((.*)\)$`)
+	// reColons matches a Rust or C++ path: crate::module::item, Type::new(),
+	// ns::func, a macro call name!().
+	reColons   = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)+)!?(\(.*\))?$`)
 	reInToken  = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+`)
 	reInFlag   = regexp.MustCompile(`(?:^|[\s,;(\[])(--?[A-Za-z][A-Za-z0-9_-]*)`)
 	reInEnv    = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`)
@@ -374,10 +377,16 @@ func (x *extractor) isTopLevelDir(name string) bool {
 	return x.topDirs[name]
 }
 
-// symbolRef classifies dotted names and calls as Go/Odin/Python symbols or
-// config keys.
+// symbolRef classifies dotted names, "::" paths and calls as Go symbols,
+// symbols of a model.Langs language, or config keys. The Go index is asked
+// first; then every present language in model.Langs order, so that a name
+// which fits several languages is attributed to the first (the resolver
+// still consults every language before reporting a miss).
 func (x *extractor) symbolRef(s string) *model.Reference {
 	s = strings.TrimLeft(s, "*&")
+	if m := reColons.FindStringSubmatch(s); m != nil {
+		return x.colonRef(s, m[1])
+	}
 	if m := reDotted.FindStringSubmatch(s); m != nil {
 		first := m[1]
 		rest := strings.TrimPrefix(m[2], ".")
@@ -392,29 +401,46 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		if IsStdlibPackage(first) && !x.hints.IsGoPackage(first) {
 			return nil
 		}
+		ref := func(kind model.Kind, c model.Confidence) *model.Reference {
+			return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: c}
+		}
 		switch {
 		case x.hints.IsGoPackage(first):
-			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: norm, Confidence: model.High}
+			return ref(model.KindGoSymbol, model.High)
 		case len(parts) == 2 && x.hints.IsGoType(first):
-			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: norm, Confidence: model.High}
-		case x.hints.HasOdin() && x.isOdinPackage(first):
-			return &model.Reference{Kind: model.KindOdinSym, Text: s, Norm: norm, Confidence: model.High}
-		case x.hints.HasPython() && x.isPyModule(first):
-			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: norm, Confidence: model.High}
+			return ref(model.KindGoSymbol, model.High)
 		}
+		for _, kind := range x.hints.Languages() {
+			if lg, _ := model.LangOf(kind); lg.Sep == "." && x.isNamespace(kind, first) {
+				return ref(kind, model.High)
+			}
+		}
+		last := parts[len(parts)-1]
 		allLower := strings.ToLower(norm) == norm
 		switch {
-		case allLower && x.hints.HasOdin():
-			return &model.Reference{Kind: model.KindOdinSym, Text: s, Norm: norm, Confidence: model.Low}
-		case allLower && x.hints.HasPython():
-			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: norm, Confidence: model.Low}
 		case allLower:
-			return &model.Reference{Kind: model.KindConfigKey, Text: s, Norm: norm, Confidence: model.Low}
-		case x.hints.HasPython() && len(parts) == 2 && isCapitalized(first) && strings.ToLower(parts[1]) == parts[1]:
-			// Class.method in a Python repo (snake_case method; Go methods are Capitalized)
-			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: norm, Confidence: model.Medium}
-		case x.hints.ModulePath() != "":
-			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: norm, Confidence: model.Low}
+			if kind, ok := x.langBy(".", model.NamingSnake, false); ok {
+				return ref(kind, model.Low)
+			}
+			return ref(model.KindConfigKey, model.Low)
+		case len(parts) == 2 && isCapitalized(first) && strings.ToLower(last) == last:
+			// Class.method with a snake_case method (Go methods are Capitalized)
+			if kind, ok := x.langBy(".", model.NamingSnake, true); ok {
+				return ref(kind, model.Medium)
+			}
+		case len(parts) == 2 && isCapitalized(first) && isCamel(last):
+			// Client.fetchAll: a JavaScript method
+			if kind, ok := x.langBy(".", model.NamingCamel, true); ok {
+				return ref(kind, model.Medium)
+			}
+		case allCapitalized(parts):
+			// Namespace.Class.Method, Class.Method: C# when present
+			if kind, ok := x.langBy(".", model.NamingPascal, true); ok {
+				return ref(kind, model.Medium)
+			}
+		}
+		if x.hints.ModulePath() != "" {
+			return ref(model.KindGoSymbol, model.Low)
 		}
 		return nil
 	}
@@ -423,14 +449,51 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		if placeholderIdents[name] {
 			return nil
 		}
-		switch {
-		case x.hints.HasOdin() && isSnake(name):
-			return &model.Reference{Kind: model.KindOdinSym, Text: s, Norm: name, Confidence: model.Medium}
-		case x.hints.HasPython() && isSnake(name):
-			return &model.Reference{Kind: model.KindPySym, Text: s, Norm: name, Confidence: model.Medium}
-		case x.hints.ModulePath() != "":
-			return &model.Reference{Kind: model.KindGoSymbol, Text: s, Norm: name, Confidence: model.Medium}
+		ref := func(kind model.Kind) *model.Reference {
+			return &model.Reference{Kind: kind, Text: s, Norm: name, Confidence: model.Medium}
 		}
+		switch {
+		case isSnake(name):
+			if kind, ok := x.langBy("", model.NamingSnake, false); ok {
+				return ref(kind)
+			}
+		case isCamel(name):
+			if kind, ok := x.langBy("", model.NamingCamel, false); ok {
+				return ref(kind)
+			}
+		}
+		if x.hints.ModulePath() != "" {
+			return ref(model.KindGoSymbol)
+		}
+		if isCapitalized(name) {
+			if kind, ok := x.langBy("", model.NamingPascal, false); ok {
+				return ref(kind)
+			}
+		}
+	}
+	return nil
+}
+
+// colonRef classifies a "::" path (norm keeps the separators) as a symbol
+// of the first present language that qualifies names that way.
+func (x *extractor) colonRef(s, norm string) *model.Reference {
+	parts := strings.Split(norm, "::")
+	if len(parts) > 5 || isPlaceholderSymbol(strings.Join(parts, ".")) {
+		return nil
+	}
+	for _, kind := range x.hints.Languages() {
+		lg, _ := model.LangOf(kind)
+		if lg.Sep != "::" {
+			continue
+		}
+		if lg.Stdlib[parts[0]] {
+			return nil // std::io::Read
+		}
+		conf := model.Medium
+		if x.isNamespace(kind, parts[0]) {
+			conf = model.High
+		}
+		return &model.Reference{Kind: kind, Text: s, Norm: norm, Confidence: conf}
 	}
 	return nil
 }
@@ -441,27 +504,63 @@ func isSnake(s string) bool {
 	return strings.ToLower(s) == s && strings.Contains(s, "_")
 }
 
-func (x *extractor) isOdinPackage(name string) bool {
-	if x.odinPkgs == nil {
-		x.odinPkgs = map[string]bool{}
-		for _, p := range x.hints.OdinPackages() {
-			x.odinPkgs[p] = true
-		}
+// isCamel reports a lowerCamelCase identifier: a lower-case start, an
+// upper-case letter somewhere after it, no underscore.
+func isCamel(s string) bool {
+	if s == "" || s[0] < 'a' || s[0] > 'z' || strings.Contains(s, "_") {
+		return false
 	}
-	return x.odinPkgs[name]
+	return strings.ToLower(s) != s
 }
 
-func (x *extractor) isPyModule(name string) bool {
-	if x.pyMods == nil {
-		x.pyMods = map[string]bool{}
-		for _, p := range x.hints.PyModules() {
-			x.pyMods[p] = true
-			if i := strings.Index(p, "."); i >= 0 {
-				x.pyMods[p[:i]] = true // the top-level package
-			}
+func allCapitalized(parts []string) bool {
+	for _, p := range parts {
+		if !isCapitalized(p) {
+			return false
 		}
 	}
-	return x.pyMods[name]
+	return len(parts) > 0
+}
+
+// langBy returns the first present language whose separator is sep (any
+// when sep is empty) and whose bare-call naming (or method naming when
+// methods is set) includes n.
+func (x *extractor) langBy(sep string, n model.Naming, methods bool) (model.Kind, bool) {
+	for _, kind := range x.hints.Languages() {
+		lg, _ := model.LangOf(kind)
+		if sep != "" && lg.Sep != sep {
+			continue
+		}
+		have := lg.Naming
+		if methods {
+			have = lg.Methods
+		}
+		if have&n != 0 {
+			return kind, true
+		}
+	}
+	return "", false
+}
+
+// isNamespace reports whether name is a namespace of the language, or the
+// first segment of one ("fastapi" for "fastapi.responses").
+func (x *extractor) isNamespace(kind model.Kind, name string) bool {
+	if x.nsCache == nil {
+		x.nsCache = map[model.Kind]map[string]bool{}
+	}
+	set, ok := x.nsCache[kind]
+	if !ok {
+		set = map[string]bool{}
+		lg, _ := model.LangOf(kind)
+		for _, ns := range x.hints.Namespaces(kind) {
+			set[ns] = true
+			if i := strings.Index(ns, lg.Sep); i >= 0 {
+				set[ns[:i]] = true // the top-level package
+			}
+		}
+		x.nsCache[kind] = set
+	}
+	return set[name]
 }
 
 // classifyTokens scans a multi-token span (an expression, a command line,

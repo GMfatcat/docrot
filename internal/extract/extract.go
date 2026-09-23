@@ -25,10 +25,10 @@ type Hints interface {
 	IsGoPackage(name string) bool
 	IsGoType(name string) bool
 	TopLevelDirs() []string
-	HasOdin() bool
-	OdinPackages() []string
-	HasPython() bool
-	PyModules() []string
+	// Languages lists the model.Langs kinds with at least one source
+	// file; Namespaces lists one language's packages, modules or crates.
+	Languages() []model.Kind
+	Namespaces(kind model.Kind) []string
 	// HasRoutes reports whether the code registers HTTP routes; without
 	// any, "/x" in a document is an absolute path, not a route claim.
 	HasRoutes() bool
@@ -48,14 +48,13 @@ type Options struct {
 }
 
 type extractor struct {
-	doc      *markdown.Doc
-	hints    Hints
-	opts     Options
-	topDirs  map[string]bool
-	odinPkgs map[string]bool
-	pyMods   map[string]bool
-	seen     map[string]bool
-	out      []model.Reference
+	doc     *markdown.Doc
+	hints   Hints
+	opts    Options
+	topDirs map[string]bool
+	nsCache map[model.Kind]map[string]bool
+	seen    map[string]bool
+	out     []model.Reference
 }
 
 // Extract returns every reference found in doc, in document order.

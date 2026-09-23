@@ -72,13 +72,14 @@ func (r *Resolver) Resolve(ref model.Reference) Result {
 	if ref.Confidence < r.opts.MinConfidence {
 		return Result{Skipped: true}
 	}
+	if lg, ok := model.LangOf(ref.Kind); ok {
+		return r.resolveLangSymbol(ref, lg)
+	}
 	switch ref.Kind {
 	case model.KindPath, model.KindCommand:
 		return r.resolvePath(ref)
 	case model.KindGoSymbol:
 		return r.resolveGoSymbol(ref)
-	case model.KindOdinSym, model.KindPySym:
-		return r.resolveOtherSymbol(ref)
 	case model.KindFlag:
 		return r.resolveFlag(ref)
 	case model.KindEnv:
@@ -416,23 +417,6 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, cands)}
 }
 
-// pyStdlibModules are the Python standard library modules documentation
-// mentions most; a dotted name starting with one is not a claim about this
-// repository unless the repository defines it itself.
-var pyStdlibModules = map[string]bool{}
-
-func init() {
-	for _, m := range strings.Fields(`typing typing_extensions datetime enum dataclasses collections functools itertools
-		os sys re json pathlib asyncio logging math random time uuid decimal fractions io shutil subprocess
-		threading multiprocessing socket ssl http urllib email csv sqlite3 unittest pytest contextlib abc
-		inspect types copy pickle struct hashlib hmac secrets base64 string textwrap operator warnings
-		argparse configparser tempfile glob fnmatch zipfile tarfile gzip heapq bisect array queue weakref
-		numbers statistics ipaddress mimetypes platform signal select selectors traceback importlib pkgutil
-		builtins __future__ concurrent contextvars dis gc html xml zoneinfo tomllib venv pprint reprlib`) {
-		pyStdlibModules[m] = true
-	}
-}
-
 // isReceiverish reports whether name looks like a short variable that
 // commonly collides with a package name (cfg, log, config, app, ...).
 func isReceiverish(name string) bool {
@@ -447,45 +431,39 @@ func isReceiverish(name string) bool {
 	return false
 }
 
-// --- Odin / Python ---------------------------------------------------------
+// --- other languages ----------------------------------------------------
 
-func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
-	var has func(string) bool
-	var sim func(string, int) []string
-	var lang string
-	if ref.Kind == model.KindOdinSym {
-		if !r.ix.HasOdin() {
-			return Result{Skipped: true}
+// resolveLangSymbol checks a symbol of one of model.Langs against that
+// language's index first and then against every other present language
+// (a mixed repository documents both), so a classification that guessed
+// the language wrong never produces a finding when the name exists.
+func (r *Resolver) resolveLangSymbol(ref model.Reference, lg model.Lang) Result {
+	if !r.ix.HasLang(ref.Kind) {
+		return Result{Skipped: true}
+	}
+	anyHas := func(q string) bool {
+		for _, k := range r.ix.Languages() {
+			if r.ix.HasSymbol(k, q) {
+				return true
+			}
 		}
-		has, sim, lang = r.ix.HasOdinSymbol, r.ix.SimilarOdinSymbols, "Odin"
-	} else {
-		if !r.ix.HasPython() {
-			return Result{Skipped: true}
-		}
-		has, sim, lang = r.ix.HasPySymbol, r.ix.SimilarPySymbols, "Python"
+		return false
 	}
-	if has(ref.Norm) {
-		return Result{OK: true}
-	}
-	// the other language may own it (mixed Odin + Python repos)
-	if ref.Kind == model.KindOdinSym && r.ix.HasPython() && r.ix.HasPySymbol(ref.Norm) {
-		return Result{OK: true}
-	}
-	if ref.Kind == model.KindPySym && r.ix.HasOdin() && r.ix.HasOdinSymbol(ref.Norm) {
+	if anyHas(ref.Norm) {
 		return Result{OK: true}
 	}
 	// Type.field where Type is a known declaration: members are not indexed
-	first, _, dotted := strings.Cut(ref.Norm, ".")
-	if dotted && isCapitalized(first) && (r.ix.HasOdinSymbol(first) || r.ix.HasPySymbol(first)) {
+	first, _, dotted := strings.Cut(ref.Norm, lg.Sep)
+	if dotted && isCapitalized(first) && anyHas(first) {
 		return Result{OK: true}
 	}
 	// owner.attr where the owner is a known class, function or module-level
-	// object (not a module): an attribute the declaration index cannot see
-	// (set in __init__, a proxy, a descriptor). A missing name *in a module*
-	// stays a finding.
-	if i := strings.LastIndex(ref.Norm, "."); i > 0 {
+	// object (not a namespace): an attribute the declaration index cannot
+	// see (set in __init__, a proxy, a descriptor). A missing name *in a
+	// namespace* stays a finding.
+	if i := strings.LastIndex(ref.Norm, lg.Sep); i > 0 {
 		owner := strings.TrimSuffix(ref.Norm[:i], "()")
-		if (has(owner) || r.ix.HasPySymbol(owner) || r.ix.HasOdinSymbol(owner)) && !r.ix.PyIsModule(owner) {
+		if anyHas(owner) && !r.ix.IsNamespace(ref.Kind, owner) {
 			return Result{OK: true}
 		}
 	}
@@ -493,17 +471,15 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 		return Result{OK: true} // a name the code spells as a string (an event, a command, a key)
 	}
 	sev := model.SeverityFor(ref.Confidence)
-	if ref.Kind == model.KindPySym {
-		switch {
-		case !dotted:
-			sev = model.SevInfo // a bare call is usually a method or a local helper
-		case pyStdlibModules[first]:
-			return Result{Skipped: true} // typing.Annotated, datetime.strptime
-		case isReceiverish(first):
-			return Result{Skipped: true} // app.routes, client.get: an instance
-		case r.ix.PyModuleIsExample(first):
-			sev = model.SevInfo // app.main from docs_src: a tutorial layout
-		}
+	switch {
+	case !dotted && !lg.Flat:
+		sev = model.SevInfo // a bare call is usually a method or a local helper
+	case dotted && lg.Stdlib[first]:
+		return Result{Skipped: true} // typing.Annotated, std::io::Read
+	case dotted && lg.Methods != 0 && isReceiverish(first):
+		return Result{Skipped: true} // app.routes, client.get: an instance
+	case dotted && r.ix.IsExample(ref.Kind, first):
+		sev = model.SevInfo // app.main from docs_src: a tutorial layout
 	}
 	if ref.Confidence <= model.Low {
 		// a lower-case dotted name may be a config key instead
@@ -518,18 +494,18 @@ func (r *Resolver) resolveOtherSymbol(ref model.Reference) Result {
 			return r.resolveConfigKey(ref)
 		}
 	}
-	msg := lang + " symbol `" + ref.Text + "` not found"
-	cands := sim(ref.Norm, 3)
-	if ref.Kind == model.KindPySym && dotted {
+	msg := lg.Name + " symbol `" + ref.Text + "` not found"
+	cands := r.ix.SimilarSymbols(ref.Kind, ref.Norm, 3)
+	if dotted {
 		// "pydantic.utils.to_camel": the module exists, the name lives in
 		// another module of the same package (moved, or reachable through a
 		// compatibility shim) — worth a look, not a build break
-		if i := strings.LastIndex(ref.Norm, "."); i > 0 && r.ix.PyIsModule(ref.Norm[:i]) {
-			bare := strings.TrimSuffix(ref.Norm[i+1:], "()")
+		if i := strings.LastIndex(ref.Norm, lg.Sep); i > 0 && r.ix.IsNamespace(ref.Kind, ref.Norm[:i]) {
+			bare := strings.TrimSuffix(ref.Norm[i+len(lg.Sep):], "()")
 			for _, c := range cands {
-				if strings.HasSuffix(c, "."+bare) && sev == model.SevError {
+				if strings.HasSuffix(c, lg.Sep+bare) && sev == model.SevError {
 					sev = model.SevWarning
-					msg = lang + " symbol `" + ref.Text + "` not found in module `" + ref.Norm[:i] + "` (a `" + bare + "` exists at " + c + ")"
+					msg = lg.Name + " symbol `" + ref.Text + "` not found in module `" + ref.Norm[:i] + "` (a `" + bare + "` exists at " + c + ")"
 					cands = append([]string{c}, cands...)
 					break
 				}

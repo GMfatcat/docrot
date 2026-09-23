@@ -13,7 +13,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `docrot coverage [dir]` — exported symbols / flags / env vars never mentioned by any document.
 - `docrot pairs [dir]` — only the source/translation checks.
 - `docrot comments [dir]` — comment checks over every exported declaration, not only documented ones.
-- `docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets|defaults` — dump an index.
+- `docrot index [dir] --kind symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c` — dump an index.
 - `docrot init [dir]` — write a default `.docrot.json`.
 
 ## Pipeline (one package per stage)

@@ -15,7 +15,7 @@ docrot coverage [dir]            documentation coverage table
 docrot pairs [dir]               only the bilingual checks
 docrot comments [dir]            comment checks over every exported declaration
 docrot explain <doc> [--kind K]  every extracted reference with its verdict
-docrot index [dir] --kind symbols|flags|env|paths|anchors|config|odin|python|routes|targets|defaults
+docrot index [dir] --kind symbols|flags|env|paths|anchors|config|routes|targets|defaults|odin|python|rust|js|csharp|c
 docrot init [dir]
 docrot version
 ```

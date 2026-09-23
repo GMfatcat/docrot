@@ -293,7 +293,7 @@ func Check(opts Options) (*Run, error) {
 				if res.File != "" && ix.FileExists(res.File) {
 					rr.File = res.File
 				}
-				isSym := ref.Kind == model.KindGoSymbol || ref.Kind == model.KindPySym || ref.Kind == model.KindOdinSym
+				isSym := ref.Kind.IsSymbol()
 				if isSym {
 					if sp, ok := ix.SymbolSpan(ref.Kind, ref.Norm); ok {
 						rr.Span = &sp
@@ -480,11 +480,10 @@ func Check(opts Options) (*Run, error) {
 		sum.Extra["go packages"] = strconv.Itoa(st.GoPackages)
 		sum.Extra["go symbols"] = strconv.Itoa(st.GoSymbols)
 	}
-	if st.OdinFiles > 0 {
-		sum.Extra["odin symbols"] = strconv.Itoa(st.OdinSymbols)
-	}
-	if st.PyFiles > 0 {
-		sum.Extra["python symbols"] = strconv.Itoa(st.PySymbols)
+	for _, l := range model.Langs {
+		if ls, ok := st.Langs[l.Kind]; ok && ls.Files > 0 {
+			sum.Extra[l.ID+" symbols"] = strconv.Itoa(ls.Symbols)
+		}
 	}
 	if st.Routes > 0 {
 		sum.Extra["routes"] = strconv.Itoa(st.Routes)

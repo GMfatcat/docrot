@@ -19,6 +19,8 @@ type fakeHints struct {
 	py       []string
 	hasOdin  bool
 	hasPy    bool
+	langs    []model.Kind            // further present languages
+	ns       map[model.Kind][]string // their namespaces
 	noModule bool
 	routes   bool
 	jsonKeys map[string]bool
@@ -34,13 +36,28 @@ func (f fakeHints) ModulePath() string {
 	}
 	return f.module
 }
-func (f fakeHints) IsGoPackage(n string) bool  { return f.pkgs[n] }
-func (f fakeHints) IsGoType(n string) bool     { return f.types[n] }
-func (f fakeHints) TopLevelDirs() []string     { return f.top }
-func (f fakeHints) HasOdin() bool              { return f.hasOdin }
-func (f fakeHints) OdinPackages() []string     { return f.odin }
-func (f fakeHints) HasPython() bool            { return f.hasPy }
-func (f fakeHints) PyModules() []string        { return f.py }
+func (f fakeHints) IsGoPackage(n string) bool { return f.pkgs[n] }
+func (f fakeHints) IsGoType(n string) bool    { return f.types[n] }
+func (f fakeHints) TopLevelDirs() []string    { return f.top }
+func (f fakeHints) Languages() []model.Kind {
+	var out []model.Kind
+	if f.hasOdin {
+		out = append(out, model.KindOdinSym)
+	}
+	if f.hasPy {
+		out = append(out, model.KindPySym)
+	}
+	return append(out, f.langs...)
+}
+func (f fakeHints) Namespaces(k model.Kind) []string {
+	switch k {
+	case model.KindOdinSym:
+		return f.odin
+	case model.KindPySym:
+		return f.py
+	}
+	return f.ns[k]
+}
 func (f fakeHints) HasRoutes() bool            { return f.routes }
 func (f fakeHints) HasJSONKey(d string) bool   { return f.jsonKeys[d] }
 func (f fakeHints) HasConfigKey(d string) bool { return f.cfgKeys[d] }
