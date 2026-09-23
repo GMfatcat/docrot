@@ -586,19 +586,65 @@ func (r *Resolver) resolveConfigKey(ref model.Reference) Result {
 	if r.ix.HasJSONKey(ref.Norm) || r.ix.HasConfigKey(ref.Norm) || r.ix.HasLiteral(ref.Norm) {
 		return Result{OK: true} // viper.Get("server.port")-style lookups spell the whole key
 	}
-	// only report when the top-level segment is a real config section;
-	// otherwise "rec.status" is just a variable in prose
-	top, _, _ := strings.Cut(ref.Norm, ".")
-	if !r.ix.HasJSONKey(top) && !r.ix.HasConfigKey(top) {
-		return Result{Skipped: true}
+	fromJSON := ref.Lang == "json"
+	if !fromJSON {
+		// only report when the top-level segment is a real config section;
+		// otherwise "rec.status" is just a variable in prose
+		top, _, _ := strings.Cut(ref.Norm, ".")
+		if !r.ix.HasJSONKey(top) && !r.ix.HasConfigKey(top) {
+			return Result{Skipped: true}
+		}
 	}
 	pool := append(append([]string{}, r.ix.JSONKeys()...), r.ix.ConfigKeys()...)
 	var cands []string
-	for _, c := range fuzzy.Rank(ref.Norm, pool, 3, maxDist(ref.Norm)) {
-		cands = append(cands, c.Text)
+	if fromJSON {
+		cands = siblingKeys(ref.Norm, pool)
+	} else {
+		for _, c := range fuzzy.Rank(ref.Norm, pool, 3, maxDist(ref.Norm)) {
+			cands = append(cands, c.Text)
+		}
 	}
 	msg := "config key `" + ref.Text + "` not found in any config struct tag or sample file"
-	return Result{Finding: r.finding(model.RuleUnknownConfigKey, model.SevInfo, ref, msg, cands)}
+	sev := model.SevInfo
+	if fromJSON {
+		// a JSON example whose other keys are real config keys: this one is
+		// a dropped or misspelled key, not a passing mention
+		msg = "key `" + ref.Text + "` in the JSON example is not in any config struct tag or sample file"
+		if ref.Confidence == model.High {
+			sev = model.SevWarning
+		}
+	}
+	return Result{Finding: r.finding(model.RuleUnknownConfigKey, sev, ref, msg, cands)}
+}
+
+// siblingKeys suggests keys that live under the same parent as dotted,
+// ranked by the edit distance of the last segment with a generous budget:
+// "server.timeout" against "server.timeout_ms" is three edits apart, but
+// there is nothing else it could mean.
+func siblingKeys(dotted string, pool []string) []string {
+	parent, last := "", dotted
+	if i := strings.LastIndex(dotted, "."); i >= 0 {
+		parent, last = dotted[:i], dotted[i+1:]
+	}
+	var sibs []string
+	for _, k := range pool {
+		kp, kl := "", k
+		if i := strings.LastIndex(k, "."); i >= 0 {
+			kp, kl = k[:i], k[i+1:]
+		}
+		if kp == parent {
+			sibs = append(sibs, kl)
+		}
+	}
+	var out []string
+	for _, c := range fuzzy.Rank(last, sibs, 3, max(3, len(last)/3)) {
+		if parent != "" {
+			out = append(out, parent+"."+c.Text)
+		} else {
+			out = append(out, c.Text)
+		}
+	}
+	return out
 }
 
 // --- anchors ---------------------------------------------------------------

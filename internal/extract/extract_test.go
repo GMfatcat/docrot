@@ -21,6 +21,8 @@ type fakeHints struct {
 	hasPy    bool
 	noModule bool
 	routes   bool
+	jsonKeys map[string]bool
+	cfgKeys  map[string]bool
 }
 
 func (f fakeHints) ModulePath() string {
@@ -32,14 +34,16 @@ func (f fakeHints) ModulePath() string {
 	}
 	return f.module
 }
-func (f fakeHints) IsGoPackage(n string) bool { return f.pkgs[n] }
-func (f fakeHints) IsGoType(n string) bool    { return f.types[n] }
-func (f fakeHints) TopLevelDirs() []string    { return f.top }
-func (f fakeHints) HasOdin() bool             { return f.hasOdin }
-func (f fakeHints) OdinPackages() []string    { return f.odin }
-func (f fakeHints) HasPython() bool           { return f.hasPy }
-func (f fakeHints) PyModules() []string       { return f.py }
-func (f fakeHints) HasRoutes() bool           { return f.routes }
+func (f fakeHints) IsGoPackage(n string) bool  { return f.pkgs[n] }
+func (f fakeHints) IsGoType(n string) bool     { return f.types[n] }
+func (f fakeHints) TopLevelDirs() []string     { return f.top }
+func (f fakeHints) HasOdin() bool              { return f.hasOdin }
+func (f fakeHints) OdinPackages() []string     { return f.odin }
+func (f fakeHints) HasPython() bool            { return f.hasPy }
+func (f fakeHints) PyModules() []string        { return f.py }
+func (f fakeHints) HasRoutes() bool            { return f.routes }
+func (f fakeHints) HasJSONKey(d string) bool   { return f.jsonKeys[d] }
+func (f fakeHints) HasConfigKey(d string) bool { return f.cfgKeys[d] }
 
 func goHints() fakeHints {
 	return fakeHints{

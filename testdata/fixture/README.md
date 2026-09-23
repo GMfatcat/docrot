@@ -39,6 +39,13 @@ Flags: `--addr`, `--config`, `--confg`, `--port`.
 Environment variables: `FIXTURE_DEBUG`, `FIXTURE_TRACE`.
 Keys: `server.addr`, `server.timeout_ms`, `server.port`, `log.level`.
 
+```json
+{
+  "server": { "addr": ":8080", "timeout": 5000 },
+  "log": { "level": "info", "fmt": "json" }
+}
+```
+
 <!-- docrot:ignore -->
 Ignored line mentions `docs/nonexistent.md` and `--nope`.
 

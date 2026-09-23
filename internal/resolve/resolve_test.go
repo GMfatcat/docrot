@@ -205,6 +205,12 @@ func ref(kind model.Kind, norm string, conf model.Confidence, file string) model
 	return model.Reference{Kind: kind, Text: norm, Norm: norm, Confidence: conf, Loc: model.Location{File: file, Line: 1}}
 }
 
+func jsonRef(key string, conf model.Confidence) model.Reference {
+	r := ref(model.KindConfigKey, key, conf, "README.md")
+	r.Lang = "json"
+	return r
+}
+
 func envRef(name, context string) model.Reference {
 	r := ref(model.KindEnv, name, model.High, "README.md")
 	r.Context = context
@@ -272,6 +278,10 @@ func TestResolvePolicy(t *testing.T) {
 		{"flag known as a literal", ref(model.KindFlag, "dry-run", model.High, "README.md"), true, false, "", "", "", ""},
 		{"env known as a literal", envRef("FIXTURE_HOME", "set the FIXTURE_HOME env var"), true, false, "", "", "", ""},
 		{"configkey known as a literal", ref(model.KindConfigKey, "server.tls", model.Low, "README.md"), true, false, "", "", "", ""},
+		{"json example key missing is warning", jsonRef("server.timeout", model.High), false, false, model.RuleUnknownConfigKey, model.SevWarning, "", ""},
+		{"json example key medium is info", jsonRef("server.timeout", model.Medium), false, false, model.RuleUnknownConfigKey, model.SevInfo, "", ""},
+		{"json example unknown top-level key still reported", jsonRef("retention", model.High), false, false, model.RuleUnknownConfigKey, model.SevWarning, "", ""},
+		{"json example key present", jsonRef("server.addr", model.High), true, false, "", "", "", ""},
 		{"import ok", ref(model.KindImport, "example.com/fixture/pkg/httpx", model.High, "README.md"), true, false, "", "", "", "pkg/httpx"},
 		{"import missing", ref(model.KindImport, "example.com/fixture/pkg/router", model.High, "README.md"), false, false, model.RuleMissingImport, model.SevError, "", ""},
 		{"import foreign skipped", ref(model.KindImport, "github.com/x/y", model.High, "README.md"), false, true, "", "", "", ""},

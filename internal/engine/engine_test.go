@@ -74,6 +74,10 @@ func TestFixtureGolden(t *testing.T) {
 		{model.RulePairLink, "README-zh.md", "https://example.com/zh-only", model.SevWarning, ""},
 		{model.RuleCommentMentions, "pkg/httpx/server.go", "tlsConfig", model.SevWarning, ""},
 		{model.RuleMissingRoute, "README.md", "DELETE /v1/items/{id}", model.SevError, ""},
+		{model.RuleUnknownConfigKey, "README.md", "server.timeout", model.SevWarning, "server.timeout_ms"},
+		{model.RuleUnknownConfigKey, "README.md", "log.fmt", model.SevWarning, "log.format"},
+		{model.RuleUnknownConfigKey, "README-zh.md", "server.timeout", model.SevWarning, "server.timeout_ms"},
+		{model.RuleUnknownConfigKey, "README-zh.md", "log.fmt", model.SevWarning, "log.format"},
 		{model.RuleCommentMentions, "tools/helper.py", "count_items", model.SevWarning, ""},
 	}
 	got := run.Report.Findings

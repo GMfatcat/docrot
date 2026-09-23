@@ -31,6 +31,10 @@ type Hints interface {
 	// HasRoutes reports whether the code registers HTTP routes; without
 	// any, "/x" in a document is an absolute path, not a route claim.
 	HasRoutes() bool
+	// HasJSONKey and HasConfigKey decide whether a ```json block is a
+	// configuration example worth checking key by key.
+	HasJSONKey(dotted string) bool
+	HasConfigKey(dotted string) bool
 }
 
 // Options controls extraction.
@@ -191,6 +195,15 @@ func (x *extractor) fences() {
 		case lang == "go" || lang == "golang":
 			for _, r := range x.goFenceRefs(f.Content) {
 				x.emit(r, f.StartLine, 0, section, lang)
+			}
+		case jsonLangs[lang]:
+			for _, r := range x.jsonFenceRefs(f) {
+				line := r.Loc.Line
+				r.Loc = model.Location{}
+				if x.ignored(line) {
+					continue
+				}
+				x.emit(r, line, 0, section, "json")
 			}
 		case shellLangs[lang]:
 			for i, line := range f.Content {

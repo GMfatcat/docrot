@@ -34,4 +34,11 @@ s := httpx.NewServer(":8080")
 
 Flags：`--addr`、`--config`。
 
+```json
+{
+  "server": { "addr": ":8080", "timeout": 5000 },
+  "log": { "level": "info", "fmt": "json" }
+}
+```
+
 版本 1.2.4 支援 3 次重試。
