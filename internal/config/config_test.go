@@ -30,7 +30,7 @@ func TestDefaultIsValid(t *testing.T) {
 		{"minConfidence", d.MinConfidence, "low"},
 		{"severity", d.Severity, map[string]string{
 			"stale-section": "warning", "pair-lag": "warning", "pair-number": "info",
-			"stale-comment": "info", "comment-mentions-missing": "warning"}},
+			"stale-symbol": "warning", "stale-comment": "info", "comment-mentions-missing": "warning"}},
 		{"pairPatterns", d.PairPatterns, []string{
 			"{stem}-zh.md", "{stem}_zh.md", "{stem}.zh.md", "{stem}.zh-TW.md", "{stem}-zh-TW.md"}},
 		{"configSamples", d.ConfigSamples, []string{
@@ -140,6 +140,7 @@ func TestParseOverlay(t *testing.T) {
 					"pair-lag":                 "error",
 					"pair-number":              "info",
 					"missing-path":             "info",
+					"stale-symbol":             "warning",
 					"stale-comment":            "info",
 					"comment-mentions-missing": "warning",
 				}

@@ -51,6 +51,9 @@ type Options struct {
 	MinDays int
 	// Severity of the findings. Empty means model.SevWarning.
 	Severity model.Severity
+	// SymbolSeverity is the severity of stale-symbol findings. Empty means
+	// model.SevWarning.
+	SymbolSeverity model.Severity
 	// Now is the reference clock. Zero means time.Now(). It is not part of
 	// the staleness decision, which compares commit times with the section's
 	// own edit time only.
@@ -68,6 +71,9 @@ func (o Options) normalized() Options {
 	if o.Severity == "" {
 		o.Severity = model.SevWarning
 	}
+	if o.SymbolSeverity == "" {
+		o.SymbolSeverity = model.SevWarning
+	}
 	if o.Now.IsZero() {
 		o.Now = time.Now()
 	}
@@ -80,6 +86,9 @@ func (o Options) normalized() Options {
 type ResolvedRef struct {
 	Ref  model.Reference
 	File string
+	// Span is the declaration a symbol reference resolved to, when the
+	// index knows it; it drives the symbol-level check.
+	Span *model.SymbolSpan
 }
 
 // section is one slice of the document: the lines of a heading and
@@ -128,9 +137,10 @@ func Analyze(repo *gitx.Repo, doc *markdown.Doc, docRel string, refs []ResolvedR
 	}
 
 	type work struct {
-		sec    section
-		edited time.Time
-		stats  []fileStat
+		sec     section
+		edited  time.Time
+		stats   []fileStat
+		symbols []symbolStat
 	}
 	var todo []work
 	for _, sec := range sections(doc) {
@@ -139,14 +149,15 @@ func Analyze(repo *gitx.Repo, doc *markdown.Doc, docRel string, refs []ResolvedR
 			continue
 		}
 		files := sectionFiles(refs, sec)
-		if len(files) == 0 {
+		syms := sectionSymbols(refs, sec)
+		if len(files) == 0 && len(syms) == 0 {
 			continue
 		}
 		stats := make([]fileStat, len(files))
 		for i, f := range files {
 			stats[i] = fileStat{file: f}
 		}
-		todo = append(todo, work{sec: sec, edited: edited, stats: stats})
+		todo = append(todo, work{sec: sec, edited: edited, stats: stats, symbols: syms})
 	}
 	if len(todo) == 0 {
 		return nil, nil
@@ -179,6 +190,15 @@ func Analyze(repo *gitx.Repo, doc *markdown.Doc, docRel string, refs []ResolvedR
 				}
 			}(&todo[wi], &todo[wi].stats[si])
 		}
+		for si := range todo[wi].symbols {
+			wg.Add(1)
+			go func(w *work, s *symbolStat) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				s.commits, s.latest = bodyChurn(repo, s.span, w.edited)
+			}(&todo[wi], &todo[wi].symbols[si])
+		}
 	}
 	wg.Wait()
 	if len(errs) > 0 {
@@ -187,13 +207,100 @@ func Analyze(repo *gitx.Repo, doc *markdown.Doc, docRel string, refs []ResolvedR
 
 	var out []model.Finding
 	for _, w := range todo {
+		symbolHit := false
+		for _, s := range w.symbols {
+			if !isStale([]fileStat{{file: s.span.File, commits: s.commits, latest: s.latest}}, w.edited, opts) {
+				continue
+			}
+			symbolHit = true
+			out = append(out, symbolFinding(docRel, w.sec, w.edited, s, opts.SymbolSeverity))
+		}
 		changed := changedFiles(w.stats)
-		if !isStale(changed, w.edited, opts) {
-			continue
+		if symbolHit || !isStale(changed, w.edited, opts) {
+			continue // a symbol-level finding is the precise form of the same news
 		}
 		out = append(out, finding(docRel, w.sec, w.edited, changed, opts.Severity))
 	}
 	return out, nil
+}
+
+// symbolStat is the churn of one referenced declaration's body since the
+// section's edit time.
+type symbolStat struct {
+	ref     model.Reference
+	span    *model.SymbolSpan
+	commits int
+	latest  time.Time
+}
+
+// sectionSymbols returns the distinct declarations referenced from the
+// section (one per file and declaration line), in first-appearance order.
+func sectionSymbols(refs []ResolvedRef, sec section) []symbolStat {
+	seen := map[string]bool{}
+	var out []symbolStat
+	for _, r := range refs {
+		if r.Span == nil || r.Span.BodyEnd < r.Span.BodyStart || r.Ref.Loc.Line < sec.start || r.Ref.Loc.Line > sec.end {
+			continue
+		}
+		key := r.Span.File + ":" + fmt.Sprint(r.Span.DeclLine)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, symbolStat{ref: r.Ref, span: r.Span})
+	}
+	return out
+}
+
+// bodyChurn counts the distinct commits newer than edited among the body
+// lines of a declaration, from a whitespace-insensitive blame of its file,
+// and returns the newest of them. A file git cannot blame counts as
+// unchanged.
+func bodyChurn(repo *gitx.Repo, sp *model.SymbolSpan, edited time.Time) (int, time.Time) {
+	lines, err := repo.BlameLines(sp.File)
+	if err != nil {
+		return 0, time.Time{}
+	}
+	seen := map[string]bool{}
+	var latest time.Time
+	for l := sp.BodyStart; l <= sp.BodyEnd && l < len(lines); l++ {
+		if l < 1 {
+			continue
+		}
+		bl := lines[l]
+		if bl.Hash == "" || !bl.Time.After(edited) || seen[bl.Hash] {
+			continue
+		}
+		seen[bl.Hash] = true
+		if bl.Time.After(latest) {
+			latest = bl.Time
+		}
+	}
+	return len(seen), latest
+}
+
+// symbolFinding builds the stale-symbol finding for one declaration.
+func symbolFinding(docRel string, sec section, edited time.Time, s symbolStat, sev model.Severity) model.Finding {
+	r := s.ref
+	msg := fmt.Sprintf("`%s` (%s:%d) changed in %d commits after this section was last edited on %s (latest %s)",
+		r.Text, s.span.File, s.span.DeclLine, s.commits, edited.UTC().Format(dateLayout), s.latest.UTC().Format(dateLayout))
+	return model.Finding{
+		Rule:        model.RuleStaleSymbol,
+		Severity:    sev,
+		Message:     msg,
+		Loc:         r.Loc,
+		Ref:         &r,
+		Fingerprint: model.Fingerprint(model.RuleStaleSymbol, docRel, markdown.Slug(sec.name), r.Norm),
+		Data: map[string]any{
+			"section": sec.name,
+			"symbol":  r.Norm,
+			"file":    s.span.File,
+			"line":    s.span.DeclLine,
+			"edited":  edited.UTC().Format(time.RFC3339),
+			"commits": s.commits,
+			"latest":  s.latest.UTC().Format(time.RFC3339),
+		},
+	}
 }
 
 // sections splits the document at its headings. The lines before the first

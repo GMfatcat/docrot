@@ -139,6 +139,7 @@ func Default() Config {
 			"stale-section":            "warning",
 			"pair-lag":                 "warning",
 			"pair-number":              "info",
+			"stale-symbol":             "warning",
 			"stale-comment":            "info",
 			"comment-mentions-missing": "warning",
 		},

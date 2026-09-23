@@ -212,6 +212,7 @@ const (
 	RuleInstallMismatch  = "install-mismatch"
 	RuleToolchain        = "toolchain-mismatch"
 	RuleMissingTarget    = "missing-target"
+	RuleStaleSymbol      = "stale-symbol"
 )
 
 // AllRules lists every rule in a stable order (for SARIF rule tables etc.).
@@ -221,7 +222,7 @@ var AllRules = []string{
 	RuleMissingImport, RuleStaleSection, RulePairHeading, RulePairCode,
 	RulePairLink, RulePairTable, RulePairNumber, RulePairLag, RuleUndocumented,
 	RuleStaleComment, RuleCommentMentions, RuleMissingRoute,
-	RuleInstallMismatch, RuleToolchain, RuleMissingTarget,
+	RuleInstallMismatch, RuleToolchain, RuleMissingTarget, RuleStaleSymbol,
 }
 
 // RuleDescriptions is the short text shown in SARIF/HTML rule metadata.
@@ -249,6 +250,7 @@ var RuleDescriptions = map[string]string{
 	RuleInstallMismatch:  "An install line (go get, pip install, npm install) names this project by a different path or name than its manifest.",
 	RuleToolchain:        "The Go or Python version the document requires differs from go.mod / pyproject.toml.",
 	RuleMissingTarget:    "A make/npm/just/task target mentioned in the document is not defined.",
+	RuleStaleSymbol:      "The body of a function or type this section names changed in several commits after the section was last edited.",
 }
 
 // Fingerprint computes the stable identity of a finding for baselining.

@@ -285,14 +285,26 @@ func Check(opts Options) (*Run, error) {
 			case res.Finding != nil:
 				r.findings = append(r.findings, *res.Finding)
 			case res.OK:
-				// only file-level references feed the staleness analysis; a
-				// directory reference ("servicex/") churns by definition
+				// only file-level references feed the section-level staleness
+				// analysis (a directory reference churns by definition); a
+				// symbol reference also carries its declaration for the
+				// symbol-level check
+				rr := stale.ResolvedRef{Ref: ref}
 				if res.File != "" && ix.FileExists(res.File) {
-					r.resolved = append(r.resolved, stale.ResolvedRef{Ref: ref, File: res.File})
+					rr.File = res.File
+				}
+				isSym := ref.Kind == model.KindGoSymbol || ref.Kind == model.KindPySym || ref.Kind == model.KindOdinSym
+				if isSym {
+					if sp, ok := ix.SymbolSpan(ref.Kind, ref.Norm); ok {
+						rr.Span = &sp
+					}
+				}
+				if rr.File != "" || rr.Span != nil {
+					r.resolved = append(r.resolved, rr)
 				}
 				mu.Lock()
 				mentioned[string(ref.Kind)+"|"+ref.Norm] = true
-				if ref.Kind == model.KindGoSymbol || ref.Kind == model.KindPySym || ref.Kind == model.KindOdinSym {
+				if isSym {
 					symbolRefs[string(ref.Kind)+"|"+ref.Norm] = ref
 				}
 				mu.Unlock()
@@ -319,6 +331,9 @@ func Check(opts Options) (*Run, error) {
 		staleOpts := stale.Options{MinChurn: cfg.Stale.MinChurn, MinDays: cfg.Stale.MinDays, Now: opts.Now}
 		if s, ok := sevOverrides[model.RuleStaleSection]; ok {
 			staleOpts.Severity = s
+		}
+		if s, ok := sevOverrides[model.RuleStaleSymbol]; ok {
+			staleOpts.SymbolSeverity = s
 		}
 		staleOut := make([][]model.Finding, len(checked))
 		parallel(len(checked), func(i int) {
