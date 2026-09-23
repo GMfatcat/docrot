@@ -5,7 +5,7 @@
 ## 總覽
 
 ```text
-docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
+docrot check [dir] [--format text|md|json|sarif|html|github|junit] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
              [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
@@ -30,6 +30,10 @@ docrot version
 `check` 另有：
 
 - `--format` 與 `--output`——把一份報告寫到檔案而不是終端。輸出目錄照樣會寫。
+  `github` 每條 finding 印一行 workflow command（`::error file=README.md,line=12,title=missing-path::…`），
+  GitHub 與 Gitea Actions 會把它變成 PR 上的標註；`junit` 輸出 JUnit XML，每份文件每條規則
+  一個 test case（info 級是 skipped），GitLab、Jenkins、Gitea 的測試面板都能讀。兩者都跟文字報告一樣，
+  沒有 `--info` 就不列 info，沒有 `--all` 就不列 baselined。
 - `--fail-on`——讓 exit code 變成 1 的最低嚴重度（預設取自設定檔，`error`）；`none` 永不失敗。
 - `--info` 讓文字報告列出 info 級 finding；`--all` 連已 baseline 的也一起顯示。
 - `--coverage` 附上文件覆蓋率那一節。
@@ -61,6 +65,7 @@ finding 失敗，`--all` 可以把已 baseline 的再顯示出來。指紋不含
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
 - run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
+- run: go run ./cmd/docrot check --format github --fail-on warning                # annotations on the PR, no SARIF upload needed
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```

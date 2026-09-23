@@ -11,13 +11,13 @@
 
 ## Wave A — `--format github` 與 `--format junit`
 
-- [ ] A1 `internal/report/github.go`：`WriteGitHub`，workflow command 逸出（`%`、`\r`、`\n`、
+- [x] A1 `internal/report/github.go`：`WriteGitHub`，workflow command 逸出（`%`、`\r`、`\n`、
       `,`、`:` 在屬性裡）；baselined 不輸出；結尾 notice 摘要。
-- [ ] A2 `internal/report/junit.go`：`WriteJUnit`，`encoding/xml`；testcase = 文件 × 規則；
+- [x] A2 `internal/report/junit.go`：`WriteJUnit`，`encoding/xml`；testcase = 文件 × 規則；
       info → skipped；乾淨文件一個 ok testcase。
-- [ ] A3 `report.Formats`、`Write` 的 case；`cmd` 的 `--format` 說明；main_test 的格式迴圈；
+- [x] A3 `report.Formats`、`Write` 的 case；`cmd` 的 `--format` 說明；main_test 的格式迴圈；
       verify.py 的格式迴圈（junit 要能 `xml.etree` parse、github 每行以 `::` 開頭）。
-- [ ] A4 文件：commands 兩語、README 兩語的 CI 段多一行 `--format github`、llms.txt。
+- [x] A4 文件：commands 兩語、README 兩語的 CI 段多一行 `--format github`、llms.txt。
 
 ## Wave B — `pair-missing` 與 `pair-orphan`
 

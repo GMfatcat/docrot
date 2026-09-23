@@ -114,6 +114,7 @@ docrot baseline | coverage | pairs | comments | init | version
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
 - run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
+- run: go run ./cmd/docrot check --format github --fail-on warning                # annotations on the PR, no SARIF upload needed
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```

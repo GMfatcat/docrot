@@ -68,7 +68,7 @@ func TestExitCodes(t *testing.T) {
 func TestFormatsWriteFiles(t *testing.T) {
 	fx := fixture(t)
 	dir := t.TempDir()
-	for _, format := range []string{"text", "md", "json", "sarif", "html"} {
+	for _, format := range []string{"text", "md", "json", "sarif", "html", "github", "junit"} {
 		out := filepath.Join(dir, "report."+format)
 		code, _, errs := call("check", fx, "--no-git", "--no-out", "--format", format, "--output", out, "--fail-on", "none")
 		if code != exitOK {
@@ -80,6 +80,12 @@ func TestFormatsWriteFiles(t *testing.T) {
 		}
 		if format == "html" && (bytes.Contains(b, []byte("<script src")) || bytes.Contains(b, []byte("<link href"))) {
 			t.Errorf("html report references an external resource")
+		}
+		if format == "github" && (!bytes.HasPrefix(b, []byte("::")) || !bytes.Contains(b, []byte("::error file=README.md,"))) {
+			t.Errorf("github report lacks the README.md annotations: %.80s", b)
+		}
+		if format == "junit" && !bytes.Contains(b, []byte(`<testcase classname="README.md" name="missing-path"`)) {
+			t.Errorf("junit report lacks the README.md missing-path case: %.200s", b)
 		}
 		if !strings.Contains(errs, "report written to") {
 			t.Errorf("%s: stderr lacks the written notice: %s", format, errs)

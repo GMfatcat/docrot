@@ -5,7 +5,7 @@
 ## Synopsis
 
 ```text
-docrot check [dir] [--format text|md|json|sarif|html] [--output FILE]
+docrot check [dir] [--format text|md|json|sarif|html|github|junit] [--output FILE]
              [--fail-on error|warning|info|none] [--min-confidence low|medium|high]
              [--out-dir DIR] [--no-out]
              [--no-git] [--net] [--info] [--all] [--coverage] [--quiet] [--config FILE]
@@ -32,7 +32,12 @@ index and git warnings, `--min-confidence` drops weak references.
 `check` adds:
 
 - `--format` and `--output` — one report to a file instead of the terminal.
-  The output directory is written regardless.
+  The output directory is written regardless. `github` prints one workflow
+  command per finding (`::error file=README.md,line=12,title=missing-path::…`),
+  which GitHub and Gitea Actions turn into pull-request annotations; `junit`
+  writes JUnit XML with one test case per document and rule (info findings
+  are skipped cases) for the test panels of GitLab, Jenkins and Gitea. Both
+  hide info findings unless `--info` and baselined ones unless `--all`.
 - `--fail-on` — the lowest severity that makes the exit code 1 (default
   from the config, `error`); `none` never fails.
 - `--info` lists info-level findings in the text report; `--all` also
@@ -71,6 +76,7 @@ headings, so editing around a finding does not resurrect it.
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
 - run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
+- run: go run ./cmd/docrot check --format github --fail-on warning                # annotations on the PR, no SARIF upload needed
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```

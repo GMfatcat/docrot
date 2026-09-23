@@ -44,7 +44,8 @@ Severity follows confidence: high → error, medium → warning, low → info.
 Flags and environment variables are one step softer because they are so
 often about *other* programs; glob misses, config keys in prose and bare
 file names are always info. The text report hides info unless you pass
-`--info`; the JSON, SARIF, HTML and Markdown reports always include it.
+`--info`; the JSON, SARIF, HTML and Markdown reports always include it,
+and the GitHub-annotation and JUnit outputs follow the text report.
 `docrot explain <doc>` shows the confidence given to every reference.
 
 ## What is deliberately ignored

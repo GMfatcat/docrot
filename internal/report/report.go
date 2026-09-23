@@ -1,10 +1,11 @@
 // Package report turns a finished docrot run into something a human, an
 // agent or a machine can read: compiler-style text for a terminal, Markdown
 // written for a language model, a stable JSON schema for scripts, SARIF
-// 2.1.0 for GitHub code scanning, and a single-file HTML page with
-// filtering.
+// 2.1.0 for GitHub code scanning, a single-file HTML page with filtering,
+// GitHub Actions workflow commands (inline pull-request annotations) and
+// JUnit XML for the test panels of GitLab, Jenkins and Gitea.
 //
-// All five writers share the Report value built by the engine. Each writer
+// All the writers share the Report value built by the engine. Each writer
 // sorts a copy of the findings with Sort, so output is deterministic no
 // matter what order the resolvers produced them in.
 package report
@@ -90,7 +91,7 @@ type Options struct {
 }
 
 // Formats lists the accepted format names for Write, in help order.
-var Formats = []string{"text", "md", "json", "sarif", "html"}
+var Formats = []string{"text", "md", "json", "sarif", "html", "github", "junit"}
 
 // Write dispatches on format, which must be one of Formats.
 func Write(format string, w io.Writer, r *Report, o Options) error {
@@ -105,6 +106,10 @@ func Write(format string, w io.Writer, r *Report, o Options) error {
 		return WriteSARIF(w, r, o)
 	case "html":
 		return WriteHTML(w, r, o)
+	case "github":
+		return WriteGitHub(w, r, o)
+	case "junit":
+		return WriteJUnit(w, r, o)
 	}
 	return fmt.Errorf("unknown report format %q (want one of %s)", format, strings.Join(Formats, ", "))
 }

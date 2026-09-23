@@ -6,7 +6,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 
 ## Commands
 
-- `docrot check [dir]` — scan, report, exit 1 when a new finding reaches `--fail-on` (default error). Formats: text (default; info hidden unless `--info`), md, json, sarif, html. `--changed` checks only documents modified since HEAD plus untracked ones; `--since REF` adds the branch's documents since the merge base (PR check). Both need git; coverage is skipped in that mode.
+- `docrot check [dir]` — scan, report, exit 1 when a new finding reaches `--fail-on` (default error). Formats: text (default; info hidden unless `--info`), md, json, sarif, html, github (Actions annotations), junit. `--changed` checks only documents modified since HEAD plus untracked ones; `--since REF` adds the branch's documents since the merge base (PR check). Both need git; coverage is skipped in that mode.
 - Every `docrot check` also rewrites the `outDir` directory (a dot-directory at the repo root by default, excluded from discovery, self-ignoring via its own `.gitignore`) with the same report in all four formats; the Markdown one is written for agents — findings grouped by file, what the severities mean, and a fix checklist. `--out-dir` moves it, `--no-out` skips it.
 - `docrot explain <doc>` — every reference extracted from one document with kind, confidence and verdict. Use it before writing ignore rules.
 - `docrot baseline [dir]` — freeze current findings into `.docrot-baseline.json`; later runs only fail on new ones.
@@ -28,7 +28,7 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - `internal/comments` — comment checks for documented declarations: body churn after the comment's last edit (git) and comment mentions that resolve nowhere.
 - `internal/coverage` — documented vs exported.
 - `internal/baseline` — fingerprints exclude line numbers.
-- `internal/report` — text, agent-facing markdown, json, sarif 2.1.0, self-contained html.
+- `internal/report` — text, agent-facing markdown, json, sarif 2.1.0, self-contained html, GitHub workflow commands, JUnit XML.
 - `internal/engine` — orchestration; `cmd/docrot` — CLI and exit codes.
 
 ## Contracts

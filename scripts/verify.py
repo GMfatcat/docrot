@@ -8,7 +8,7 @@ Steps:
   4. go build            → dist/docrot(.exe)
   5. docrot check on the fixture repo (must exit 1: it contains known lies)
   6. docrot check on docrot's own repo (must exit 0 with --fail-on error)
-  7. docrot check --format md/json/sarif/html on the fixture (must produce valid output)
+  7. docrot check --format md/json/sarif/html/github/junit on the fixture (must produce valid output)
 
 Exit code 0 when everything passes; 1 otherwise. Run from anywhere:
     python scripts/verify.py [--no-race] [--keep]
@@ -16,6 +16,7 @@ Exit code 0 when everything passes; 1 otherwise. Run from anywhere:
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ET
 import os
 import shutil
 import subprocess
@@ -105,7 +106,7 @@ def main(argv: list[str]) -> int:
     step("output formats")
     tmp = Path(tempfile.mkdtemp(prefix="docrot-verify-"))
     try:
-        for fmt in ("md", "json", "sarif", "html"):
+        for fmt in ("md", "json", "sarif", "html", "github", "junit"):
             out = tmp / f"report.{fmt}"
             p = run([str(EXE), "check", str(FIXTURE), "--no-git", "--no-out", "--format", fmt, "--output", str(out)], check=False)
             if p.returncode not in (0, 1):
@@ -122,6 +123,18 @@ def main(argv: list[str]) -> int:
                     failures.append("sarif: version is not 2.1.0")
                 if fmt == "json" and "findings" not in doc:
                     failures.append("json: no findings key")
+            elif fmt == "github":
+                bad = [l for l in data.splitlines() if l and not l.startswith("::")]
+                if bad or "::error file=" not in data:
+                    failures.append(f"github: not every line is a workflow command: {bad[:3]}")
+            elif fmt == "junit":
+                try:
+                    tree = ET.fromstring(data)
+                except ET.ParseError as e:
+                    failures.append(f"junit: invalid XML: {e}")
+                    continue
+                if tree.tag != "testsuites" or tree.find("testsuite") is None:
+                    failures.append("junit: no <testsuites>/<testsuite>")
             elif fmt == "md":
                 for want in ("# docrot report", "## How to read this", "## Findings", "## Fix checklist", "missing-path"):
                     if want not in data:

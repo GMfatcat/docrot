@@ -136,6 +136,7 @@ Every flag, the exit codes and the CI recipes: [docs/commands.md](docs/commands.
 ```yaml
 - run: go run ./cmd/docrot check --format sarif --output docrot.sarif --fail-on error
 - run: go run ./cmd/docrot check --changed --since origin/main --fail-on warning   # PR: changed docs only
+- run: go run ./cmd/docrot check --format github --fail-on warning                # annotations on the PR, no SARIF upload needed
 - uses: github/codeql-action/upload-sarif@v3
   with: { sarif_file: docrot.sarif }
 ```

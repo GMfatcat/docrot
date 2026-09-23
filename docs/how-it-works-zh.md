@@ -30,7 +30,8 @@
 
 嚴重度跟著信心值走：high → error、medium → warning、low → info。flag 與環境變數再放寬一級，
 因為它們太常是在講*別的*程式；glob 沒命中、內文裡的設定鍵與只有檔名的路徑一律 info。文字報告
-預設隱藏 info，加 `--info` 才列出；JSON、SARIF、HTML 與 Markdown 報告則一律包含。
+預設隱藏 info，加 `--info` 才列出；JSON、SARIF、HTML 與 Markdown 報告則一律包含，GitHub 標註與
+JUnit 輸出跟文字報告一樣。
 `docrot explain <doc>` 會列出每個引用拿到的信心值。
 
 ## 刻意忽略的東西
