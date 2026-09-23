@@ -15,8 +15,9 @@ formatting, nothing checks the *claims*.
 docrot does:
 
 - 📌 pulls every claim a document makes about the repository (paths, symbols, flags, environment variables, config keys, routes, defaults, install lines) and checks it against the real code
+- 🧪 parses every Go example, so a snippet with a missing brace is caught before a reader copies it
 - ⏳ uses git history to find the sections the code has moved on from
-- 🌏 keeps bilingual document pairs honest
+- 🌏 keeps bilingual document pairs honest, and rewrites the mechanical mistakes itself (`docrot fix`: git renames, letter case)
 - 📦 reads Markdown, reStructuredText and AsciiDoc about Go, Python, TypeScript/JavaScript, Rust, C#, C/C++ and Odin code, in any mix; one static Go binary, **standard library only**; an HTML report that opens offline
 
 ![docrot check on the fixture repository](docs/assets/terminal.svg)
@@ -93,8 +94,8 @@ Every rule, how it decides and how to silence it: [docs/rules.md](docs/rules.md)
 Tokenize each document, extract references with a *kind* and a
 *confidence*, index the repository once (files, Go/Odin/Python/Rust/JS/C#/C++
 declarations, routes, string literals, manifests, anchors), resolve each
-reference, blame and log for staleness, diff pair fingerprints, check
-comments, apply the baseline. Severity follows confidence: high → error,
+reference, parse the Go examples, blame and log for staleness, diff pair
+fingerprints, check comments, apply the baseline. Severity follows confidence: high → error,
 medium → warning, low → info; the text report hides info unless you pass
 `--info`. The heuristics were tuned on real repositories; what they
 deliberately ignore is written down in
@@ -127,6 +128,7 @@ Every key with its default, the output directory and the git cache:
 docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] [--fail-on LEVEL]
 docrot explain <doc>             every extracted reference with its verdict
 docrot index [dir] --kind K      what was indexed: symbols, flags, env, routes, targets… or one language (rust, js, csharp, c)
+docrot fix [dir] [--apply]       rewrite paths git renamed or that differ only by letter case (dry run by default)
 docrot baseline | coverage | pairs | comments | init | version
 ```
 
@@ -164,7 +166,7 @@ they are full of illustrative paths by design.
 - [How it works](docs/how-it-works.md) — the pipeline, confidence and severity, what is deliberately ignored
 - [Configuration](docs/configuration.md) — `.docrot.json`, the output directory, the git cache
 - [Commands](docs/commands.md) — flags, exit codes, CI
-- [Field report](docs/field-report.md) (Go and Odin), [Python](docs/field-report-python.md), [Rust](docs/field-report-rust.md), [JavaScript/TypeScript](docs/field-report-js.md), [C#](docs/field-report-csharp.md) and [C/C++](docs/field-report-c.md) field reports — what it found on real repositories, and what was noise
+- [Field report](docs/field-report.md) (Go and Odin), [Python](docs/field-report-python.md), [Rust](docs/field-report-rust.md), [JavaScript/TypeScript](docs/field-report-js.md), [C#](docs/field-report-csharp.md), [C/C++](docs/field-report-c.md) and [Go examples](docs/field-report-examples.md) field reports — what it found on real repositories, and what was noise
 - [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md) · [Plan](docs/superpowers/plans/2026-09-23-docrot-plan.md) · [llms.txt](llms.txt) for agents
 
 ## 🚫 Non-goals
@@ -172,7 +174,7 @@ they are full of illustrative paths by design.
 - Not a Markdown linter. Formatting is none of docrot's business.
 - Not a CommonMark implementation. It recognises exactly what it needs.
 - Does not execute examples, and does not judge translation quality.
-- Does not rewrite documents (yet).
+- Does not rewrite prose. `docrot fix` touches only paths that git renamed or that differ by letter case.
 
 ## 📄 License
 

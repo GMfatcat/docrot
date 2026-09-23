@@ -64,5 +64,5 @@
 
 ## 收尾
 
-- [ ] F1 CHANGELOG 0.9.0；roadmap tier 2 表移到「Done in 0.9.0」並記錄教訓；
+- [x] F1 CHANGELOG 0.9.0；roadmap tier 2 表移到「Done in 0.9.0」並記錄教訓；
       `release = "0.9.0"`；`scripts/screenshots.py` 重跑；verify 綠；自檢 0/0；tag `v0.9.0`。

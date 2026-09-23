@@ -39,7 +39,7 @@ import (
 // release number below is reported together with the VCS revision.
 var version = ""
 
-const release = "0.8.0"
+const release = "0.9.0"
 
 const (
 	exitOK       = 0

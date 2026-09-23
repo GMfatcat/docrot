@@ -14,8 +14,9 @@
 docrot 就是做這件事的：
 
 - 📌 抽出文件對 repo 的每一個主張（路徑、符號、flag、環境變數、設定鍵、路由、預設值、安裝指令），對照真正的程式碼
+- 🧪 每個 Go 範例都試著 parse，少一個大括號的片段在讀者複製前就會被抓到
 - ⏳ 用 git 歷史找出程式碼早已往前走的章節
-- 🌏 盯著雙語文件是否同步
+- 🌏 盯著雙語文件是否同步，機械性的錯誤自己改（`docrot fix`：git 改名、大小寫）
 - 📦 讀 Markdown、reStructuredText、AsciiDoc，對照 Go、Python、TypeScript／JavaScript、Rust、C#、C／C++、Odin 程式碼，混合也行；單一靜態 Go 執行檔，**只用標準庫**；HTML 報告離線就能開
 
 ![docrot 對 fixture repo 執行 check 的輸出](docs/assets/terminal.svg)
@@ -75,8 +76,8 @@ docrot fix --apply              # rewrite paths git renamed or that differ only 
 ## 🧠 怎麼判斷
 
 把每份文件 tokenize，抽出帶*種類*與*信心值*的引用，整個 repo 只建一次索引（檔案、
-Go／Odin／Python／Rust／JS／C#／C++ 宣告、路由、字串常值、manifest、錨點），逐一解析，用 blame 與 log 判斷
-過期，比對配對指紋，檢查註解，套用 baseline。嚴重度跟著信心值走：high → error、
+Go／Odin／Python／Rust／JS／C#／C++ 宣告、路由、字串常值、manifest、錨點），逐一解析，parse 每個 Go 範例，
+用 blame 與 log 判斷過期，比對配對指紋，檢查註解，套用 baseline。嚴重度跟著信心值走：high → error、
 medium → warning、low → info；文字報告預設隱藏 info，加 `--info` 才列出。啟發式規則是在
 真實 repo 上調校的；它刻意忽略哪些東西，寫在 [docs/how-it-works.md](docs/how-it-works.md)。
 
@@ -103,6 +104,7 @@ inline text <!-- docrot:ignore -->  this line
 docrot check [dir] [--format text|md|json|sarif|html] [--changed] [--since REF] [--fail-on LEVEL]
 docrot explain <doc>             every extracted reference with its verdict
 docrot index [dir] --kind K      what was indexed: symbols, flags, env, routes, targets… or one language (rust, js, csharp, c)
+docrot fix [dir] [--apply]       rewrite paths git renamed or that differ only by letter case (dry run by default)
 docrot baseline | coverage | pairs | comments | init | version
 ```
 
@@ -139,7 +141,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 - [運作方式](docs/how-it-works.md)——處理流程、信心值與嚴重度、刻意忽略的東西
 - [設定](docs/configuration.md)——`.docrot.json`、輸出目錄、git 快取
 - [指令](docs/commands.md)——flag、exit code、CI
-- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md)、[C#](docs/field-report-csharp.md) 與 [C／C++](docs/field-report-c.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
+- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md)、[C#](docs/field-report-csharp.md)、[C／C++](docs/field-report-c.md) 與 [Go 範例](docs/field-report-examples.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
 - [變更紀錄](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [設計規格](docs/superpowers/specs/2026-09-23-docrot-design.md) · [計畫](docs/superpowers/plans/2026-09-23-docrot-plan.md) · 給 agent 的 [llms.txt](llms.txt)
 
 ## 🚫 非目標
@@ -147,7 +149,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 - 不是 Markdown linter。排版不關 docrot 的事。
 - 不是 CommonMark 實作。它只認得它需要的東西。
 - 不執行範例，也不評斷翻譯品質。
-- 不改寫文件（目前）。
+- 不改寫內文。`docrot fix` 只碰 git 改過名、或只差大小寫的路徑。
 
 ## 📄 授權
 

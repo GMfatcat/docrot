@@ -1,7 +1,40 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-09-24
 
+The rest of `docs/roadmap.md`'s tier 2: five independent additions.
+
+- `--format github` prints one GitHub Actions workflow command per finding
+  (`::error file=README.md,line=12,title=missing-path::…`), so a job gets
+  inline pull-request annotations on GitHub and Gitea without a SARIF
+  upload; `--format junit` writes JUnit XML (one test case per document
+  and rule, info findings as skipped cases) for the test panels of GitLab,
+  Jenkins and Gitea. Both hide info and baselined findings like the text
+  report.
+- `pair-missing` (info, on the source) and `pair-orphan` (warning, on the
+  translation): in a `docs/en/` ↔ `docs/<lang>/` tree with at least one <!-- docrot:ignore missing-path -->
+  detected pair, a page missing on either side. Suffix pairs form no tree.
+- `example-syntax`: every ```go block is parsed with `go/parser` under
+  the shapes a snippet takes (file, statements, statements then
+  declarations, switch cases, literal elements, struct fields, interface
+  methods; imports hoisted). Elided (`...`, `…`, `{{`), go.mod and
+  opted-out (```go ignore) blocks are skipped, changelogs too. A syntax
+  error is a warning; a block that merely ends before its braces close is
+  info, because on the 1,570 blocks of the meowbase repositories that
+  shape was always an excerpt (`docs/field-report-examples.md`).
+- Coverage for registered HTTP routes and for the leaf keys of the
+  configuration samples, in `docrot coverage`, `--coverage` and every
+  report format; `undocumented` findings for both with `coverage.report`.
+  A route mentioned without a method covers every method; a mention that
+  ends with a mounted router's path counts; a documented default counts as
+  a mention of its key.
+- `docrot fix [--apply]`: the resolver marks a `missing-path` finding as
+  mechanically fixable when git history records the rename or the real
+  file differs only by letter case (`data.fix` holds the corrected text,
+  in the frame the document used). `fix` prints each line before and
+  after and rewrites the documents only with `--apply`, keeping line
+  endings and byte-order marks. Symbols, anchors and fuzzy suggestions
+  stay manual.
 - `stale-section` no longer counts a link to the document's own translation
   (a detected pair): a busy `README-zh.md` used to make the English intro
   that links to it "stale", while the pair rules already report that drift.

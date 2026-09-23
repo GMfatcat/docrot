@@ -3,7 +3,7 @@
      yet; that is the point of a roadmap, so docrot skips this file. -->
 # Roadmap: what docrot does not check yet
 
-A full review of the pipeline after 0.2.0, updated after 0.3.0 and 0.4.0
+A full review of the pipeline after 0.2.0, updated as 0.3.0, 0.4.0 and 0.9.0
 shipped the first two tiers, listing claims documents make that docrot still
 takes on faith. Ordered by the ratio of "how often this
 rots in real repositories" to "how much code it takes". Nothing here is
@@ -74,15 +74,22 @@ keeps the old import in its own docs), and nested runner files (a
 monorepo's `packages/x/Makefile`) — today such documents are skipped
 rather than checked.
 
-## Tier 2 — real value, more code or more judgement
+## Done in 0.9.0 (was tier 2)
 
-| Candidate | The lie it catches | Where | Cost |
-|---|---|---|---|
-| **Go example blocks must parse** — run `go/parser` on ```` ```go ```` fences (with an implicit `package main` wrapper when needed) and report syntax errors; optionally `gofmt` drift | Copy-paste examples with a missing brace or an old syntax. Stdlib-only and cheap for Go; Python would need a real parser (out of scope). | `extract` or a new `examples` stage | small for Go |
-| **Untranslated pages** (`pair-missing`) — in a `docs/en` ↔ `docs/zh` tree, list source pages with no counterpart, and translations whose source disappeared (`pair-orphan`) | FastAPI has both kinds; translation teams track this by hand. | `pairs` | small |
-| **Coverage for routes and config keys** — once routes and string literals are indexed, "documented / total" for endpoints and for config keys, next to symbols/flags/env | The `llms.txt` audience: an agent needs the endpoint list and the config keys more than the exported Go surface. | `coverage` | small after Tier 1 |
-| **`docrot fix --dry-run`** — apply the high-confidence suggestions: git-recorded renames (`old/path.go → new/path.go`) and case-only mismatches; print a diff, `--apply` to write | The mechanical half of the fixes; the rename map is already computed. Symbol renames stay manual. | new `fix` stage over `Finding.Suggestion` + `Data["candidates"]` | medium |
-| **GitHub/Gitea annotation output** (`--format github`, `::warning file=…,line=…::msg`) and JUnit XML | CI surfaces findings inline on the PR without SARIF upload; Gitea Actions understands the same syntax. | `report` | tiny |
+GitHub-annotation and JUnit output, `pair-missing`/`pair-orphan`,
+`example-syntax`, route and config-key coverage and `docrot fix` all
+shipped in 0.9.0; see `CHANGELOG.md`. Lessons: a Go snippet in a README
+takes eight shapes (file, statements, statements then declarations,
+switch cases, literal elements, struct fields, interface methods, go.mod
+content that is not an example at all) and a block cut before its
+closing brace is an excerpt far more often than a mistake, so it is only
+info; a translation *set* exists only where a directory convention
+defines one; a route mentioned without a method documents every method;
+and the only suggestions safe to apply unattended are the ones the
+resolver could prove — git renames and letter case — everything else
+stays a suggestion. Left over: gofmt drift of Go examples (the parser
+already has the AST; a formatting diff is a policy, not a lie) and
+`fix` for anchors, which would need a unique heading match to be safe.
 
 ## Tier 3 — possible, not obviously worth it yet
 

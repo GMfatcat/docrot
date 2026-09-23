@@ -52,6 +52,6 @@ Module `docrot`, Go 1.26. Entry point `cmd/docrot`. All logic lives under `inter
 - [C# field report](docs/field-report-csharp.md) — results on Polly, Humanizer and TodoApi
 - [C/C++ field report](docs/field-report-c.md) — results on curl, nlohmann/json and CLI11
 - [Go example check field report](docs/field-report-examples.md) — 1,570 ```go blocks of the meowbase repositories
-- [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md)
+- [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-plan.md); languages: [spec](docs/superpowers/specs/2026-09-23-docrot-languages-design.md), [plan](docs/superpowers/plans/2026-09-23-docrot-languages-plan.md); 0.9.0: [spec](docs/superpowers/specs/2026-09-24-docrot-tier2-design.md), [plan](docs/superpowers/plans/2026-09-24-docrot-tier2-plan.md)
 - [Roadmap](docs/roadmap.md) — claims docrot does not check yet, ranked by value/cost
 - Verify everything: `python scripts/verify.py`

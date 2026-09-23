@@ -51,7 +51,8 @@ listings, `link:`/`xref:`/`include::`/`image::` macros, `<<xrefs>>`, bare
 URLs, `//` comments and `////` blocks. Whatever the format, the code a
 document talks about may be Go, Python, Odin, Rust, JavaScript/TypeScript,
 C# or C/C++, in any mix: each language is indexed on its own and a name is looked up in
-every one before it is reported.
+every one before it is reported. Go code blocks are additionally parsed
+(see [Code examples](#code-examples)).
 
 ## Reference rules
 
@@ -198,7 +199,8 @@ the correction is in the finding's `data.fix` field of the JSON report.
 
 Pairs come from `pairs` in `.docrot.json` plus automatic patterns <!-- docrot:ignore -->
 (`README-zh.md`, `README.zh-TW.md`, `docs/en/…` ↔ `docs/zh/…`). <!-- docrot:ignore -->
-Findings are reported on the translation file.
+Findings are reported on the translation file, except `pair-missing`, which
+sits on the source page that has no translation.
 
 | Rule | Meaning |
 |---|---|
