@@ -4,19 +4,20 @@
 
 **docrot finds where your documentation lies about your code.**
 
-Code moves; docs rarely follow. The README still names a function that was
-renamed two sprints ago, `llms.txt` points an AI agent at a file that no
-longer exists, the `--config` flag in the quick-start was deleted, the anchor
-in the guide is dead, and the Chinese README is three commits behind the
-English one. Link checkers only look at URLs. Markdown linters only look at
-formatting. Nothing checks the *claims*.
+Does your README still name the function you renamed last sprint?
+Does `llms.txt` send your AI agent to a file that no longer exists?
+Is the `--config` flag in the quick start still there?
+Do the anchors in the guide still land? Is the Chinese README three commits behind?
 
-docrot extracts every claim a document makes about the repository and checks
-it against the real code, then uses git history to find the sections the
-code has moved on from, and compares bilingual document pairs. It reads
-Markdown, reStructuredText and AsciiDoc. It is a single static Go binary
-with **no dependencies outside the standard library**, and the HTML report
-it writes is one file that opens offline.
+Nobody knows, because nothing checks the *claims*: link checkers look at
+URLs, Markdown linters look at formatting.
+
+docrot does. It pulls every claim a document makes about the repository —
+paths, symbols, flags, environment variables, config keys, routes, defaults,
+install lines — and checks each one against the real code; then it uses git
+history to find the sections the code has moved on from, and keeps
+bilingual pairs honest. Markdown, reStructuredText, AsciiDoc. One static Go
+binary, **standard library only**; one HTML report that opens offline.
 
 ![docrot check on the fixture repository](docs/assets/terminal.svg)
 

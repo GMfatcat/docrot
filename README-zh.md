@@ -4,15 +4,18 @@
 
 **docrot 找出「文件在說謊」的地方。**
 
-程式碼一直在動，文件卻很少跟著動。README 還在講兩個 sprint 前就改名的函式，
-`llms.txt` 把 AI agent 指向早已不存在的檔案，快速上手裡的 `--config` flag 早就刪了，
-指南裡的錨點失效，中文 README 落後英文版三個 commit。連結檢查器只看 URL，Markdown
-linter 只看排版，沒有任何工具檢查文件裡的「主張」。
+README 裡那個函式，上個 sprint 是不是已經改名了？
+`llms.txt` 指給 AI agent 的檔案，還在嗎？
+快速上手裡的 `--config` flag，是不是早就刪了？
+指南裡的錨點還指得到嗎？中文 README 落後英文版幾個 commit 了？
 
-docrot 把文件對 repo 的每一個主張抽出來，對照真正的程式碼；再用 git 歷史找出程式碼
-早已往前走的章節；也比對雙語文件是否同步。Markdown、reStructuredText 與 AsciiDoc 都
-讀得懂。它是單一靜態執行檔，以 Go 撰寫，**除了標準庫沒有任何依賴**，產出的 HTML 報告
-也是單一檔案，離線打開就能用。
+沒有人知道——因為沒有工具在檢查文件裡的「主張」：連結檢查器只看 URL，Markdown linter
+只看排版。
+
+docrot 就是做這件事的。它把文件對 repo 的每一個主張——路徑、符號、flag、環境變數、設定鍵、
+路由、預設值、安裝指令——逐一抽出來對照真正的程式碼；再用 git 歷史找出程式碼早已往前走的
+章節；也盯著雙語文件是否同步。Markdown、reStructuredText、AsciiDoc 都讀得懂。單一靜態 Go
+執行檔，**只用標準庫**；一份 HTML 報告，離線打開就能用。
 
 ![docrot 對 fixture repo 執行 check 的輸出](docs/assets/terminal.svg)
 
