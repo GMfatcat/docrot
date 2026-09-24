@@ -39,7 +39,7 @@ import (
 // release number below is reported together with the VCS revision.
 var version = ""
 
-const release = "0.9.0"
+const release = "1.0.0"
 
 const (
 	exitOK       = 0
@@ -97,9 +97,28 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 	return exitUsage
 }
 
-func usage(w io.Writer) {
-	fmt.Fprint(w, `docrot — find where documentation lies about the code
+// bannerLines is the 2.5D wordmark printed above the usage text: block
+// letters extruded to the lower right, plain ASCII so that every console
+// renders it, and only in `docrot` / `docrot help`, never in output a
+// script or a CI job parses.
+var bannerLines = []string{
+	"     __                                    __",
+	"    /\\ \\                                  /\\ \\__",
+	"    \\_\\ \\     ___     ___   _ __   ___    \\ \\ ,_\\",
+	"    /'_` \\   / __`\\  /'___\\/\\`'__\\/ __`\\   \\ \\ \\/",
+	"   /\\ \\L\\ \\ /\\ \\L\\ \\/\\ \\__/\\ \\ \\//\\ \\L\\ \\   \\ \\ \\_",
+	"   \\ \\___,_\\\\ \\____/\\ \\____\\\\ \\_\\\\ \\____/    \\ \\__\\",
+	"    \\/__,_ / \\/___/  \\/____/ \\/_/ \\/___/      \\/__/",
+}
 
+func banner() string {
+	return strings.Join(bannerLines, "\n") + "\n"
+}
+
+func usage(w io.Writer) {
+	fmt.Fprint(w, banner())
+	fmt.Fprint(w, "\n  docrot "+versionString()+" — find where documentation lies about the code\n")
+	fmt.Fprint(w, `
 Usage:
   docrot check [dir] [flags]      scan docs and report findings (exit 1 when --fail-on is met)
                                   --changed [--since REF]: only documents modified since HEAD / REF

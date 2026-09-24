@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0 — 2026-09-24
+
+The planned scope is complete: every language the project set out to
+cover, every tier of the roadmap worth doing, and the field runs behind
+each rule. 1.0.0 adds only the wordmark: `docrot` and `docrot help` open
+with a 2.5D ASCII banner, plain ASCII so that any console renders it and
+absent from every output a script or CI job parses (`check`, `version`,
+the report formats).
+
 ## 0.9.0 — 2026-09-24
 
 The rest of `docs/roadmap.md`'s tier 2: five independent additions.
