@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — 2026-09-24
+
+- The banner's `t` sits two columns closer to the `o`, the same kerning as
+  the other letters.
+
 ## 1.0.0 — 2026-09-24
 
 The planned scope is complete: every language the project set out to

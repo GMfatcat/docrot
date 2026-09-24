@@ -39,7 +39,7 @@ import (
 // release number below is reported together with the VCS revision.
 var version = ""
 
-const release = "1.0.0"
+const release = "1.0.1"
 
 const (
 	exitOK       = 0
@@ -102,13 +102,13 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 // renders it, and only in `docrot` / `docrot help`, never in output a
 // script or a CI job parses.
 var bannerLines = []string{
-	"     __                                    __",
-	"    /\\ \\                                  /\\ \\__",
-	"    \\_\\ \\     ___     ___   _ __   ___    \\ \\ ,_\\",
-	"    /'_` \\   / __`\\  /'___\\/\\`'__\\/ __`\\   \\ \\ \\/",
-	"   /\\ \\L\\ \\ /\\ \\L\\ \\/\\ \\__/\\ \\ \\//\\ \\L\\ \\   \\ \\ \\_",
-	"   \\ \\___,_\\\\ \\____/\\ \\____\\\\ \\_\\\\ \\____/    \\ \\__\\",
-	"    \\/__,_ / \\/___/  \\/____/ \\/_/ \\/___/      \\/__/",
+	"     __                                  __",
+	"    /\\ \\                                /\\ \\__",
+	"    \\_\\ \\     ___     ___   _ __   ___  \\ \\ ,_\\",
+	"    /'_` \\   / __`\\  /'___\\/\\`'__\\/ __`\\ \\ \\ \\/",
+	"   /\\ \\L\\ \\ /\\ \\L\\ \\/\\ \\__/\\ \\ \\//\\ \\L\\ \\ \\ \\ \\_",
+	"   \\ \\___,_\\\\ \\____/\\ \\____\\\\ \\_\\\\ \\____/  \\ \\__\\",
+	"    \\/__,_ / \\/___/  \\/____/ \\/_/ \\/___/    \\/__/",
 }
 
 func banner() string {

@@ -36,7 +36,7 @@ func TestExitCodes(t *testing.T) {
 		{"no arguments is a usage error", nil, exitUsage, "Usage:"},
 		{"unknown command", []string{"frobnicate"}, exitUsage, "unknown command"},
 		{"help exits 0", []string{"help"}, exitOK, "docrot check"},
-		{"help opens with the banner", []string{"help"}, exitOK, `\/__,_ / \/___/  \/____/ \/_/ \/___/      \/__/`},
+		{"help opens with the banner", []string{"help"}, exitOK, `\/__,_ / \/___/  \/____/ \/_/ \/___/    \/__/`},
 		{"version stays a single plain line", []string{"version"}, exitOK, "docrot " + release + "\n"},
 		{"command help exits 0", []string{"check", "-h"}, exitOK, "-fail-on"},
 		{"version", []string{"version"}, exitOK, "docrot " + release},
