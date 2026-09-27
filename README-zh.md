@@ -52,6 +52,7 @@ docrot fix --apply              # rewrite paths git renamed or that differ only 
 - 📁 **路徑、符號、import** —— `` `internal/gitx/gitx.go` ``、`` `report.WriteSARIF` ``、
   `` `render_frame()` `` 與 `import "docrot/internal/model"` 都存在（Go 走 `go/parser`；
   Odin、Python、Rust、JavaScript／TypeScript、C# 與 C／C++ 走會跟著再匯出的宣告索引），附「你是不是想找」建議與 git 改名歷史。
+  句子若是為了說「這東西不存在」才提到它（「已移除 `old/api.go`」），不算主張。
 - 🎛️ **flag、環境變數、設定鍵、預設值** —— `--format` 有定義、`DOCROT_DEBUG` 有被讀、
   `stale.minChurn` 是 struct tag 或樣本檔裡的鍵、```` ```json ```` 設定範例沒有已刪掉的鍵、
   「`--port` 預設是 `8080`」和程式碼說的一樣。

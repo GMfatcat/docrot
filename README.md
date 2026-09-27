@@ -58,7 +58,8 @@ docrot fix --apply              # rewrite paths git renamed or that differ only 
   `import "docrot/internal/model"` exist (Go through `go/parser`; Odin,
   Python, Rust, JavaScript/TypeScript, C# and C/C++ through a declaration
   index that follows re-exports), with did-you-mean suggestions and git
-  rename history.
+  rename history. A sentence that names a thing to say it does *not*
+  exist ("`old/api.go` was removed") is not a claim.
 - 🎛️ **Flags, environment variables, config keys, defaults** — `--format`
   is defined, `DOCROT_DEBUG` is read, `stale.minChurn` is a struct tag or a
   sample key, a ```` ```json ```` config example has no dropped key, and
