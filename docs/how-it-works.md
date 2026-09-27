@@ -85,14 +85,16 @@ scanned.
 The seven field reports record every round of tuning: what the first run
 reported on eight Go and Odin repositories, seven Python projects, three
 Rust crates, three JavaScript/TypeScript projects, three C# projects,
-three C/C++ projects and, for the Go example check, five Go repositories
-with 1,570 example blocks; which findings were real, which were noise, and the
+three C/C++ projects, for the Go example check, five Go repositories
+with 1,570 example blocks, and, in a sweep meant to fix rather than measure,
+the five meowbase repositories end to end; which findings were real, which were noise, and the
 rule that removed each class of noise. See [field-report.md](field-report.md),
 [field-report-python.md](field-report-python.md),
 [field-report-rust.md](field-report-rust.md),
 [field-report-js.md](field-report-js.md),
 [field-report-csharp.md](field-report-csharp.md),
-[field-report-c.md](field-report-c.md) and
-[field-report-examples.md](field-report-examples.md); every rule's exact behaviour is
+[field-report-c.md](field-report-c.md),
+[field-report-examples.md](field-report-examples.md) and
+[field-report-sweep.md](field-report-sweep.md); every rule's exact behaviour is
 in [rules.md](rules.md), and every rule that changed because of a field run
 says so in `CHANGELOG.md`.

@@ -53,7 +53,8 @@ type Resolver struct {
 
 	httpOnce   sync.Once
 	httpClient *http.Client
-	urlCache   sync.Map // url → error string ("" = ok)
+	urlCache   sync.Map        // url → error string ("" = ok)
+	sibs       siblingPackages // exported names of the sibling repos' Go packages, loaded on first use
 }
 
 // New creates a Resolver.
@@ -428,6 +429,9 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	var msg string
 	switch {
 	case len(parts) == 1:
+		if r.ix.HasGoMember(last) {
+			return Result{OK: true} // `Ready()`, `Close()`: a method some type has
+		}
 		msg = "function or type `" + ref.Text + "` not found in any package"
 		if ref.Confidence < model.High {
 			sev = model.SevInfo // a bare call is usually a method or a local helper
@@ -439,6 +443,13 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 		if strings.ToLower(last) == last && strings.Contains(last, "_") {
 			return r.resolveConfigKey(model.Reference{Kind: model.KindConfigKey, Text: ref.Text, Norm: q, Confidence: model.Low, Loc: ref.Loc, Section: ref.Section, Context: ref.Context})
 		}
+		if short := r.shortMethodForm(q, first, last, len(parts)); short != "" {
+			// `db.VacuumInto`: the method db.DB.VacuumInto written the short way — a
+			// convention, not a lie, but worth a note since no such function exists
+			msg = "`" + q + "` is the short form of `" + short + "`; there is no function `" + q + "`"
+			sev = model.SevInfo
+			break
+		}
 		msg = "`" + q + "` not found in package " + first
 		if strings.ToLower(last) == last {
 			// db.synchronous, htmx.trigger: an unexported name or not Go at all
@@ -448,6 +459,13 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 			// `cfg.Addr` where cfg is both a package and a common variable name
 			msg += " (if `" + first + "` is a variable, its type may have `" + last + "`)"
 			sev = model.SevInfo
+		}
+		if len(parts) == 2 {
+			if sib := r.siblingHas(first, last); sib != "" {
+				// `httpx.Response` next to this module's own httpx: the sibling's package of the same name
+				msg += " (the sibling module at " + filepath.Base(sib) + " has a package " + first + " with `" + last + "`)"
+				sev = model.SevInfo
+			}
 		}
 	case r.ix.IsGoType(first):
 		if strings.ToLower(last) == last && r.ix.HasJSONKey(last) {
@@ -464,6 +482,24 @@ func (r *Resolver) resolveGoSymbol(ref model.Reference) Result {
 	}
 	cands := r.ix.SimilarGoSymbols(q, 3)
 	return Result{Finding: r.finding(model.RuleMissingSymbol, sev, ref, msg, cands)}
+}
+
+// shortMethodForm returns pkg.Type.last when the document's pkg.last names
+// a method or field of one type in that package the short way, or "".
+func (r *Resolver) shortMethodForm(q, first, last string, nparts int) string {
+	if nparts != 2 || !isCapitalized(last) {
+		return ""
+	}
+	for _, c := range r.ix.SimilarGoSymbols(q, 8) {
+		mid, ok := strings.CutPrefix(c, first+".")
+		if !ok || !strings.HasSuffix(mid, "."+last) {
+			continue
+		}
+		if typ := strings.TrimSuffix(mid, "."+last); typ != "" && !strings.Contains(typ, ".") && isCapitalized(typ) {
+			return c
+		}
+	}
+	return ""
 }
 
 // isReceiverish reports whether name looks like a short variable that
@@ -628,6 +664,9 @@ func (r *Resolver) resolveFlag(ref model.Reference) Result {
 	}
 	if r.ix.HasLiteral(ref.Norm) || r.ix.HasLiteral("--"+ref.Norm) || r.ix.HasLiteral("-"+ref.Norm) || r.ix.HasLiteral(strings.ReplaceAll(ref.Norm, "-", "_")) {
 		return Result{OK: true} // defined by a flag library the index does not parse (pflag, cobra, argparse…)
+	}
+	if externalFlags[ref.Norm] {
+		return Result{Skipped: true} // docker's --read-only, go test's -race, git's --amend: another tool's flag
 	}
 	sev := model.SevWarning
 	if ref.Confidence == model.Medium {

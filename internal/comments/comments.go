@@ -28,6 +28,10 @@ type Options struct {
 	StaleSeverity   model.Severity // default info
 	MentionSeverity model.Severity // default warning
 	Workers         int            // parallel blames (default 4)
+	// ExternalWords are identifiers and string literals of code outside
+	// the index — the sibling repositories — that a comment may name
+	// (`NOT_FOUND` from meowbase's errx). See WordsOf.
+	ExternalWords map[string]bool
 }
 
 // Lookup is the part of model.Index the mention check needs.
@@ -37,6 +41,9 @@ type Lookup interface {
 	IsGoPackage(name string) bool
 	SimilarPaths(rel string, n int) []string
 	HasGoSymbol(qualified string) bool
+	// HasGoMember reports whether any type has a field or method named
+	// name, so that `natsx.Request` in a comment may mean (*Conn).Request.
+	HasGoMember(name string) bool
 	// Languages, HasSymbol and IsNamespace cover every other language
 	// (model.Langs).
 	Languages() []model.Kind
@@ -63,6 +70,9 @@ var (
 // builtins and other words that look like identifiers but are language
 // vocabulary, never a claim about this code.
 var skipTokens = map[string]bool{
+	// proper nouns spelled with an inner capital
+	"gRPC": true, "gRPCs": true, "mTLS": true, "iOS": true, "macOS": true, "eBPF": true, "oAuth": true,
+	"jQuery": true, "tvOS": true, "watchOS": true, "iPadOS": true, "npm": true, "pnpm": true, "eXist": true,
 	"nil": true, "true": true, "false": true, "err": true, "error": true, "string": true, "int": true,
 	"int64": true, "int32": true, "uint": true, "uint64": true, "byte": true, "bool": true, "float64": true,
 	"rune": true, "map": true, "chan": true, "func": true, "struct": true, "interface": true, "any": true,
@@ -290,7 +300,7 @@ func mentions(sp model.SymbolSpan, lines []string, ix Lookup, opts Options) []mo
 		if norm == "" || reported[norm] || skipTokens[norm] || !plausible(norm, ix, sp.Kind) {
 			continue
 		}
-		if known(norm, bodyWords, fileWords, own, ix, sp.Kind, dirOf(sp.File)) {
+		if known(norm, bodyWords, fileWords, own, ix, sp.Kind, dirOf(sp.File)) || externalKnown(norm, opts.ExternalWords) {
 			continue
 		}
 		reported[norm] = true
@@ -599,6 +609,15 @@ func known(tok string, body, file, own map[string]bool, ix Lookup, kind model.Ki
 			if strings.EqualFold(p, tok) || strings.HasSuffix(p, "/"+tok) {
 				return true
 			}
+		}
+	}
+	if i := strings.Index(tok, "."); i > 0 && !strings.Contains(tok[i+1:], ".") {
+		first, last := tok[:i], strings.TrimSuffix(tok[i+1:], "()")
+		if ix.IsGoPackage(first) && ix.HasGoMember(last) {
+			return true // natsx.Request: a method of a type in that package, named the short way
+		}
+		if ix.HasGoSymbol(first) && (ix.HasJSONKey(last) || ix.HasLiteral(last)) {
+			return true // Envelope.content_type: a wire field of a known type
 		}
 	}
 	if strings.Contains(tok, ".") {

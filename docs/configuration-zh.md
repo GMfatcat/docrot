@@ -33,7 +33,9 @@
   `docs/**/*.txt`）。
 - `ignore` 是套用在引用文字上的正規表示式。
 - `siblings` 列出其他 repo（相對於根目錄），這裡找不到的路徑可能合理地住在那邊——
-  服務文件裡引用它所依賴的函式庫時很有用。
+  服務文件裡引用它所依賴的函式庫時很有用。sibling 也會軟化 `missing-symbol`（同名套件在
+  sibling 有匯出的名字降為 info），並供 `comment-mentions-missing` 查詢（sibling Go 原始碼裡的
+  識別字算已知）。
 - `pairs` 明確指定原文與翻譯的配對；`pairPatterns` 由原文檔名推導翻譯（`{stem}` 是去掉副檔名的
   檔名）。`docs/en/…` ↔ `docs/<lang>/…` 這種目錄結構不用設定就會被偵測到。 <!-- docrot:ignore missing-path -->
 - `configSamples` 是用來挖設定鍵的 JSON 檔（預設含 .NET 專案的 `appsettings*.json`）。

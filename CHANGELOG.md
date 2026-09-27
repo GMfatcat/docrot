@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.0 — 2026-09-27
+
+Tuning from the meowbase sweep (`docs/field-report-sweep.md`): docrot was
+run over five repositories to fix every lie it named, and each class of
+noise met on the way is gone.
+
+- A sentence that names a symbol or path to say it does *not* exist
+  ("不提供 `backup.NewTask()`", "No `X()`.", "`core/errs` was removed",
+  "曾經存在的 `Codec` 介面") is no longer an existence claim. The reach of
+  a cue ends at clause punctuation and, after an intervening span, at a
+  colon, so the alternative named after "：" is still checked.
+- `missing-symbol`: `pkg.Method` written for `pkg.Type.Method` is an info
+  note spelling out the full name (it was an error); a bare `Ready()`
+  resolves when any type has that method; a name exported by a configured
+  sibling's package of the same name is info and names the sibling; Go
+  built-ins, SQL functions, ALL-CAPS calls, placeholder calls (`fn()`,
+  `cancel()`) and JavaScript runtime globals (`Date.now`) are never claims.
+- `missing-path`: brace patterns (`scripts/smoke.{sh,ps1}`) are checked as <!-- docrot:ignore missing-path -->
+  each file; a code span with spaces can be one file name; a capitalized
+  tail after the dot (`servicex.Service`, `fs.FS`) is a member, not an
+  extension; bare extensions and suffixes (`.tmp`, `.pb.go`, `_test.go`)
+  and paths holding `<>{}$` are never claims. `missing-command` skips the
+  same placeholders (`./cmd/<your-service>`).
+- `unknown-flag`: docker, `go test`/`go build` and git flags in prose are
+  skipped unless the code defines the name.
+- `comment-mentions-missing` consults the identifiers of the configured
+  siblings' Go sources, accepts `pkg.Method` and `Type.field`, and skips
+  proper nouns spelled with an inner capital (gRPC, mTLS, macOS).
+- `<!-- docrot:ignore -->` before a fenced block now covers the block.
+
+Because `servicex.Service`-style spans now resolve as symbols, sections that
+reference them are tracked by `stale-section`; a repository may gain a
+warning or two it did not have. The fixture's own "was removed" lines were
+rewritten as plain lies so that they stay seeded findings.
+
 ## 1.0.1 — 2026-09-24
 
 - The banner's `t` sits two columns closer to the `o`, the same kerning as

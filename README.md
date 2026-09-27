@@ -166,7 +166,7 @@ they are full of illustrative paths by design.
 - [How it works](docs/how-it-works.md) — the pipeline, confidence and severity, what is deliberately ignored
 - [Configuration](docs/configuration.md) — `.docrot.json`, the output directory, the git cache
 - [Commands](docs/commands.md) — flags, exit codes, CI
-- [Field report](docs/field-report.md) (Go and Odin), [Python](docs/field-report-python.md), [Rust](docs/field-report-rust.md), [JavaScript/TypeScript](docs/field-report-js.md), [C#](docs/field-report-csharp.md), [C/C++](docs/field-report-c.md) and [Go examples](docs/field-report-examples.md) field reports — what it found on real repositories, and what was noise
+- [Field report](docs/field-report.md) (Go and Odin), [Python](docs/field-report-python.md), [Rust](docs/field-report-rust.md), [JavaScript/TypeScript](docs/field-report-js.md), [C#](docs/field-report-csharp.md), [C/C++](docs/field-report-c.md), [Go examples](docs/field-report-examples.md) and [the meowbase sweep](docs/field-report-sweep.md) field reports — what it found on real repositories, and what was noise
 - [Changelog](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [Design spec](docs/superpowers/specs/2026-09-23-docrot-design.md) · [Plan](docs/superpowers/plans/2026-09-23-docrot-plan.md) · [llms.txt](llms.txt) for agents
 
 ## 🚫 Non-goals

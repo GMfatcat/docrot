@@ -97,7 +97,7 @@ already has the AST; a formatting diff is a policy, not a lie) and
 - Odin `#load("…")` paths, `-define:` flags, `core:` imports — the Odin corpus here is two repositories; wait for demand.
 - Jupyter notebooks as documents — markdown cells are trivial, code cells are not.
 - Watch mode / `docrot serve` dashboard — the output directory plus a file watcher covers most of it.
-- Cross-repository symbol resolution (`siblings` for symbols, not only paths) — needs the sibling's index; feasible, slow.
+- Cross-repository symbol resolution with the sibling's *types* (`App.Run` for a sibling's `servicex.App`) — needs the sibling's index; feasible, slow. The cheap form — a sibling's package of the same name exporting the missing name — shipped in 1.1.0.
 - Detecting *missing* documentation of behaviour (a new flag with no README line) is `coverage`; detecting missing documentation of *changes* (a CHANGELOG entry per exported change) is a policy, not a fact — out.
 
 ## Explicitly rejected

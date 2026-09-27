@@ -36,7 +36,10 @@ rather than ignored.
 - `ignore` holds regular expressions matched against the reference text.
 - `siblings` lists other repositories (relative to the root) where a path
   missing here may legitimately live — useful when a service documents the
-  library it is built on.
+  library it is built on. Siblings also soften `missing-symbol` (a name a
+  sibling's package of the same name exports becomes info) and feed
+  `comment-mentions-missing` (identifiers of the siblings' Go sources count
+  as known).
 - `pairs` ties a source document to its translation explicitly;
   `pairPatterns` derives translations from a source name (`{stem}` is the
   file name without its extension). `docs/en/…` ↔ `docs/<lang>/…` trees <!-- docrot:ignore missing-path -->

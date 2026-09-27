@@ -35,7 +35,7 @@ func Serve() {}
 
 Start it with `+"`app.Serve`"+`, defined in `+"`app/server.go`"+`.
 
-The old entry point was `+"`app/gone.go`"+`, which no longer exists.
+Some guides still point at `+"`app/gone.go`"+` as the entry point.
 `)
 	return root
 }

@@ -141,7 +141,7 @@ docrot 在 `scripts/verify.py` 裡會檢查自己的文件；`docs/superpowers/`
 - [運作方式](docs/how-it-works.md)——處理流程、信心值與嚴重度、刻意忽略的東西
 - [設定](docs/configuration.md)——`.docrot.json`、輸出目錄、git 快取
 - [指令](docs/commands.md)——flag、exit code、CI
-- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md)、[C#](docs/field-report-csharp.md)、[C／C++](docs/field-report-c.md) 與 [Go 範例](docs/field-report-examples.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
+- [實地報告](docs/field-report.md)（Go 與 Odin）、[Python](docs/field-report-python.md)、[Rust](docs/field-report-rust.md)、[JavaScript／TypeScript](docs/field-report-js.md)、[C#](docs/field-report-csharp.md)、[C／C++](docs/field-report-c.md)、[Go 範例](docs/field-report-examples.md) 與 [meowbase 巡檢](docs/field-report-sweep.md) 實地報告——在真實 repo 上找到什麼、哪些是噪音
 - [變更紀錄](CHANGELOG.md) · [Roadmap](docs/roadmap.md) · [設計規格](docs/superpowers/specs/2026-09-23-docrot-design.md) · [計畫](docs/superpowers/plans/2026-09-23-docrot-plan.md) · 給 agent 的 [llms.txt](llms.txt)
 
 ## 🚫 非目標

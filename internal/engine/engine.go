@@ -252,13 +252,14 @@ func Check(opts Options) (*Run, error) {
 		}
 	}
 	sevOverrides := severityMap(cfg.Severity)
+	siblings := absSiblings(root, cfg.Siblings)
 	rs := resolve.New(ix, resolve.Options{
 		Root:          root,
 		MinConfidence: minConf,
 		Net:           opts.Net || cfg.Net,
 		Severity:      sevOverrides,
 		Renames:       renames,
-		Siblings:      absSiblings(root, cfg.Siblings),
+		Siblings:      siblings,
 	})
 
 	type docResult struct {
@@ -384,7 +385,7 @@ func Check(opts Options) (*Run, error) {
 			}
 		}
 		if len(spans) > 0 {
-			copts := comments.Options{MinChurn: cfg.Comments.MinChurn, MinFrac: cfg.Comments.MinFrac}
+			copts := comments.Options{MinChurn: cfg.Comments.MinChurn, MinFrac: cfg.Comments.MinFrac, ExternalWords: comments.WordsOf(siblings)}
 			if s, ok := sevOverrides[model.RuleStaleComment]; ok {
 				copts.StaleSeverity = s
 			}

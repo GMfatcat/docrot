@@ -1156,7 +1156,8 @@ func (d *Doc) ApplyIgnores(alone func(Comment) bool) {
 			if alone(c) {
 				for l := c.EndLine + 1; l <= n; l++ {
 					if strings.TrimSpace(d.Lines[l-1]) != "" {
-						mark(l, l, rules)
+						// the next line may open a fenced block: then the whole block is meant
+						mark(l, fenceEnd(d.Lines, l), rules)
 						break
 					}
 				}
@@ -1198,4 +1199,31 @@ func markRange(m map[int]bool, from, to int) {
 	for l := from; l <= to; l++ {
 		m[l] = true
 	}
+}
+
+// fenceEnd returns the 1-based line that closes the fenced code block
+// opened on line l (``` or ~~~, any longer run of the same character), the
+// last line when the fence is never closed, or l itself when line l does
+// not open a fence.
+func fenceEnd(lines []string, l int) int {
+	if l < 1 || l > len(lines) {
+		return l
+	}
+	t := strings.TrimSpace(lines[l-1])
+	var marker string
+	switch {
+	case strings.HasPrefix(t, "```"):
+		marker = t[:3+len(t[3:])-len(strings.TrimLeft(t[3:], "`"))]
+	case strings.HasPrefix(t, "~~~"):
+		marker = t[:3+len(t[3:])-len(strings.TrimLeft(t[3:], "~"))]
+	default:
+		return l
+	}
+	for e := l + 1; e <= len(lines); e++ {
+		s := strings.TrimSpace(lines[e-1])
+		if strings.HasPrefix(s, marker) && strings.Trim(s, marker[:1]) == "" {
+			return e
+		}
+	}
+	return len(lines)
 }

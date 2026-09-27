@@ -183,7 +183,8 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 				return r
 			}
 		}
-		return nil
+		// `docs/Local Artifact Relay PRD v0.1.md`: a file name with spaces
+		return x.spacedPath(s)
 	}
 	if reURL.MatchString(s) {
 		return &model.Reference{Kind: model.KindURL, Text: s, Norm: s, Confidence: model.Low}
@@ -239,7 +240,7 @@ func (x *extractor) classifyWhole(s string) *model.Reference {
 			return &model.Reference{Kind: kind, Text: s, Norm: member, Confidence: model.Medium}
 		}
 	}
-	if m := reDotted.FindStringSubmatch(s); m != nil && x.runtimeGlobal(m[1]) {
+	if m := reDotted.FindStringSubmatch(s); m != nil && (x.runtimeGlobal(m[1]) || universalGlobals[m[1]]) {
 		return nil // console.log, Math.max, process.exit: the language's runtime, not a path or a claim
 	}
 	if r := x.pathRef(s, false); r != nil {
@@ -306,13 +307,16 @@ func cleanPath(s string) string {
 // pathRef decides whether s is a path. When loose is true the token came
 // from tokenizing a larger span and gets at most Medium confidence.
 func (x *extractor) pathRef(s string, loose bool) *model.Reference {
-	if strings.HasPrefix(s, "-") || strings.Contains(s, "://") || strings.ContainsAny(s, "()[]#@") {
-		return nil
+	if strings.HasPrefix(s, "-") || strings.Contains(s, "://") || strings.ContainsAny(s, "()[]#@<>{}$") {
+		return nil // `./cmd/<your-service>`, `$OUT/x`: placeholders and shell syntax
 	}
 	if hasNonASCIIPunct(s) {
 		return nil
 	}
 	p := cleanPath(s)
+	if isBareExtension(p) {
+		return nil // `.tmp`, `.json`: a kind of file
+	}
 	if p == "" || p == "." || p == ".." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "~") {
 		return nil
 	}
@@ -370,6 +374,9 @@ func (x *extractor) pathRef(s string, loose bool) *model.Reference {
 		if stem == "" || (ext == "js" && stem[0] >= 'A' && stem[0] <= 'Z') {
 			return nil // ".gitignore"-style handled below; "Node.js" is not a file
 		}
+		if raw := strings.TrimPrefix(path.Ext(p), "."); raw != strings.ToLower(raw) {
+			return nil // servicex.Service, fs.FS, Options.FS: a member, not an extension
+		}
 		return x.mkPath(s, p, model.Medium)
 	case !hasSlash && isTop && !loose:
 		return x.mkPath(s, p, model.High)
@@ -417,11 +424,11 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 		rest := strings.TrimPrefix(m[2], ".")
 		parts := append([]string{first}, strings.Split(rest, ".")...)
 		norm := strings.Join(parts, ".")
-		if len(parts) > 4 || (len(parts) == 2 && (knownExt[strings.ToLower(parts[1])] || tldSegments[strings.ToLower(parts[1])])) {
-			return nil
+		if len(parts) > 4 || (len(parts) == 2 && parts[1] == strings.ToLower(parts[1]) && (knownExt[parts[1]] || tldSegments[parts[1]])) {
+			return nil // main.go, example.com — but servicex.Service and fs.FS are members
 		}
-		if isPlaceholderSymbol(norm) {
-			return nil
+		if isPlaceholderSymbol(norm) || universalGlobals[first] || x.runtimeGlobal(first) {
+			return nil // Date.now, console.log: a runtime, whichever way the span was cut
 		}
 		if IsStdlibPackage(first) && !x.hints.IsGoPackage(first) {
 			return nil
@@ -486,8 +493,8 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 	}
 	if m := reCall.FindStringSubmatch(s); m != nil {
 		name := m[1]
-		if placeholderIdents[name] {
-			return nil
+		if placeholderIdents[name] || builtinCall(name) {
+			return nil // make([]byte, n), MIN(c), typeof(x), cancel(): the language or SQL, not this module
 		}
 		ref := func(kind model.Kind) *model.Reference {
 			return &model.Reference{Kind: kind, Text: s, Norm: name, Confidence: model.Medium}
@@ -506,6 +513,9 @@ func (x *extractor) symbolRef(s string) *model.Reference {
 			if kind, ok := x.langBy("", model.NamingUpper, false); ok {
 				return ref(kind)
 			}
+		}
+		if isAllCaps(name) {
+			return nil // MIN(c), COUNT(*): SQL, or a macro of a language that is not present
 		}
 		if x.hints.ModulePath() != "" {
 			return ref(model.KindGoSymbol)

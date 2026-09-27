@@ -134,11 +134,25 @@ func (x *extractor) spans() {
 		if x.ignored(sp.Line) {
 			continue
 		}
-		if r := x.classifyWhole(sp.Text); r != nil {
-			x.emit(*r, sp.Line, sp.Col, sp.Section, "")
+		// "不提供 `backup.NewTask()`", "`core/errs` was removed": the sentence
+		// says the thing does not exist, so its absence is not a lie
+		negated := x.negated(sp)
+		whole := false
+		for _, text := range expandBraces(sp.Text) { // `scripts/smoke.{sh,ps1}` stands for two files
+			if r := x.classifyWhole(text); r != nil {
+				whole = true
+				if !(negated && existenceClaim(r.Kind)) {
+					x.emit(*r, sp.Line, sp.Col, sp.Section, "")
+				}
+			}
+		}
+		if whole {
 			continue
 		}
 		for _, r := range x.classifyTokens(sp.Text) {
+			if negated && existenceClaim(r.Kind) {
+				continue
+			}
 			x.emit(r, sp.Line, sp.Col, sp.Section, "")
 		}
 		// `make build`, `pip install httpx`: an inline command line

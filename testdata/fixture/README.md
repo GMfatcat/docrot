@@ -33,7 +33,8 @@ Requires Go 1.22 or later and Python 3.10+. The crate requires Rust 1.70+. The w
 
 - `httpx.NewServer(addr)` creates a server; `Server.Addr()` returns the address.
 - `httpx.WriteData(w, v)` writes the envelope, `httpx.WriteDatum(w, v)` is the old name.
-- `Server.Address()` was removed in v2.
+- `Server.Address()` returns the bound address.
+- The old `Server.Listen()` helper was removed in v2 and `pkg/legacy/` is gone: negated claims, never reported.
 - `store.Open` is internal.
 
 ```go

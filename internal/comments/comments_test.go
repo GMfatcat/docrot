@@ -26,6 +26,7 @@ func (f fakeLookup) SimilarPaths(rel string, n int) []string {
 }
 func (f fakeLookup) DirExists(r string) bool                 { return false }
 func (f fakeLookup) HasGoSymbol(q string) bool               { return f.syms[q] }
+func (f fakeLookup) HasGoMember(n string) bool               { return f.syms["member:"+n] }
 func (f fakeLookup) Languages() []model.Kind                 { return []model.Kind{model.KindPySym, model.KindOdinSym} }
 func (f fakeLookup) HasSymbol(_ model.Kind, q string) bool   { return f.syms[q] }
 func (f fakeLookup) IsNamespace(_ model.Kind, q string) bool { return f.syms["ns:"+q] }
